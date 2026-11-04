@@ -88,6 +88,7 @@ export function simularRota(rota: RotaOperacional, matriz: MatrizViaria, comprom
 /** Examina todas as posições possíveis para embarque e desembarque, sem mudar a ordem dos antigos. */
 export function encontrarEncaixes(rota: RotaOperacional, pedido: PedidoEncaixe, matriz: MatrizViaria): OpcaoEncaixe[] {
   if (!validoPonto(pedido.casa) || !validoPonto(pedido.escola) || !inteiro(pedido.horarioEscolaMin) || !pedido.alunoId || !Number.isInteger(rota.versao)) return [];
+  if (!inteiro(pedido.atendimentoMin ?? 1) || !inteiro(rota.toleranciaMin ?? 10) || rota.compromissos.some(p => p.alunoId === pedido.alunoId) || new Set(rota.compromissos.map(p => p.id)).size !== rota.compromissos.length) return [];
   const base = simularRota(rota, matriz);
   if (!base.valido) return []; // nunca compara com uma rota-base inconsistente
   const tolerancia = Math.min(10, Math.max(0, rota.toleranciaMin ?? 10));
@@ -100,8 +101,10 @@ export function encontrarEncaixes(rota: RotaOperacional, pedido: PedidoEncaixe, 
       // Para escola já presente na rota, a nova criança deve ser entregue
       // no momento daquela visita, jamais depois de passar pela escola.
       const indiceEscola = rota.compromissos.findIndex(p => p.ponto.id === pedido.escola.id && (p.tipo === 'escola' || p.tipo === 'desembarque' || p.tipo === 'embarque'));
-      if (indiceEscola >= 0 && rota.sentido === 'ida' && (i > indiceEscola || j > indiceEscola + 1)) continue;
-      if (indiceEscola >= 0 && rota.sentido === 'volta' && i > indiceEscola + 1) continue;
+      // O motor só aceita escolas efetivamente cadastradas no itinerário.
+      if (indiceEscola < 0) continue;
+      if (rota.sentido === 'ida' && (i > indiceEscola || j > indiceEscola + 1)) continue;
+      if (rota.sentido === 'volta' && i > indiceEscola + 1) continue;
       const paradas = [...rota.compromissos];
       paradas.splice(i, 0, busca);
       paradas.splice(j, 0, entrega);
