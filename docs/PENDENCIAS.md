@@ -8,7 +8,7 @@ Lista honesta do que **falta**, o que é **risco** e o que é **dívida técnica
 |---|---|---|---|
 | 1 | **Motor de encaixe real ausente** (`motor/`, `motor-van-bora.md`) | Compatibilidade é simulada | Receber os arquivos, ler a API real, rodar os testes, criar adaptador |
 | 2 | **Documento mestre e PDF do Ideathon ausentes** | Risco de divergência de regras/cronograma | Adicionar ao repo; revisar `PLANO-MESTRE.md` |
-| 3 | **Projeto Supabase não criado/aplicado** | Migrações prontas, mas sem persistência até aplicar | Usuário: criar projeto e seguir `docs/GUIA-SUPABASE.md` (rodar SQL + variáveis). Depois: validar ponta a ponta |
+| 3 | ~~Projeto Supabase não criado~~ ✅ CRIADO e APLICADO (ref `rnulmjdsvvuirqijemzy`) | Banco real no ar e verificado | Falta: variáveis no Vercel (URL + chave publishable) e Parte B (vitrine lendo do banco) |
 | 4 | **Requisitos legais de transporte escolar (Araçatuba)** | Não podemos afirmar conformidade | Pesquisa documental (municipal/estadual/federal); status "pendente de verificação" |
 
 ## 🟡 A fazer nas próximas etapas

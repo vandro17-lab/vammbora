@@ -66,8 +66,17 @@ Após revisão do coordenador (visual precisava ser mais premium):
 - **App**: cliente `@supabase/supabase-js`, `src/lib/supabase.ts` (flag), camada única
   `src/data/source.ts` com **fallback local**, e `WaitlistForm` gravando via RPC quando ligado.
 - **Guia** `docs/GUIA-SUPABASE.md` (passo a passo para iniciante) e `supabase/README.md`.
-- Validado: `npm run build` (exit 0), 19 testes passando. **Migrações ainda NÃO aplicadas**
-  (dependem do usuário criar o projeto Supabase — sem acesso remoto nesta sessão).
+- Validado: `npm run build` (exit 0), 19 testes passando.
+
+### 04/11/2026 — Etapa 2 (Parte A): migrações APLICADAS no Supabase
+- Projeto Supabase **criado** via conector MCP: `vambora` (ref `rnulmjdsvvuirqijemzy`, região sa-east-1).
+- Migrações 0001–0005 **aplicadas** + seed executado. Verificação: 6 motoristas, 5 destinos,
+  12 vínculos, 6 na vitrine pública.
+- **Teste de segurança (como anon):** `public_listings` devolve 6 linhas; a tabela `drivers`
+  devolve **0 linhas** (telefone/documentos protegidos pela RLS). Advisor rodado; avisos restantes
+  são intencionais e documentados em `0005_hardening.sql`.
+- Falta: configurar as variáveis de ambiente no Vercel (URL + chave publishable) e fazer a Parte B
+  (vitrine lendo do banco).
 
 ### Pendências abertas
 Ver [`PENDENCIAS.md`](PENDENCIAS.md). Principais: integrar motor real, configurar Supabase,
