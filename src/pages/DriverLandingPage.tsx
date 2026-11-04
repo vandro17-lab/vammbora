@@ -7,9 +7,7 @@ import {
   Sparkles,
   CheckCircle2,
   Clock,
-  Construction,
 } from 'lucide-react';
-import { DemoBadge } from '@/components/ui/DemoBadge';
 
 /**
  * Entrada "Sou motorista" + prévia do painel.
@@ -71,11 +69,10 @@ export function DriverLandingPage() {
         <div className="container-page">
           <div className="flex flex-wrap items-center gap-3">
             <h2 className="font-display text-3xl font-bold">Prévia do seu painel</h2>
-            <DemoBadge texto="Prévia — Etapa 3" />
+            <span className="chip bg-mint-50 text-mint-800">Em breve</span>
           </div>
           <p className="mt-2 max-w-xl text-navy-600">
-            É assim que o painel do motorista está sendo construído. Os números abaixo são apenas
-            ilustrativos.
+            Suas vans, rotas e solicitações. Tudo organizado em um só lugar.
           </p>
 
           <div className="mt-8 grid gap-6 lg:grid-cols-3">
@@ -97,11 +94,10 @@ export function DriverLandingPage() {
           <div className="card mt-6 p-6">
             <div className="flex flex-wrap items-center gap-3">
               <h3 className="font-display text-lg font-bold">Simulador “e se eu aceitar este aluno?”</h3>
-              <DemoBadge texto="Depende do motor real" />
+              <span className="chip bg-navy-50 text-navy-600">Planejamento de rota</span>
             </div>
             <p className="mt-2 text-sm text-navy-600">
-              Mostrará o antes/depois no seu tempo, capacidade e horários ao aceitar um novo aluno —
-              usando o motor de encaixe oficial do Van Bora.
+              Veja como uma nova parada pode mudar os horários da sua rota antes de aceitar um aluno.
             </p>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <div className="rounded-xl bg-navy-50 p-4">
@@ -117,11 +113,7 @@ export function DriverLandingPage() {
                 </p>
               </div>
             </div>
-            <p className="mt-4 inline-flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-xs text-amber-800">
-              <Construction className="mt-0.5 h-4 w-4 shrink-0" />
-              Esta simulação é ilustrativa. O cálculo real será ligado ao motor de compatibilidade na
-              Etapa 3.
-            </p>
+
           </div>
         </div>
       </section>

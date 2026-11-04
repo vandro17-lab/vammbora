@@ -1,197 +1,76 @@
-import { useState } from 'react';
+import { nomeDestinoParaExibicao } from '@/lib/utils';
+import { useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapPin, Search, School } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, MapPin, Search } from 'lucide-react';
 import type { Contratacao, ModalidadeTrajeto, Turno } from '@/types';
 import { CIDADE_PADRAO } from '@/data/cidades';
 import { useVitrine } from '@/data/VitrineProvider';
 import { TURNO_LABEL, cn } from '@/lib/utils';
 import { criteriosParaParams } from '@/lib/searchParams';
 
-const TURNOS: Turno[] = ['manha', 'tarde', 'noite', 'integral'];
-const MODALIDADES: { valor: ModalidadeTrajeto; label: string }[] = [
-  { valor: 'ida', label: 'Só ida' },
-  { valor: 'volta', label: 'Só volta' },
-  { valor: 'ambos', label: 'Ida e volta' },
-];
+const TITULOS = ['De onde vamos sair?', 'Qual é o destino?', 'Como é sua rotina?'];
+const DESCRICOES = ['Comece pelo bairro de embarque.', 'Escolha a escola ou a faculdade.', 'Falta pouco para encontrar suas opções.'];
 
 export function SearchForm({ compact = false }: { compact?: boolean }) {
   const navigate = useNavigate();
-  const { destinos } = useVitrine();
+  const { destinos, carregando, erro } = useVitrine();
+  const [passo, setPasso] = useState(0);
   const [endereco, setEndereco] = useState('');
   const [destinoId, setDestinoId] = useState('');
   const [turno, setTurno] = useState<Turno | ''>('');
   const [contratacao, setContratacao] = useState<Contratacao>('mensal');
   const [dataAvulso, setDataAvulso] = useState('');
   const [modalidade, setModalidade] = useState<ModalidadeTrajeto>('ida');
-
-  const onSubmit = (e: React.FormEvent) => {
+  const titulo = useRef<HTMLHeadingElement>(null);
+  function ir(n: number) { setPasso(n); requestAnimationFrame(() => titulo.current?.focus()); }
+  function enviar(e: React.FormEvent) {
     e.preventDefault();
-    const params = criteriosParaParams({
-      cidadeId: CIDADE_PADRAO.id,
-      endereco: endereco.trim(),
-      destinoId: destinoId || null,
-      turno: turno || null,
-      contratacao,
-      dataAvulso: contratacao === 'avulso' ? dataAvulso : undefined,
-      modalidade,
-    });
+    if (passo < 2) { ir(passo + 1); return; }
+    const params = criteriosParaParams({ cidadeId: CIDADE_PADRAO.id, endereco: endereco.trim(), destinoId: destinoId || null, turno: turno || null, contratacao, dataAvulso: contratacao === 'avulso' ? dataAvulso : undefined, modalidade });
     navigate(`/resultados?${params}`);
-  };
-
+  }
   return (
-    <form
-      onSubmit={onSubmit}
-      className={cn('card p-5 sm:p-6', compact ? '' : 'shadow-float')}
-      aria-label="Buscar van"
-    >
-      <div className="grid gap-4 sm:grid-cols-2">
-        {/* Cidade (fixa no piloto) */}
-        <div>
-          <label className="field-label" htmlFor="cidade">
-            Cidade
-          </label>
-          <div className="relative">
-            <MapPin className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-navy-300" />
-            <select
-              id="cidade"
-              className="field-input appearance-none pl-10"
-              value={CIDADE_PADRAO.id}
-              disabled
-            >
-              <option value={CIDADE_PADRAO.id}>
-                {CIDADE_PADRAO.nome} — {CIDADE_PADRAO.uf}
-              </option>
-            </select>
-          </div>
-        </div>
-
-        {/* Endereço / região */}
-        <div>
-          <label className="field-label" htmlFor="endereco">
-            Endereço ou bairro de embarque
-          </label>
-          <input
-            id="endereco"
-            className="field-input"
-            placeholder="Ex: Rua das Flores, Centro"
-            value={endereco}
-            onChange={(e) => setEndereco(e.target.value)}
-            autoComplete="off"
-          />
-        </div>
-
-        {/* Destino (escola/faculdade) */}
-        <div className="sm:col-span-2">
-          <label className="field-label" htmlFor="destino">
-            Escola, faculdade ou destino
-          </label>
-          <div className="relative">
-            <School className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-navy-300" />
-            <select
-              id="destino"
-              className="field-input appearance-none pl-10"
-              value={destinoId}
-              onChange={(e) => setDestinoId(e.target.value)}
-            >
-              <option value="">Qualquer destino</option>
-              {destinos.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.nome} — {d.bairro}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
+    <form onSubmit={enviar} className={cn('search-panel rounded-[1.75rem] bg-white p-6 sm:p-8', compact ? '' : 'shadow-float')} aria-label="Buscar van">
+      <div className="flex items-center justify-between gap-3">
+        <span className="eyebrow">Encontre sua van</span><span className="text-xs font-medium text-navy-500">{passo + 1} de 3</span>
       </div>
-
-      {/* Turno */}
-      <fieldset className="mt-4">
-        <legend className="field-label">Turno</legend>
-        <div className="flex flex-wrap gap-2">
-          <Segment ativo={turno === ''} onClick={() => setTurno('')}>
-            Qualquer
-          </Segment>
-          {TURNOS.map((t) => (
-            <Segment key={t} ativo={turno === t} onClick={() => setTurno(t)}>
-              {TURNO_LABEL[t]}
-            </Segment>
-          ))}
-        </div>
-      </fieldset>
-
-      <div className="mt-4 grid gap-4 sm:grid-cols-2">
-        {/* Contratação */}
-        <fieldset>
-          <legend className="field-label">Contratação</legend>
-          <div className="flex gap-2">
-            <Segment ativo={contratacao === 'mensal'} onClick={() => setContratacao('mensal')}>
-              Mensal
-            </Segment>
-            <Segment ativo={contratacao === 'avulso'} onClick={() => setContratacao('avulso')}>
-              Avulso
-            </Segment>
-          </div>
-          {contratacao === 'avulso' && (
-            <input
-              type="date"
-              className="field-input mt-2"
-              value={dataAvulso}
-              onChange={(e) => setDataAvulso(e.target.value)}
-              aria-label="Data do serviço avulso"
-            />
-          )}
-        </fieldset>
-
-        {/* Modalidade */}
-        <fieldset>
-          <legend className="field-label">Trajeto</legend>
-          <div className="flex flex-wrap gap-2">
-            {MODALIDADES.map((m) => (
-              <Segment
-                key={m.valor}
-                ativo={modalidade === m.valor}
-                onClick={() => setModalidade(m.valor)}
-              >
-                {m.label}
-              </Segment>
-            ))}
-          </div>
-        </fieldset>
+      <ol className="my-6 flex items-center gap-2" aria-label="Etapas da busca">
+        {['Embarque', 'Destino', 'Rotina'].map((nome, i) => <li key={nome} className="flex-1">
+          <button type="button" disabled={i > passo} onClick={() => ir(i)} aria-current={i === passo ? 'step' : undefined} className={cn('w-full border-t-2 pt-2 text-left text-xs font-semibold transition-colors', i <= passo ? 'border-mint-500 text-mint-700' : 'border-navy-100 text-navy-400')}>
+            {i < passo ? <Check className="mr-1 inline h-3 w-3" /> : `${i + 1}. `}{nome}
+          </button>
+        </li>)}
+      </ol>
+      <div className="min-h-[245px]">
+        <h2 ref={titulo} tabIndex={-1} className="font-display text-2xl font-bold tracking-tight outline-none">{TITULOS[passo]}</h2>
+        <p className="mt-2 text-sm leading-relaxed text-navy-500">{DESCRICOES[passo]}</p>
+        {passo === 0 && <div className="mt-6 space-y-5">
+          <div className="flex items-center gap-3 rounded-xl bg-navy-50 p-4"><MapPin className="h-5 w-5 text-mint-700" /><div><span className="block text-xs text-navy-500">Sua cidade</span><span className="text-sm font-semibold">Araçatuba, SP</span></div></div>
+          <div><label className="field-label" htmlFor="endereco">Bairro ou região de embarque</label><input id="endereco" className="field-input" placeholder="Ex.: Centro, São João…" value={endereco} onChange={e => setEndereco(e.target.value)} autoComplete="off" /><p className="mt-2 text-xs text-navy-500">O ponto exato você combina com o motorista.</p></div>
+        </div>}
+        {passo === 1 && <div className="mt-6">
+          <label className="field-label" htmlFor="destino">Escola, faculdade ou destino</label>
+          <select id="destino" className="field-input" value={destinoId} onChange={e => setDestinoId(e.target.value)} disabled={carregando}>
+            <option value="">{carregando ? 'Carregando destinos…' : 'Explorar todos os destinos'}</option>
+            {destinos.map(d => <option key={d.id} value={d.id}>{nomeDestinoParaExibicao(d.nome)} — {d.bairro}</option>)}
+          </select>
+          <p className="mt-4 rounded-xl bg-mint-50 p-4 text-sm leading-relaxed text-mint-800">{erro ? 'Não foi possível carregar os destinos. Você ainda pode explorar as vans da cidade.' : 'Você pode explorar as opções e confirmar o trajeto diretamente com o motorista.'}</p>
+        </div>}
+        {passo === 2 && <div className="mt-5 space-y-5">
+          <fieldset><legend className="field-label">Turno</legend><div className="flex flex-wrap gap-2">{(['', 'manha', 'tarde', 'noite', 'integral'] as const).map(t => <Segment key={t} ativo={turno === t} onClick={() => setTurno(t)}>{t ? TURNO_LABEL[t] : 'Qualquer'}</Segment>)}</div></fieldset>
+          <fieldset><legend className="field-label">Contratação</legend><div className="flex gap-2">{(['mensal', 'avulso'] as const).map(c => <Segment key={c} ativo={contratacao === c} onClick={() => setContratacao(c)}>{c === 'mensal' ? 'Mensal' : 'Avulso'}</Segment>)}</div>
+            {contratacao === 'avulso' && <div className="mt-3"><label htmlFor="data-avulso" className="field-label">Data da viagem</label><input id="data-avulso" type="date" required className="field-input" value={dataAvulso} onChange={e => setDataAvulso(e.target.value)} /></div>}
+          </fieldset>
+          <fieldset><legend className="field-label">Trajeto</legend><div className="flex flex-wrap gap-2">{([['ida', 'Só ida'], ['volta', 'Só volta'], ['ambos', 'Ida e volta']] as const).map(([v, label]) => <Segment key={v} ativo={modalidade === v} onClick={() => setModalidade(v)}>{label}</Segment>)}</div></fieldset>
+        </div>}
       </div>
-
-      <button type="submit" className="btn btn-sheen btn-lg btn-primary mt-6 w-full">
-        <Search className="h-5 w-5" />
-        Buscar vans compatíveis
-      </button>
-      <p className="mt-3 text-center text-xs text-navy-400">
-        Busca pública, sem login. Mostramos só vans com rota compatível.
-      </p>
+      <div className="mt-7 flex gap-3">{passo > 0 && <button type="button" onClick={() => ir(passo - 1)} className="btn btn-lg btn-ghost px-4" aria-label="Voltar à etapa anterior"><ArrowLeft className="h-5 w-5" /></button>}
+        <button type="submit" className="btn btn-lg btn-primary flex-1">{passo === 2 ? <><Search className="h-4 w-4" /> Encontrar vans</> : <>Continuar <ArrowRight className="h-4 w-4" /></>}</button>
+      </div>
+      <p className="mt-4 text-center text-xs text-navy-500">Sem criar conta. No seu tempo.</p>
     </form>
   );
 }
-
-function Segment({
-  ativo,
-  onClick,
-  children,
-}: {
-  ativo: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={ativo}
-      className={cn(
-        'rounded-full px-4 py-2 text-sm font-medium transition-all',
-        ativo
-          ? 'bg-navy-900 text-white shadow-card'
-          : 'bg-navy-50 text-navy-600 ring-1 ring-navy-100 hover:bg-navy-100',
-      )}
-    >
-      {children}
-    </button>
-  );
+function Segment({ ativo, onClick, children }: { ativo: boolean; onClick: () => void; children: React.ReactNode }) {
+  return <button type="button" onClick={onClick} aria-pressed={ativo} className={cn('rounded-xl px-3 py-2.5 text-sm font-medium transition-colors', ativo ? 'bg-navy-900 text-white' : 'bg-navy-50 text-navy-600 hover:bg-navy-100')}>{children}</button>;
 }

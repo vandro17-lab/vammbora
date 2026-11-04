@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { nomeDestinoParaExibicao } from '@/lib/utils';
+import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import { SlidersHorizontal, ArrowLeft, SearchX } from 'lucide-react';
@@ -23,21 +24,12 @@ export function SearchResultsPage() {
     [criterios, motoristas, destinos],
   );
 
-  const [tempoAnimacao, setTempoAnimacao] = useState(true);
   const [soComVaga, setSoComVaga] = useState(false);
 
-  // A tela de busca premium roda por ~2,3s; só revelamos quando a animação
-  // terminou E os dados já chegaram (do banco ou locais).
-  useEffect(() => {
-    setTempoAnimacao(true);
-    const t = setTimeout(() => setTempoAnimacao(false), 3800);
-    return () => clearTimeout(t);
-  }, [sp]);
-
-  const carregando = tempoAnimacao || carregandoDados;
+  const carregando = carregandoDados;
   const destino = criterios.destinoId ? destinosPorId[criterios.destinoId] : null;
   const listaFiltrada = soComVaga
-    ? elegiveis.filter((r) => r.nivel === 'disponivel')
+    ? elegiveis.filter((r) => r.motorista.vagasDisponiveis > 0)
     : elegiveis;
 
   return (
@@ -59,7 +51,7 @@ export function SearchResultsPage() {
         {/* Resumo da busca */}
         <div className="mt-4">
           <h1 className="font-display text-2xl font-bold sm:text-3xl">
-            {destino ? `Vans para ${destino.nome}` : `Vans em ${CIDADE_PADRAO.nome}`}
+            {destino ? `Vans para ${nomeDestinoParaExibicao(destino.nome)}` : `Vans em ${CIDADE_PADRAO.nome}`}
           </h1>
         </div>
         <div className="mt-2 flex flex-wrap gap-2 text-sm">
@@ -88,7 +80,7 @@ export function SearchResultsPage() {
           <>
             <div className="mt-6 flex items-center justify-between gap-4">
               <p className="text-sm text-navy-600">
-                {plural(listaFiltrada.length, 'van compatível', 'vans compatíveis')} de{' '}
+                {plural(listaFiltrada.length, 'opção encontrada', 'opções encontradas')} de{' '}
                 {totalConsultados} consultadas
               </p>
               <label className="inline-flex cursor-pointer items-center gap-2 text-sm font-medium text-navy-700">
@@ -128,10 +120,10 @@ function NenhumResultado({ children }: { children: React.ReactNode }) {
     <div className="mt-10">
       <div className="mx-auto mb-8 max-w-lg text-center">
         <SearchX className="mx-auto h-12 w-12 text-navy-300" />
-        <h2 className="mt-4 font-display text-2xl font-bold">Ainda não achamos uma van compatível</h2>
+        <h2 className="mt-4 font-display text-2xl font-bold">Vamos encontrar outro caminho?</h2>
         <p className="mt-2 text-navy-600">
           Isso não significa que não existe — pode ser só questão de tempo ou de ajustar os filtros.
-          Deixe seu interesse e a gente avisa.
+          Você pode deixar seu interesse para a equipe acompanhar a procura.
         </p>
       </div>
       {children}

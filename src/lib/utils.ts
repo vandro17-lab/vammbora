@@ -41,3 +41,8 @@ export function minutosParaTextoHora(min: number): string {
   const m = min % 60;
   return `${h}h${m.toString().padStart(2, '0')}`;
 }
+
+/** Rótulo de apresentação; mantém a origem e os dados originais intactos. */
+export function nomeDestinoParaExibicao(nome: string): string {
+  return nome.replace(/\s*\(demonstração\)\s*$/i, '').trim();
+}

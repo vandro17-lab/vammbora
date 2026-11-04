@@ -18,17 +18,17 @@ const BENEFICIOS = [
   {
     Icone: Route,
     titulo: 'Rota que faz sentido',
-    texto: 'Mostramos só vans cujo trajeto realmente passa perto de você — não a distância no mapa.',
+    texto: 'Encontre opções para seu destino e confirme o ponto de embarque.',
   },
   {
     Icone: Clock,
     titulo: 'Chega a tempo',
-    texto: 'Consideramos horário de aula, janela de embarque e o pior caso de trânsito.',
+    texto: 'Converse sobre o horário da aula e a rotina de embarque.',
   },
   {
     Icone: Users,
     titulo: 'Vaga de verdade',
-    texto: 'Capacidade por trecho: a vaga que aparece respeita quem já está na van.',
+    texto: 'Consulte os lugares informados e confirme a disponibilidade.',
   },
   {
     Icone: MessageCircle,
@@ -65,8 +65,8 @@ export function Benefits() {
 
 /* ---------------- Como funciona ---------------- */
 const PASSOS = [
-  { Icone: Search, titulo: 'Diga para onde', texto: 'Informe endereço, escola/faculdade, turno e se é mensal ou avulso.' },
-  { Icone: MousePointerClick, titulo: 'Compare as vans', texto: 'Veja só as compatíveis, com horário aproximado, vagas e avaliações.' },
+  { Icone: Search, titulo: 'Diga para onde', texto: 'Escolha sua região, escola ou faculdade e os horários da sua rotina.' },
+  { Icone: MousePointerClick, titulo: 'Compare as vans', texto: 'Conheça os perfis, os recursos da van e os valores informados.' },
   { Icone: HeartHandshake, titulo: 'Combine direto', texto: 'Chame o motorista no WhatsApp e acerte os detalhes com quem dirige.' },
 ];
 
@@ -154,7 +154,7 @@ export function Trust() {
 const PERGUNTAS = [
   {
     q: 'Preciso criar conta para buscar?',
-    a: 'Não. A busca é pública e aberta. Conta só será necessária no futuro, para áreas pessoais.',
+    a: 'Não. Você pode pesquisar e conhecer os perfis sem criar uma conta.',
   },
   {
     q: 'O Vambora cobra pela viagem?',
@@ -165,8 +165,8 @@ const PERGUNTAS = [
     a: 'Mostramos o selo de documentação apenas quando há verificação real registrada. Caso contrário, informamos que não foi verificada.',
   },
   {
-    q: 'Os dados que vejo agora são reais?',
-    a: 'Este é um protótipo acadêmico (Ideathon Fatec 2026). Os motoristas exibidos são exemplos de demonstração, sempre identificados.',
+    q: 'Posso procurar uma viagem avulsa?',
+    a: 'Sim. Selecione Avulso na busca e informe a data. A disponibilidade precisa ser confirmada com o motorista para aquele dia.',
   },
 ];
 
@@ -205,11 +205,11 @@ export function DriverCTA() {
           <div className="relative max-w-2xl">
             <h2 className="font-display text-3xl font-bold sm:text-4xl">Você dirige uma van?</h2>
             <p className="mt-3 text-lg text-navy-100">
-              Preencha os assentos vazios com alunos cuja rota combina com a sua. Cadastre-se e
-              apareça para as famílias certas.
+              Preencha os assentos vazios com alunos cuja rota combina com a sua. Conheça uma forma mais simples de
+              organizar sua presença e receber novos interessados.
             </p>
             <Link to="/motorista" className="btn btn-sheen btn-lg btn-primary mt-7">
-              Quero cadastrar minha van
+              Conhecer a área do motorista
             </Link>
           </div>
         </div>

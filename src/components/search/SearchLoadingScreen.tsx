@@ -20,7 +20,7 @@ export function SearchLoadingScreen({ totalConsultados, cidade }: Props) {
   const [passo, setPasso] = useState(0);
 
   const passos = [
-    { Icone: Route, texto: 'Traçando as rotas disponíveis' },
+    { Icone: Route, texto: 'Buscando opções para seu destino' },
     {
       Icone: Clock3,
       texto:
@@ -124,7 +124,7 @@ export function SearchLoadingScreen({ totalConsultados, cidade }: Props) {
       </div>
 
       {/* Mensagens */}
-      <div className="relative z-10 mt-8 flex h-7 items-center">
+      <div className="relative z-10 mt-8 flex min-h-14 max-w-lg items-center px-6 text-center">
         <AnimatePresence mode="wait">
           <motion.p
             key={passo}
@@ -150,7 +150,7 @@ export function SearchLoadingScreen({ totalConsultados, cidade }: Props) {
         />
       </div>
       <p className="relative z-10 mt-3 text-xs text-navy-300">
-        Comparando rota, horário e vagas de verdade.
+        Reunindo as informações para sua escolha.
       </p>
     </motion.div>,
     document.body,
