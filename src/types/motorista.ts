@@ -1,0 +1,58 @@
+import type { Turno } from '@/types';
+
+export type SentidoRota = 'ida' | 'volta';
+export type TipoParada = 'saida' | 'casa' | 'escola';
+export type StatusRota = 'rascunho' | 'concluida';
+
+export interface Veiculo {
+  id: string;
+  modelo: string;
+  ano?: number;
+  placa?: string; // privada
+  lugaresPassageiro: number;
+  arCondicionado: boolean;
+  acessivel: boolean;
+  cintos: boolean;
+  fotos: string[];
+}
+
+export interface ParadaRota {
+  id: string;
+  ordem: number;
+  tipo: TipoParada;
+  /** Endereço/referência — PRIVADO. */
+  rotulo: string;
+  lat?: number;
+  lng?: number;
+  confirmado: boolean;
+  /** Quando tipo === 'escola'. */
+  destinoId?: string | null;
+  destinoNome?: string | null;
+}
+
+export interface PassageiroRota {
+  id: string;
+  /** Nome curto/apelido — PRIVADO. Identificação é por `id`, não pelo nome. */
+  identificacao: string;
+  embarqueParadaId: string | null;
+  desembarqueParadaId: string | null;
+  destinoId?: string | null;
+}
+
+export interface Rota {
+  id: string;
+  nome: string;
+  sentido: SentidoRota;
+  turno: Turno | null;
+  dias: string[];
+  veiculoId: string | null;
+  monitor: boolean;
+  monitorOcupaLugar: boolean;
+  lugaresReservados: number;
+  ultimoDesembarqueMin: number | null;
+  limiteAntecipacaoMin: number | null;
+  status: StatusRota;
+  paradas: ParadaRota[];
+  passageiros: PassageiroRota[];
+  atualizadoEm: string;
+}

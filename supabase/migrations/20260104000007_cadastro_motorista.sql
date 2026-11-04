@@ -294,3 +294,71 @@ where public.motorista_elegivel(d);
 
 grant select on public.public_listings to anon, authenticated;
 grant select on public.document_requirements to authenticated;
+
+-- ----------------------------------------------------------------------------
+-- RPC transacional: salvar rota + paradas + passageiros de uma vez (atômico)
+-- ----------------------------------------------------------------------------
+create or replace function public.salvar_rota_completa(p_rota jsonb)
+returns uuid
+language plpgsql security definer set search_path = public as $$
+declare
+  v_route_id uuid := nullif(p_rota->>'id','')::uuid;
+  v_owner uuid := auth.uid();
+  v_city text;
+  v_stop jsonb;
+  v_pax jsonb;
+begin
+  if v_owner is null then raise exception 'Precisa estar autenticado.'; end if;
+
+  -- cidade: do veículo/driver do dono (fallback: primeira cidade)
+  select coalesce((select city_id from public.drivers where owner_id = v_owner limit 1),
+                  (select id from public.cities limit 1)) into v_city;
+
+  if v_route_id is null then
+    insert into public.routes (owner_id, vehicle_id, city_id, name, direction, turno, days,
+      monitor, monitor_ocupa_lugar, reserved_seats, last_dropoff_min, early_leave_limit_min, status)
+    values (v_owner, nullif(p_rota->>'vehicle_id','')::uuid, v_city,
+      coalesce(p_rota->>'name',''), coalesce(p_rota->>'direction','ida'),
+      nullif(p_rota->>'turno','')::public.turno,
+      coalesce((select array_agg(value::text) from jsonb_array_elements_text(p_rota->'days')), '{}'),
+      coalesce((p_rota->>'monitor')::boolean,false), coalesce((p_rota->>'monitor_ocupa_lugar')::boolean,false),
+      coalesce((p_rota->>'reserved_seats')::int,0), nullif(p_rota->>'last_dropoff_min','')::int,
+      nullif(p_rota->>'early_leave_limit_min','')::int, coalesce(p_rota->>'status','rascunho'))
+    returning id into v_route_id;
+  else
+    update public.routes set
+      vehicle_id = nullif(p_rota->>'vehicle_id','')::uuid, name = coalesce(p_rota->>'name',''),
+      direction = coalesce(p_rota->>'direction','ida'), turno = nullif(p_rota->>'turno','')::public.turno,
+      days = coalesce((select array_agg(value::text) from jsonb_array_elements_text(p_rota->'days')), '{}'),
+      monitor = coalesce((p_rota->>'monitor')::boolean,false),
+      monitor_ocupa_lugar = coalesce((p_rota->>'monitor_ocupa_lugar')::boolean,false),
+      reserved_seats = coalesce((p_rota->>'reserved_seats')::int,0),
+      last_dropoff_min = nullif(p_rota->>'last_dropoff_min','')::int,
+      early_leave_limit_min = nullif(p_rota->>'early_leave_limit_min','')::int,
+      status = coalesce(p_rota->>'status','rascunho')
+    where id = v_route_id and (owner_id = v_owner or public.is_admin());
+    if not found then raise exception 'Rota não encontrada ou sem permissão.'; end if;
+  end if;
+
+  delete from public.route_passengers where route_id = v_route_id;
+  delete from public.route_stops where route_id = v_route_id;
+
+  for v_stop in select * from jsonb_array_elements(coalesce(p_rota->'stops','[]'::jsonb)) loop
+    insert into public.route_stops (id, route_id, ordem, type, label, lat, lng, confirmed, destination_id)
+    values (coalesce(nullif(v_stop->>'id','')::uuid, gen_random_uuid()), v_route_id,
+      (v_stop->>'ordem')::int, v_stop->>'type', coalesce(v_stop->>'label',''),
+      nullif(v_stop->>'lat','')::double precision, nullif(v_stop->>'lng','')::double precision,
+      coalesce((v_stop->>'confirmed')::boolean,false), nullif(v_stop->>'destination_id',''));
+  end loop;
+
+  for v_pax in select * from jsonb_array_elements(coalesce(p_rota->'passengers','[]'::jsonb)) loop
+    insert into public.route_passengers (id, route_id, identificacao, board_stop_id, alight_stop_id, destination_id)
+    values (coalesce(nullif(v_pax->>'id','')::uuid, gen_random_uuid()), v_route_id,
+      coalesce(v_pax->>'identificacao',''), nullif(v_pax->>'board_stop_id','')::uuid,
+      nullif(v_pax->>'alight_stop_id','')::uuid, nullif(v_pax->>'destination_id',''));
+  end loop;
+
+  return v_route_id;
+end;
+$$;
+grant execute on function public.salvar_rota_completa(jsonb) to authenticated;
