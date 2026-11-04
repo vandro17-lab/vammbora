@@ -26,7 +26,7 @@ describe('motor de encaixe geográfico',()=>{
  it('rejeita escola com limite impossível',()=>{const r=rota();r.compromissos[2].limiteEscolaMin=395;expect(encontrarEncaixes(r,pedido,matriz)).toEqual([])});
  it('não altera mais de dez minutos dos antigos',()=>{const r=rota();r.toleranciaMin=0;const op=encontrarEncaixes(r,pedido,matriz);for(const x of op)expect(x.alteracoes.every(a=>a.diferencaMin===0)).toBe(true)});
  it('rejeita trechos sem dados viários',()=>{const incompleta: MatrizViaria={origem:'fixture-testada',obter:()=>null};expect(encontrarEncaixes(rota(),pedido,incompleta)).toEqual([])});
- it('calcula ida e volta com chegada em casa',()=>{const r=encontrarIdaVolta(rota(),rota('volta'),pedido,matriz,720);expect(r.ida).not.toBeNull();expect(r.volta).toBeNull();expect(r.completo).toBe(false);expect(r.ida!.horarioEntregaMin).toBeGreaterThan(r.ida!.horarioBuscaMin)});
+ it('calcula ida e volta com chegada em casa',()=>{const r=encontrarIdaVolta(rota(),rota('volta'),pedido,matriz,matriz,720);expect(r.ida).not.toBeNull();expect(r.volta).toBeNull();expect(r.completo).toBe(false);expect(r.ida!.horarioEntregaMin).toBeGreaterThan(r.ida!.horarioBuscaMin)});
  it('não inventa escola fora do itinerário',()=>{expect(encontrarEncaixes(rota(),{...pedido,escola:p('outra-escola')},matriz)).toEqual([])});
  it('não duplica aluno já cadastrado',()=>{expect(encontrarEncaixes(rota(),{...pedido,alunoId:'a'},matriz)).toEqual([])});
  it('não aceita duração negativa de atendimento',()=>{expect(encontrarEncaixes(rota(),{...pedido,atendimentoMin:-2},matriz)).toEqual([])});
