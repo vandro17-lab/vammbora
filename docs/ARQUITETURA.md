@@ -76,3 +76,19 @@ Registradas em [`DECISOES.md`](DECISOES.md). Destaques:
 - Dados de busca na **URL** (não só em memória): busca recarregável e compartilhável.
 - Componentes acessíveis escritos à mão com Tailwind, em vez de arrastar uma biblioteca grande,
   para manter o bundle enxuto ("biblioteca premium não significa paga/pesada").
+
+## Atualização (revisão 04/11/2026)
+
+- **Erros sem esconder o problema:** com o Supabase ativo, as leituras em `src/data/source.ts`
+  **lançam erro** em caso de falha (não devolvem demonstração). O `VitrineProvider` expõe
+  `status` (`carregando` | `pronto` | `erro`) e `recarregar()`; as telas mostram carregando, vazio,
+  erro-com-"tentar-de-novo" e marcam o modo demonstração. O admin confere o resultado de cada
+  gravação e informa falhas.
+- **Permissões no banco (não só na UI):** o gatilho `trg_proteger_driver` (migração 0006) fixa os
+  campos reservados (`doc_verified`, `rating_*`, `is_suspended`, `is_demo`, `owner_id`, `slug`) para
+  quem não é admin, no INSERT e no UPDATE. RLS cuida de QUAIS linhas; o gatilho cuida de QUAIS colunas.
+- **Privacidade no WhatsApp:** `montarMensagemWhatsApp` inclui os critérios da busca, mas **nunca**
+  envia o endereço livre digitado (que pode ser completo). A família combina o ponto de embarque na
+  conversa. A mensagem é uma sugestão: a família revisa e envia por conta própria.
+- **Continuidade da busca:** os critérios viajam pela URL (resultados → perfil → voltar), então o
+  perfil usa os mesmos critérios na mensagem e o "voltar" recompõe a mesma busca.
