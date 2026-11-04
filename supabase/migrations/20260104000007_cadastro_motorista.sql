@@ -141,6 +141,7 @@ create table if not exists public.route_stops (
   lng              double precision,
   confirmed        boolean not null default false,
   destination_id   text references public.destinations(id) on delete set null, -- quando escola
+  leg_time_min     int,                            -- minutos informados até a PRÓXIMA parada
   planned_time_min int,                           -- estimativa (opcional)
   created_at       timestamptz not null default now()
 );
@@ -344,11 +345,11 @@ begin
   delete from public.route_stops where route_id = v_route_id;
 
   for v_stop in select * from jsonb_array_elements(coalesce(p_rota->'stops','[]'::jsonb)) loop
-    insert into public.route_stops (id, route_id, ordem, type, label, lat, lng, confirmed, destination_id)
+    insert into public.route_stops (id, route_id, ordem, type, label, lat, lng, confirmed, destination_id, leg_time_min)
     values (coalesce(nullif(v_stop->>'id','')::uuid, gen_random_uuid()), v_route_id,
       (v_stop->>'ordem')::int, v_stop->>'type', coalesce(v_stop->>'label',''),
       nullif(v_stop->>'lat','')::double precision, nullif(v_stop->>'lng','')::double precision,
-      coalesce((v_stop->>'confirmed')::boolean,false), nullif(v_stop->>'destination_id',''));
+      coalesce((v_stop->>'confirmed')::boolean,false), nullif(v_stop->>'destination_id',''), nullif(v_stop->>'leg_time_min','')::int);
   end loop;
 
   for v_pax in select * from jsonb_array_elements(coalesce(p_rota->'passengers','[]'::jsonb)) loop

@@ -28,6 +28,9 @@ export interface ParadaRota {
   /** Quando tipo === 'escola'. */
   destinoId?: string | null;
   destinoNome?: string | null;
+  /** Minutos estimados até a PRÓXIMA parada (informado pelo motorista; opcional).
+   *  Usado pelo motor para calcular horários/ocupação; nunca inventado pelo app. */
+  tempoAteProximaMin?: number | null;
 }
 
 export interface PassageiroRota {

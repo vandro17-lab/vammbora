@@ -95,7 +95,7 @@ export async function listarRotas(): Promise<Rota[]> {
       .from('routes')
       .select(
         'id,name,direction,turno,days,vehicle_id,monitor,monitor_ocupa_lugar,reserved_seats,last_dropoff_min,early_leave_limit_min,status,updated_at,' +
-          'route_stops(id,ordem,type,label,lat,lng,confirmed,destination_id),' +
+          'route_stops(id,ordem,type,label,lat,lng,confirmed,destination_id,leg_time_min),' +
           'route_passengers(id,identificacao,board_stop_id,alight_stop_id,destination_id)',
       )
       .order('updated_at', { ascending: false });
@@ -143,7 +143,7 @@ export async function excluirRota(id: string): Promise<void> {
 /* ------------------------- mapeadores Supabase --------------------------- */
 interface LinhaStop {
   id: string; ordem: number; type: string; label: string | null;
-  lat: number | null; lng: number | null; confirmed: boolean; destination_id: string | null;
+  lat: number | null; lng: number | null; confirmed: boolean; destination_id: string | null; leg_time_min: number | null;
 }
 interface LinhaPax {
   id: string; identificacao: string; board_stop_id: string | null;
@@ -176,7 +176,7 @@ function mapRotaDoBanco(r: unknown): Rota {
       .map((s) => ({
         id: s.id, ordem: s.ordem, tipo: s.type as 'saida' | 'casa' | 'escola',
         rotulo: s.label ?? '', lat: s.lat ?? undefined, lng: s.lng ?? undefined,
-        confirmado: s.confirmed, destinoId: s.destination_id,
+        confirmado: s.confirmed, destinoId: s.destination_id, tempoAteProximaMin: s.leg_time_min,
       }))
       .sort((a, b) => a.ordem - b.ordem),
     passageiros: (x.route_passengers ?? []).map((p) => ({
@@ -204,7 +204,7 @@ function rotaParaBanco(r: Rota): unknown {
     stops: r.paradas.map((p) => ({
       id: p.id, ordem: p.ordem, type: p.tipo, label: p.rotulo,
       lat: p.lat ?? null, lng: p.lng ?? null, confirmed: p.confirmado,
-      destination_id: p.destinoId ?? null,
+      destination_id: p.destinoId ?? null, leg_time_min: p.tempoAteProximaMin ?? null,
     })),
     passengers: r.passageiros.map((p) => ({
       id: p.id, identificacao: p.identificacao,
