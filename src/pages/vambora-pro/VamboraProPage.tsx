@@ -93,6 +93,11 @@ function Inicio({ onVerOportunidades }: { onVerOportunidades: () => void }) {
         </div>
       </div>
 
+      <Link to="/pro/encaixe" className="flex items-center justify-between rounded-2xl border border-mint-200 bg-mint-50 p-4 text-mint-900 transition hover:bg-mint-100">
+        <div><p className="font-display font-bold">Testar encaixe inteligente</p><p className="mt-1 text-xs">Ida, volta e horários de chegada em casa · simulação</p></div>
+        <ChevronRight className="h-5 w-5 shrink-0" />
+      </Link>
+
       {/* Próxima rota */}
       <div className="card p-5">
         <div className="flex items-center justify-between">
