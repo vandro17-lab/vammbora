@@ -1,3 +1,4 @@
+import { StartupExperience } from '@/components/brand/StartupExperience';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { ScrollManager } from '@/components/ScrollManager';
@@ -18,6 +19,7 @@ export default function App() {
       <ScrollManager />
       <AuthProvider>
         <VitrineProvider>
+          <StartupExperience>
           <Routes>
             <Route element={<Layout />}>
               <Route path="/" element={<PageTransition><HomePage /></PageTransition>} />
@@ -30,6 +32,7 @@ export default function App() {
             <Route path="/admin/login" element={<AdminLoginPage />} />
             <Route path="/admin" element={<AdminPage />} />
           </Routes>
+          </StartupExperience>
         </VitrineProvider>
       </AuthProvider>
     </BrowserRouter>

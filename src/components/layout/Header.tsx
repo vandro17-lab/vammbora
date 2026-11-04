@@ -16,8 +16,8 @@ export function Header() {
   const { podeInstalar, instalar } = useInstallPrompt();
 
   return (
-    <header className="sticky top-0 z-40 border-b border-navy-100/70 bg-white/85 backdrop-blur-md">
-      <div className="container-page flex h-16 items-center justify-between gap-4">
+    <header className="sticky top-0 z-40 border-b border-navy-100/70 bg-white/95 backdrop-blur-md">
+      <div className="container-page flex h-20 items-center justify-between gap-4">
         <Link to="/" aria-label="Página inicial Vambora">
           <Logo />
         </Link>
@@ -60,7 +60,7 @@ export function Header() {
       <div
         className={cn(
           'overflow-hidden border-t border-navy-100 bg-white transition-all md:hidden',
-          aberto ? 'max-h-96' : 'max-h-0 border-t-0',
+          aberto ? 'max-h-96' : 'invisible max-h-0 border-t-0',
         )}
       >
         <div className="container-page flex flex-col gap-1 py-3">

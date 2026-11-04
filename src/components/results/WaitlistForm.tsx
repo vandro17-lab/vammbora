@@ -1,5 +1,6 @@
+import { nomeDestinoParaExibicao } from '@/lib/utils';
 import { useState } from 'react';
-import { CheckCircle2, Info, Loader2 } from 'lucide-react';
+import { CheckCircle2, Loader2 } from 'lucide-react';
 import type { CriteriosBusca } from '@/types';
 import { DESTINOS_POR_ID } from '@/data/destinos';
 import { TURNO_LABEL } from '@/lib/utils';
@@ -44,18 +45,11 @@ export function WaitlistForm({ criterios }: { criterios: CriteriosBusca }) {
     return (
       <div className="card mx-auto max-w-lg p-8 text-center">
         <CheckCircle2 className="mx-auto h-12 w-12 text-mint-500" />
-        <h3 className="mt-4 font-display text-xl font-bold">Interesse registrado!</h3>
+        <h3 className="mt-4 font-display text-xl font-bold">{USE_SUPABASE ? 'Interesse registrado!' : 'Tudo certo com os seus dados'}</h3>
         <p className="mt-2 text-navy-600">
-          Assim que surgir uma van compatível na sua região, um motorista poderá te chamar. Você não
-          fica preso a nada.
+          {USE_SUPABASE ? 'Seu contato foi enviado para a equipe acompanhar a procura na sua região.' : 'O envio da lista de interesse estará disponível em breve.'}
         </p>
-        {!USE_SUPABASE && (
-          <p className="mt-4 inline-flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-left text-xs text-amber-800">
-            <Info className="mt-0.5 h-4 w-4 shrink-0" />
-            Protótipo em modo demonstração: o registro é apenas local. Com o banco de dados ligado,
-            o envio é gravado de verdade e com segurança.
-          </p>
-        )}
+
       </div>
     );
   }
@@ -64,7 +58,7 @@ export function WaitlistForm({ criterios }: { criterios: CriteriosBusca }) {
     <form onSubmit={onSubmit} className="card mx-auto max-w-lg p-6 sm:p-8">
       <h3 className="font-display text-xl font-bold">Quer entrar na lista de interesse?</h3>
       <p className="mt-1.5 text-sm text-navy-600">
-        Avisamos quando uma van atender {destino ? <strong>{destino.nome}</strong> : 'sua região'}
+        Registre sua procura por uma van para {destino ? <strong>{nomeDestinoParaExibicao(destino.nome)}</strong> : 'sua região'}
         {criterios.turno && (
           <>
             {' '}
