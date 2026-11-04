@@ -37,9 +37,17 @@ export function DriverLandingPage() {
               O Vambora mostra sua van para famílias cuja rota realmente combina com a sua — sem
               bagunçar o trajeto de quem já viaja com você.
             </p>
-            <button className="btn btn-lg btn-primary mt-6" disabled>
-              Começar cadastro (em breve)
-            </button>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <Link to="/pro" className="btn btn-lg btn-primary">
+                Conhecer o Vambora Pro
+              </Link>
+              <button className="btn btn-lg btn-ghost text-white ring-1 ring-white/20" disabled>
+                Começar cadastro (em breve)
+              </button>
+            </div>
+            <p className="mt-3 text-sm text-navy-200">
+              O Vambora Pro é uma demonstração do app do motorista, com dados de exemplo.
+            </p>
           </div>
         </div>
       </section>
