@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { MapPin, Search, School } from 'lucide-react';
 import type { Contratacao, ModalidadeTrajeto, Turno } from '@/types';
 import { CIDADE_PADRAO } from '@/data/cidades';
-import { DESTINOS } from '@/data/destinos';
+import { useVitrine } from '@/data/VitrineProvider';
 import { TURNO_LABEL, cn } from '@/lib/utils';
 import { criteriosParaParams } from '@/lib/searchParams';
 
@@ -16,6 +16,7 @@ const MODALIDADES: { valor: ModalidadeTrajeto; label: string }[] = [
 
 export function SearchForm({ compact = false }: { compact?: boolean }) {
   const navigate = useNavigate();
+  const { destinos } = useVitrine();
   const [endereco, setEndereco] = useState('');
   const [destinoId, setDestinoId] = useState('');
   const [turno, setTurno] = useState<Turno | ''>('');
@@ -93,7 +94,7 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
               onChange={(e) => setDestinoId(e.target.value)}
             >
               <option value="">Qualquer destino</option>
-              {DESTINOS.map((d) => (
+              {destinos.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.nome} — {d.bairro}
                 </option>

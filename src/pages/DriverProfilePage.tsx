@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -11,9 +12,10 @@ import {
   Users,
   MapPin,
   CalendarCheck,
+  Loader2,
 } from 'lucide-react';
-import { MOTORISTAS_POR_SLUG } from '@/data/motoristas';
-import { DESTINOS_POR_ID } from '@/data/destinos';
+import { useVitrine } from '@/data/VitrineProvider';
+import { solicitarContatoWhatsapp } from '@/data/source';
 import { Avatar } from '@/components/brand/Avatar';
 import { VanIllustration } from '@/components/brand/VanIllustration';
 import { Stars } from '@/components/ui/Stars';
@@ -24,13 +26,43 @@ import { formatBRL, TURNO_LABEL, plural } from '@/lib/utils';
 
 export function DriverProfilePage() {
   const { slug } = useParams();
-  const m = slug ? MOTORISTAS_POR_SLUG[slug] : undefined;
+  const { motoristas, destinosPorId, carregando } = useVitrine();
+  const [abrindoZap, setAbrindoZap] = useState(false);
+  const [erroZap, setErroZap] = useState(false);
 
+  const m = slug ? motoristas.find((x) => x.slug === slug) : undefined;
+
+  // Ainda carregando os dados da vitrine (do banco ou locais).
+  if (!m && carregando) {
+    return (
+      <div className="container-page flex items-center justify-center py-32 text-navy-400">
+        <Loader2 className="h-6 w-6 animate-spin" />
+      </div>
+    );
+  }
   if (!m) return <NotFoundPage />;
 
-  const destinos = m.destinosIds.map((id) => DESTINOS_POR_ID[id]).filter(Boolean);
-  const mensagem = montarMensagemWhatsApp(m, null, null);
-  const linkZap = montarLinkWhatsApp(m.whatsapp, mensagem);
+  const motorista = m;
+  const destinos = motorista.destinosIds.map((id) => destinosPorId[id]).filter(Boolean);
+
+  // Abre o WhatsApp de forma segura (popup aberto no clique) e registra o lead.
+  // O telefone vem do banco via RPC quando o Supabase está ligado; senão, local.
+  async function abrirWhatsApp() {
+    setErroZap(false);
+    setAbrindoZap(true);
+    const janela = window.open('about:blank', '_blank');
+    const fone = await solicitarContatoWhatsapp(motorista.slug, true, {});
+    const link = fone
+      ? montarLinkWhatsApp(fone, montarMensagemWhatsApp(motorista, null, null))
+      : null;
+    setAbrindoZap(false);
+    if (link && janela) {
+      janela.location.href = link;
+    } else {
+      janela?.close();
+      setErroZap(true);
+    }
+  }
 
   const recursos = [
     m.recursos.arCondicionado && { Icone: Snowflake, label: 'Ar-condicionado' },
@@ -150,19 +182,26 @@ export function DriverProfilePage() {
               </div>
             </dl>
 
-            {linkZap ? (
-              <a
-                href={linkZap}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn btn-sheen btn-lg btn-whatsapp mt-5 w-full"
-              >
-                <MessageCircle className="h-5 w-5" />
-                Falar no WhatsApp
-              </a>
-            ) : (
-              <p className="mt-5 rounded-xl bg-navy-50 p-3 text-center text-sm text-navy-500">
-                Contato indisponível no momento.
+            <button
+              type="button"
+              onClick={abrirWhatsApp}
+              disabled={abrindoZap}
+              className="btn btn-sheen btn-lg btn-whatsapp mt-5 w-full"
+            >
+              {abrindoZap ? (
+                <>
+                  <Loader2 className="h-5 w-5 animate-spin" /> Abrindo…
+                </>
+              ) : (
+                <>
+                  <MessageCircle className="h-5 w-5" />
+                  Falar no WhatsApp
+                </>
+              )}
+            </button>
+            {erroZap && (
+              <p className="mt-2 rounded-xl bg-red-50 p-2 text-center text-xs text-red-700" role="alert">
+                Não foi possível abrir o contato agora. Tente novamente.
               </p>
             )}
             <p className="mt-3 text-center text-xs text-navy-400">

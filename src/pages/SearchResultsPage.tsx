@@ -4,8 +4,7 @@ import { AnimatePresence } from 'framer-motion';
 import { SlidersHorizontal, ArrowLeft, SearchX } from 'lucide-react';
 import { paramsParaCriterios } from '@/lib/searchParams';
 import { buscarMotoristas } from '@/lib/matching';
-import { MOTORISTAS } from '@/data/motoristas';
-import { DESTINOS, DESTINOS_POR_ID } from '@/data/destinos';
+import { useVitrine } from '@/data/VitrineProvider';
 import { CIDADE_PADRAO } from '@/data/cidades';
 import { ResultCard } from '@/components/results/ResultCard';
 import { WaitlistForm } from '@/components/results/WaitlistForm';
@@ -17,22 +16,26 @@ export function SearchResultsPage() {
   const [sp] = useSearchParams();
   const criterios = useMemo(() => paramsParaCriterios(sp), [sp]);
 
+  const { motoristas, destinos, destinosPorId, carregando: carregandoDados } = useVitrine();
+
   const { elegiveis, totalConsultados } = useMemo(
-    () => buscarMotoristas(criterios, MOTORISTAS, DESTINOS),
-    [criterios],
+    () => buscarMotoristas(criterios, motoristas, destinos),
+    [criterios, motoristas, destinos],
   );
 
-  const [carregando, setCarregando] = useState(true);
+  const [tempoAnimacao, setTempoAnimacao] = useState(true);
   const [soComVaga, setSoComVaga] = useState(false);
 
-  // A tela de busca premium roda por ~2,3s; depois revelamos os resultados reais.
+  // A tela de busca premium roda por ~2,3s; só revelamos quando a animação
+  // terminou E os dados já chegaram (do banco ou locais).
   useEffect(() => {
-    setCarregando(true);
-    const t = setTimeout(() => setCarregando(false), 2300);
+    setTempoAnimacao(true);
+    const t = setTimeout(() => setTempoAnimacao(false), 2300);
     return () => clearTimeout(t);
   }, [sp]);
 
-  const destino = criterios.destinoId ? DESTINOS_POR_ID[criterios.destinoId] : null;
+  const carregando = tempoAnimacao || carregandoDados;
+  const destino = criterios.destinoId ? destinosPorId[criterios.destinoId] : null;
   const listaFiltrada = soComVaga
     ? elegiveis.filter((r) => r.nivel === 'disponivel')
     : elegiveis;

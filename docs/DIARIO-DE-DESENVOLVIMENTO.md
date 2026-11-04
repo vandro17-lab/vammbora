@@ -75,8 +75,21 @@ Após revisão do coordenador (visual precisava ser mais premium):
 - **Teste de segurança (como anon):** `public_listings` devolve 6 linhas; a tabela `drivers`
   devolve **0 linhas** (telefone/documentos protegidos pela RLS). Advisor rodado; avisos restantes
   são intencionais e documentados em `0005_hardening.sql`.
-- Falta: configurar as variáveis de ambiente no Vercel (URL + chave publishable) e fazer a Parte B
-  (vitrine lendo do banco).
+- Falta: configurar as variáveis de ambiente no Vercel (URL + chave publishable).
+
+### 04/11/2026 — Etapa 2 (Parte B): vitrine lendo do banco
+- Provedor central `src/data/VitrineProvider.tsx` carrega destinos + motoristas uma vez e distribui
+  às telas (home, busca, resultados, perfil) via `useVitrine()`.
+- Home (busca + destaques), Resultados e Perfil agora leem do `source.ts` (Supabase quando ligado,
+  senão seed local). Esqueletos de carregamento adicionados.
+- Perfil: botão de WhatsApp agora chama a RPC `solicitar_contato_whatsapp` (registra o lead e
+  devolve o telefone) no modo Supabase; no modo demo usa o telefone local. Popup aberto no clique
+  (evita bloqueador).
+- Mapeamento banco→domínio conferido campo a campo.
+- Validado: `npm run build` (exit 0), 19 testes passando.
+- **Limitação do sandbox:** o proxy deste ambiente bloqueia `supabase.co` (403 no túnel), então o
+  teste navegador→banco ao vivo não pôde ser feito aqui; o fallback local manteve o app funcionando.
+  No navegador do usuário e no Vercel a chamada funciona. O banco em si foi validado via conector MCP.
 
 ### Pendências abertas
 Ver [`PENDENCIAS.md`](PENDENCIAS.md). Principais: integrar motor real, configurar Supabase,

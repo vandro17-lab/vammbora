@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { ArrowRight } from 'lucide-react';
-import { MOTORISTAS } from '@/data/motoristas';
+import { useVitrine } from '@/data/VitrineProvider';
 import { Avatar } from '@/components/brand/Avatar';
 import { VanIllustration } from '@/components/brand/VanIllustration';
 import { Stars } from '@/components/ui/Stars';
@@ -8,7 +8,8 @@ import { DemoBadge } from '@/components/ui/DemoBadge';
 import { Reveal } from '@/components/motion/Reveal';
 
 export function FeaturedDrivers() {
-  const destaque = [...MOTORISTAS]
+  const { motoristas, carregando } = useVitrine();
+  const destaque = [...motoristas]
     .sort((a, b) => b.avaliacao.media - a.avaliacao.media)
     .slice(0, 3);
 
@@ -22,7 +23,18 @@ export function FeaturedDrivers() {
       </Reveal>
 
       <div className="mt-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        {destaque.map((m, i) => (
+        {carregando && destaque.length === 0
+          ? Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="card overflow-hidden">
+                <div className="shimmer h-40 w-full bg-navy-100" />
+                <div className="space-y-3 p-5">
+                  <div className="shimmer h-11 w-11 rounded-full bg-navy-100" />
+                  <div className="shimmer h-4 w-2/3 rounded bg-navy-100" />
+                  <div className="shimmer h-3 w-full rounded bg-navy-100" />
+                </div>
+              </div>
+            ))
+          : destaque.map((m, i) => (
           <Reveal key={m.id} delay={i * 0.1}>
             <Link
               to={`/van/${m.slug}`}

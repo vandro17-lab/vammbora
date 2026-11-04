@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Layout } from '@/components/layout/Layout';
 import { ScrollManager } from '@/components/ScrollManager';
 import { PageTransition } from '@/components/motion/PageTransition';
+import { VitrineProvider } from '@/data/VitrineProvider';
 import { HomePage } from '@/pages/HomePage';
 import { SearchResultsPage } from '@/pages/SearchResultsPage';
 import { DriverProfilePage } from '@/pages/DriverProfilePage';
@@ -12,7 +13,8 @@ export default function App() {
   return (
     <BrowserRouter>
       <ScrollManager />
-      <Routes>
+      <VitrineProvider>
+        <Routes>
         <Route element={<Layout />}>
           <Route path="/" element={<PageTransition><HomePage /></PageTransition>} />
           <Route path="/resultados" element={<PageTransition><SearchResultsPage /></PageTransition>} />
@@ -20,7 +22,8 @@ export default function App() {
           <Route path="/motorista" element={<PageTransition><DriverLandingPage /></PageTransition>} />
           <Route path="*" element={<PageTransition><NotFoundPage /></PageTransition>} />
         </Route>
-      </Routes>
+        </Routes>
+      </VitrineProvider>
     </BrowserRouter>
   );
 }
