@@ -24,25 +24,44 @@ export function WaitlistForm({ criterios }: { criterios: CriteriosBusca }) {
 
   const destino = criterios.destinoId ? DESTINOS_POR_ID[criterios.destinoId] : null;
 
+  function validar(): string | null {
+    if (nome.trim().length < 2) return 'Digite seu nome.';
+    const digitos = whatsapp.replace(/\D/g, '');
+    if (digitos.length < 10 || digitos.length > 13) return 'Digite um WhatsApp válido com DDD.';
+    if (!consent) return 'Confirme o consentimento para continuar.';
+    return null;
+  }
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    // Evita envio duplicado (clique duplo ou reenvio enquanto grava).
+    if (enviando || enviado) return;
     setErro(null);
+    const problema = validar();
+    if (problema) { setErro(problema); return; }
+
     setEnviando(true);
-    const r = await registrarInteresse({
-      cidadeId: criterios.cidadeId,
-      nome,
-      whatsapp,
-      consentimento: consent,
-      regiao: criterios.endereco || undefined,
-      destinoId: criterios.destinoId,
-      turno: criterios.turno,
-    });
-    setEnviando(false);
-    if (r.ok) {
-      setFoiSimulacao(!!r.demo);
-      setEnviado(true);
-    } else {
-      setErro(r.erro ?? 'Não foi possível registrar agora. Tente novamente.');
+    try {
+      // Espera a confirmação REAL da gravação; só então mostra sucesso.
+      const r = await registrarInteresse({
+        cidadeId: criterios.cidadeId,
+        nome: nome.trim(),
+        whatsapp: whatsapp.trim(),
+        consentimento: consent,
+        regiao: criterios.endereco || undefined,
+        destinoId: criterios.destinoId,
+        turno: criterios.turno,
+      });
+      if (r.ok) {
+        setFoiSimulacao(!!r.demo);
+        setEnviado(true);
+      } else {
+        setErro(r.erro ?? 'Não foi possível registrar agora. Verifique sua conexão e tente de novo.');
+      }
+    } catch {
+      setErro('Falha de conexão. Nada foi gravado — tente novamente.');
+    } finally {
+      setEnviando(false);
     }
   }
 
