@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import { SlidersHorizontal, ArrowLeft, SearchX, WifiOff, RefreshCw } from 'lucide-react';
@@ -9,9 +9,8 @@ import { CIDADE_PADRAO } from '@/data/cidades';
 import { ResultCard } from '@/components/results/ResultCard';
 import { WaitlistForm } from '@/components/results/WaitlistForm';
 import { SearchLoadingScreen } from '@/components/search/SearchLoadingScreen';
-import { DemoBadge } from '@/components/ui/DemoBadge';
 import { Reveal } from '@/components/motion/Reveal';
-import { TURNO_LABEL, plural } from '@/lib/utils';
+import { TURNO_LABEL, plural, nomeDestinoParaExibicao } from '@/lib/utils';
 
 function formatarData(iso?: string): string | null {
   if (!iso) return null;
@@ -23,25 +22,16 @@ export function SearchResultsPage() {
   const [sp] = useSearchParams();
   const criterios = useMemo(() => paramsParaCriterios(sp), [sp]);
 
-  const { motoristas, destinos, destinosPorId, status, modoDemo, recarregar } = useVitrine();
+  const { motoristas, destinos, destinosPorId, status, recarregar } = useVitrine();
 
   const { elegiveis, totalConsultados } = useMemo(
     () => buscarMotoristas(criterios, motoristas, destinos),
     [criterios, motoristas, destinos],
   );
 
-  const [tempoAnimacao, setTempoAnimacao] = useState(true);
   const [soComVaga, setSoComVaga] = useState(false);
 
-  // A tela de busca roda por ~3,8s; só revelamos quando a animação terminou E os
-  // dados já chegaram. Em caso de erro, saímos da animação assim que ela termina.
-  useEffect(() => {
-    setTempoAnimacao(true);
-    const t = setTimeout(() => setTempoAnimacao(false), 3800);
-    return () => clearTimeout(t);
-  }, [sp]);
-
-  const carregando = tempoAnimacao || status === 'carregando';
+  const carregando = status === 'carregando';
   const destino = criterios.destinoId ? destinosPorId[criterios.destinoId] : null;
   const listaFiltrada = soComVaga ? elegiveis.filter((r) => r.motorista.vagasDisponiveis > 0) : elegiveis;
   const dataAvulso = formatarData(criterios.dataAvulso);
@@ -65,9 +55,8 @@ export function SearchResultsPage() {
         {/* Resumo da busca */}
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <h1 className="font-display text-2xl font-bold sm:text-3xl">
-            {destino ? `Vans para ${destino.nome}` : `Vans em ${CIDADE_PADRAO.nome}`}
+            {destino ? `Vans para ${nomeDestinoParaExibicao(destino.nome)}` : `Vans em ${CIDADE_PADRAO.nome}`}
           </h1>
-          {modoDemo && <DemoBadge />}
         </div>
         <div className="mt-2 flex flex-wrap gap-2 text-sm">
           {criterios.endereco && (
@@ -162,10 +151,11 @@ function NenhumResultado({ children }: { children: React.ReactNode }) {
         <h2 className="mt-4 font-display text-2xl font-bold">Vamos encontrar outro caminho?</h2>
         <p className="mt-2 text-navy-600">
           Isso não significa que não existe — pode ser só questão de tempo ou de ajustar os filtros.
-          Deixe seu interesse e a gente avisa.
+          Você pode registrar seu interesse para a equipe acompanhar a procura.
         </p>
       </div>
       {children}
     </div>
   );
 }
+

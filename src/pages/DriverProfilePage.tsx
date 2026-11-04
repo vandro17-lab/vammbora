@@ -36,7 +36,7 @@ export function DriverProfilePage() {
   const [erroZap, setErroZap] = useState(false);
 
   // Critérios vindos da busca (preservados na URL): escola, turno, mensal/avulso, data, ida/volta.
-  const criterios = paramsParaCriterios(sp);
+  const criterios = sp.size ? paramsParaCriterios(sp) : null;
   const voltarUrl = sp.toString() ? `/resultados?${sp.toString()}` : '/resultados';
 
   const m = slug ? motoristas.find((x) => x.slug === slug) : undefined;
@@ -66,7 +66,7 @@ export function DriverProfilePage() {
 
   const motorista = m;
   const destinos = motorista.destinosIds.map((id) => destinosPorId[id]).filter(Boolean);
-  const destinoBusca = criterios.destinoId ? destinosPorId[criterios.destinoId] ?? null : null;
+  const destinoBusca = criterios?.destinoId ? destinosPorId[criterios?.destinoId] ?? null : null;
 
   // Abre o WhatsApp de forma segura (popup aberto no clique) e registra o lead.
   // O telefone vem do banco via RPC quando o Supabase está ligado; senão, local.
@@ -76,10 +76,9 @@ export function DriverProfilePage() {
     setAbrindoZap(true);
     const janela = window.open('about:blank', '_blank');
     const fone = await solicitarContatoWhatsapp(motorista.slug, true, {
-      destinoId: criterios.destinoId,
-      turno: criterios.turno,
-      contratacao: criterios.contratacao,
-      regiao: criterios.endereco || null,
+      destinoId: criterios?.destinoId,
+      turno: criterios?.turno,
+      contratacao: criterios?.contratacao,
     });
     const link = fone
       ? montarLinkWhatsApp(fone, montarMensagemWhatsApp(motorista, criterios, destinoBusca))
@@ -271,3 +270,4 @@ export function DriverProfilePage() {
     </div>
   );
 }
+
