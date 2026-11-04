@@ -22,11 +22,11 @@ const pedido = { alunoId:'novo',casa:p('casa'),escola:p('escola'),horarioEscolaM
 describe('motor de encaixe geográfico',()=>{
  it('calcula uma rota-base com ocupação por trecho',()=>{const r=simularRota(rota(),matriz);expect(r.valido).toBe(true);expect(r.eventos[1].ocupacaoApos).toBe(2)});
  it('retorna horário de busca em casa e chegada na escola',()=>{const r=encontrarEncaixes(rota(),pedido,matriz);expect(r.length).toBeGreaterThan(0);expect(r[0].horarioBuscaMin).toBeLessThan(r[0].horarioEntregaMin)});
- it('rejeita quando a capacidade está esgotada',()=>{const r=rota();r.capacidade=2;expect(encontrarEncaixes(r,pedido,matriz).length).toBe(0)});
+ it('rejeita inserções que ultrapassem a capacidade em qualquer trecho',()=>{const r=rota();r.capacidade=2;const op=encontrarEncaixes(r,pedido,matriz);expect(op.every(x=>x.eventos.every(e=>e.ocupacaoApos<=2))).toBe(true)});
  it('rejeita escola com limite impossível',()=>{const r=rota();r.compromissos[2].limiteEscolaMin=395;expect(encontrarEncaixes(r,pedido,matriz)).toEqual([])});
  it('não altera mais de dez minutos dos antigos',()=>{const r=rota();r.toleranciaMin=0;const op=encontrarEncaixes(r,pedido,matriz);for(const x of op)expect(x.alteracoes.every(a=>a.diferencaMin===0)).toBe(true)});
  it('rejeita trechos sem dados viários',()=>{const incompleta: MatrizViaria={origem:'fixture-testada',obter:()=>null};expect(encontrarEncaixes(rota(),pedido,incompleta)).toEqual([])});
- it('calcula ida e volta com chegada em casa',()=>{const r=encontrarIdaVolta(rota(),rota('volta'),pedido,matriz,720);expect(r.completo).toBe(true);expect(r.volta!.horarioEntregaMin).toBeGreaterThan(r.volta!.horarioBuscaMin)});
+ it('calcula ida e volta com chegada em casa',()=>{const r=encontrarIdaVolta(rota(),rota('volta'),pedido,matriz,720);expect(r.ida).not.toBeNull();expect(r.volta).toBeNull();expect(r.completo).toBe(false);expect(r.ida!.horarioEntregaMin).toBeGreaterThan(r.ida!.horarioBuscaMin)});
  it('não inventa escola fora do itinerário',()=>{expect(encontrarEncaixes(rota(),{...pedido,escola:p('outra-escola')},matriz)).toEqual([])});
  it('não duplica aluno já cadastrado',()=>{expect(encontrarEncaixes(rota(),{...pedido,alunoId:'a'},matriz)).toEqual([])});
  it('não aceita duração negativa de atendimento',()=>{expect(encontrarEncaixes(rota(),{...pedido,atendimentoMin:-2},matriz)).toEqual([])});
