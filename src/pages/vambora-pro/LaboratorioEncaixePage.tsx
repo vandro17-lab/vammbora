@@ -15,8 +15,8 @@ const tempo: Record<string, number> = {
   'garagem>casa-a': 5, 'casa-a>casa-b': 5, 'casa-b>escola': 7,
   'garagem>casa-nova': 7, 'casa-a>casa-nova': 3, 'casa-nova>casa-b': 4,
   'casa-b>casa-nova': 4, 'casa-nova>escola': 8,
-  'escola>casa-a': 8, 'casa-a>casa-b': 5, 'escola>casa-nova': 6,
-  'casa-nova>casa-a': 4, 'casa-b>casa-nova': 4,
+  'escola>casa-a': 8, 'escola>casa-nova': 6,
+  'casa-nova>casa-a': 4,
 };
 const matriz: MatrizViaria = {
   origem: 'fixture-testada',
@@ -54,7 +54,7 @@ export function LaboratorioEncaixePage() {
     const ida = criarRota('ida', limite);
     const volta = criarRota('volta', limite);
     ida.capacidade = vagas; volta.capacidade = vagas;
-    return encontrarIdaVolta(ida, volta, { alunoId:'novo', casa:casaNova, escola, horarioEscolaMin:limite }, matriz, 730);
+    return encontrarIdaVolta(ida, volta, { alunoId:'novo', casa:casaNova, escola, horarioEscolaMin:limite }, matriz, matriz, 730);
   }, [limite, vagas]);
   const { ida, volta, completo } = resultado;
   return <div className="min-h-dvh bg-navy-50 pb-16">
