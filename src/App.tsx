@@ -18,6 +18,7 @@ import { VeiculosPage } from '@/pages/motorista/VeiculosPage';
 import { RotasListPage } from '@/pages/motorista/RotasListPage';
 import { RotaBuilderPage } from '@/pages/motorista/RotaBuilderPage';
 import { PerfilMotoristaPage, DocumentosMotoristaPage, ProcuraMotoristaPage } from '@/pages/motorista/PaginasSimples';
+import { VamboraProPage } from '@/pages/vambora-pro/VamboraProPage';
 
 export default function App() {
   return (
@@ -46,6 +47,8 @@ export default function App() {
             <Route path="/painel/procura" element={<ProcuraMotoristaPage />} />
             <Route path="/painel/rotas" element={<RotasListPage />} />
             <Route path="/painel/rota/:id" element={<RotaBuilderPage />} />
+            {/* Vambora Pro — app do motorista (experiência visual demonstrativa) */}
+            <Route path="/pro" element={<VamboraProPage />} />
           </Routes>
           </StartupExperience>
         </VitrineProvider>
