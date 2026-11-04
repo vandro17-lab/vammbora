@@ -65,19 +65,22 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
           </div>
         </div>
 
-        {/* Endereço / região */}
+        {/* Região/bairro (opcional) — o ponto exato é combinado com o motorista */}
         <div>
           <label className="field-label" htmlFor="endereco">
-            Endereço ou bairro de embarque
+            Bairro ou região de embarque <span className="font-normal text-navy-400">(opcional)</span>
           </label>
           <input
             id="endereco"
             className="field-input"
-            placeholder="Ex: Rua das Flores, Centro"
+            placeholder="Ex: Centro, Vila Mendonça"
             value={endereco}
             onChange={(e) => setEndereco(e.target.value)}
             autoComplete="off"
           />
+          <p className="mt-1 text-xs text-navy-400">
+            O ponto exato você combina direto com o motorista, com privacidade.
+          </p>
         </div>
 
         {/* Destino (escola/faculdade) */}

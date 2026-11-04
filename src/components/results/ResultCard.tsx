@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Snowflake, UserCheck, Accessibility, ShieldCheck, Users, Clock } from 'lucide-react';
 import type { ResultadoCompatibilidade } from '@/types';
 import { Avatar } from '@/components/brand/Avatar';
@@ -17,6 +17,8 @@ function textoPreco(r: ResultadoCompatibilidade): string {
 
 export function ResultCard({ resultado }: { resultado: ResultadoCompatibilidade }) {
   const m = resultado.motorista;
+  const [sp] = useSearchParams();
+  const qs = sp.toString();
   const recursos = [
     m.recursos.arCondicionado && { Icone: Snowflake, label: 'Ar-condicionado' },
     m.recursos.monitor && { Icone: UserCheck, label: 'Monitor(a)' },
@@ -49,9 +51,12 @@ export function ResultCard({ resultado }: { resultado: ResultadoCompatibilidade 
         <p className="mt-3 line-clamp-2 text-sm text-navy-600">{m.descricao}</p>
 
         <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
-          <div className="flex items-center gap-2 text-navy-700">
+          <div
+            className="flex items-center gap-2 text-navy-700"
+            title="Horário informado pelo motorista — não é um cálculo para o seu endereço."
+          >
             <Clock className="h-4 w-4 text-navy-400" />
-            <span>Passa ~{resultado.passagemAproximada}</span>
+            <span>Motorista: {resultado.passagemAproximada}</span>
           </div>
           <div className="flex items-center gap-2 text-navy-700">
             <Users className="h-4 w-4 text-navy-400" />
@@ -87,7 +92,10 @@ export function ResultCard({ resultado }: { resultado: ResultadoCompatibilidade 
               <span className="mt-0.5 text-xs text-navy-400">Documentação não verificada</span>
             )}
           </div>
-          <Link to={`/van/${m.slug}`} className="btn btn-sheen btn-md btn-navy shrink-0">
+          <Link
+            to={`/van/${m.slug}${qs ? `?${qs}` : ''}`}
+            className="btn btn-sheen btn-md btn-navy shrink-0"
+          >
             Ver perfil
           </Link>
         </div>

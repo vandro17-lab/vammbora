@@ -27,23 +27,40 @@ describe('montarLinkWhatsApp', () => {
 describe('montarMensagemWhatsApp', () => {
   const criterios: CriteriosBusca = {
     cidadeId: 'aracatuba-sp',
-    endereco: 'Centro',
+    endereco: 'Rua das Flores, 123, Centro',
     destinoId: 'esc-paineiras',
     turno: 'manha',
-    contratacao: 'mensal',
-    modalidade: 'ida',
+    contratacao: 'avulso',
+    dataAvulso: '2026-11-10',
+    modalidade: 'ambos',
   };
 
-  it('inclui destino e turno quando informados', () => {
+  it('inclui os critérios: destino, turno, contratação/data e trajeto', () => {
     const msg = montarMensagemWhatsApp(motorista, criterios, DESTINOS_POR_ID['esc-paineiras']);
     expect(msg).toContain('Colégio Paineiras');
     expect(msg).toContain('Manhã');
+    expect(msg).toContain('avulso');
+    expect(msg).toContain('10/11/2026');
+    expect(msg).toContain('ida e volta');
   });
 
-  it('não vaza dados sensíveis além da região informada', () => {
+  it('NÃO envia o endereço livre automaticamente (privacidade)', () => {
     const msg = montarMensagemWhatsApp(motorista, criterios, DESTINOS_POR_ID['esc-paineiras']);
-    // A mensagem usa só a "região de embarque" informada, não um endereço completo extra.
-    expect(msg).toContain('Região de embarque: Centro');
+    // O endereço digitado (que pode ser completo) não vai na mensagem.
+    expect(msg).not.toContain('Rua das Flores');
+    expect(msg).not.toContain('123');
+    expect(msg.toLowerCase()).not.toContain('região de embarque');
+    // A família é convidada a combinar o ponto de embarque na conversa.
+    expect(msg.toLowerCase()).toContain('ponto de embarque');
+  });
+
+  it('inclui "somente ida" quando a modalidade é ida', () => {
+    const msg = montarMensagemWhatsApp(
+      motorista,
+      { ...criterios, modalidade: 'ida' },
+      DESTINOS_POR_ID['esc-paineiras'],
+    );
+    expect(msg).toContain('somente ida');
   });
 
   it('funciona sem critérios (perfil direto)', () => {
