@@ -97,6 +97,11 @@ export function encontrarEncaixes(rota: RotaOperacional, pedido: PedidoEncaixe, 
   const opcoes: OpcaoEncaixe[] = [];
   for (let i = 0; i <= n; i++) {
     for (let j = i + 1; j <= n + 1; j++) {
+      // Para escola já presente na rota, a nova criança deve ser entregue
+      // no momento daquela visita, jamais depois de passar pela escola.
+      const indiceEscola = rota.compromissos.findIndex(p => p.ponto.id === pedido.escola.id && (p.tipo === 'escola' || p.tipo === 'desembarque' || p.tipo === 'embarque'));
+      if (indiceEscola >= 0 && rota.sentido === 'ida' && (i > indiceEscola || j > indiceEscola + 1)) continue;
+      if (indiceEscola >= 0 && rota.sentido === 'volta' && i > indiceEscola + 1) continue;
       const paradas = [...rota.compromissos];
       paradas.splice(i, 0, busca);
       paradas.splice(j, 0, entrega);
