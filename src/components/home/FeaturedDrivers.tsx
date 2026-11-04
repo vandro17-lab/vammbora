@@ -4,7 +4,6 @@ import { useVitrine } from '@/data/VitrineProvider';
 import { Avatar } from '@/components/brand/Avatar';
 import { VanIllustration } from '@/components/brand/VanIllustration';
 import { Stars } from '@/components/ui/Stars';
-import { DemoBadge } from '@/components/ui/DemoBadge';
 import { Reveal } from '@/components/motion/Reveal';
 
 export function FeaturedDrivers() {
@@ -15,11 +14,12 @@ export function FeaturedDrivers() {
     .slice(0, 3);
 
   return (
-    <section id="motoristas" className="container-page py-16">
+    <section id="motoristas" className="container-page py-16 lg:py-20">
       <Reveal>
-        <h2 className="font-display text-3xl font-bold sm:text-4xl">Motoristas em destaque</h2>
+        <p className="eyebrow mb-3">Pessoas que conectam caminhos</p>
+        <h2 className="font-display text-3xl font-bold sm:text-4xl">Conheça quem vai com você</h2>
         <p className="mt-2 max-w-xl text-navy-600">
-          Profissionais bem avaliados pela comunidade. Todos com perfil completo e contato direto.
+          Veja os perfis, conheça os veículos e encontre uma opção para sua rotina.
         </p>
       </Reveal>
 
@@ -44,16 +44,16 @@ export function FeaturedDrivers() {
               <div className="relative overflow-hidden">
                 <VanIllustration
                   seedKey={m.slug}
-                  className="h-40 w-full transition-transform duration-700 ease-premium group-hover:scale-[1.07]"
+                  className="h-48 w-full transition-transform duration-700 ease-premium group-hover:scale-[1.07]"
                 />
-                {m.demo && <DemoBadge className="absolute right-3 top-3" />}
+                
               </div>
-              <div className="p-5">
+              <div className="p-6">
                 <div className="flex items-center gap-3">
                   <Avatar nome={m.nome} className="h-11 w-11 text-sm" />
                   <div>
                     <h3 className="font-display font-bold text-navy-900">{m.nome}</h3>
-                    <Stars media={m.avaliacao.media} quantidade={m.avaliacao.quantidade} />
+                    {!m.demo && m.avaliacao.quantidade > 0 ? <Stars media={m.avaliacao.media} quantidade={m.avaliacao.quantidade} /> : <p className="mt-1 text-xs text-navy-500">{m.bairrosAtendidos.slice(0, 2).join(' · ')}</p>}
                   </div>
                 </div>
                 <p className="mt-3 line-clamp-2 text-sm text-navy-600">{m.descricao}</p>

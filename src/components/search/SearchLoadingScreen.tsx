@@ -124,7 +124,7 @@ export function SearchLoadingScreen({ totalConsultados, cidade }: Props) {
       </div>
 
       {/* Mensagens */}
-      <div className="relative z-10 mt-8 flex h-7 items-center">
+      <div className="relative z-10 mt-8 flex min-h-14 max-w-lg items-center px-6 text-center">
         <AnimatePresence mode="wait">
           <motion.p
             key={passo}

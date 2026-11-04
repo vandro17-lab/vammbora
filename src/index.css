@@ -16,7 +16,8 @@
   }
 
   body {
-    @apply bg-navy-50 text-navy-900 font-sans antialiased;
+    @apply text-navy-900 font-sans antialiased;
+    background: #f6f7f5;
     min-height: 100dvh;
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
@@ -187,3 +188,19 @@
     animation: none;
   }
 }
+
+/* Refinamento visual: superfícies leves, marca profunda e movimento discreto. */
+.premium-hero { background: radial-gradient(ellipse at 20% 100%, #184044 0, transparent 65%), #0b1f3a; }
+.hero-orbit { position: absolute; width: 740px; height: 740px; border: 1px solid rgb(255 255 255 / 7%); border-radius: 50%; top: -360px; left: -170px; box-shadow: 0 0 0 110px rgb(255 255 255 / 2%), 0 0 0 220px rgb(255 255 255 / 2%); pointer-events: none; }
+.eyebrow { font-size: 0.68rem; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: #347266; }
+.search-panel { border: 1px solid rgb(255 255 255 / 30%); box-shadow: 0 24px 70px rgb(0 0 0 / 16%); }
+.card { border-radius: 1.5rem; box-shadow: 0 4px 24px rgb(11 31 58 / 3%); }
+.card-interactive:hover { transform: translateY(-4px); box-shadow: 0 16px 32px rgb(11 31 58 / 8%); }
+.btn-primary { background: #147d61; }
+.btn-primary:hover { background: #10694f; }
+.btn-whatsapp { background: #147d61; }
+.btn-sheen::after { display: none; }
+.field-input { border-color: #d9e1e8; border-radius: 0.8rem; }
+.field-input::placeholder { color: #66778c; }
+section[id] { scroll-margin-top: 90px; }
+@media (max-width: 639px) { .container-page { padding-left: 20px; padding-right: 20px; } }

@@ -13,7 +13,7 @@ export function Layout() {
         Pular para o conteúdo
       </a>
       <Header />
-      <main id="conteudo" className="flex-1">
+      <main id="conteudo" tabIndex={-1} className="flex-1 outline-none">
         <Outlet />
       </main>
       <Footer />

@@ -43,7 +43,7 @@ export function SearchResultsPage() {
 
   const carregando = tempoAnimacao || status === 'carregando';
   const destino = criterios.destinoId ? destinosPorId[criterios.destinoId] : null;
-  const listaFiltrada = soComVaga ? elegiveis.filter((r) => r.nivel === 'disponivel') : elegiveis;
+  const listaFiltrada = soComVaga ? elegiveis.filter((r) => r.motorista.vagasDisponiveis > 0) : elegiveis;
   const dataAvulso = formatarData(criterios.dataAvulso);
 
   return (
@@ -159,7 +159,7 @@ function NenhumResultado({ children }: { children: React.ReactNode }) {
     <div className="mt-10">
       <div className="mx-auto mb-8 max-w-lg text-center">
         <SearchX className="mx-auto h-12 w-12 text-navy-300" />
-        <h2 className="mt-4 font-display text-2xl font-bold">Ainda não achamos uma van para esta busca</h2>
+        <h2 className="mt-4 font-display text-2xl font-bold">Vamos encontrar outro caminho?</h2>
         <p className="mt-2 text-navy-600">
           Isso não significa que não existe — pode ser só questão de tempo ou de ajustar os filtros.
           Deixe seu interesse e a gente avisa.

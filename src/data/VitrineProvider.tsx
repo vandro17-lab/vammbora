@@ -9,6 +9,9 @@ interface VitrineData {
   motoristas: Motorista[];
   destinosPorId: Record<string, Destino>;
   status: VitrineStatus;
+  /** Compatibilidade: derivados de `status` (há consumidores que usam estes nomes). */
+  carregando: boolean;
+  erro: boolean;
   /** true quando rodando com dados de exemplo (Supabase desligado). */
   modoDemo: boolean;
   /** Recarrega a vitrine (usado no "tentar de novo"). */
@@ -20,6 +23,8 @@ const Ctx = createContext<VitrineData>({
   motoristas: [],
   destinosPorId: {},
   status: 'carregando',
+  carregando: true,
+  erro: false,
   modoDemo: MODO_DEMO,
   recarregar: () => {},
 });
@@ -68,6 +73,8 @@ export function VitrineProvider({ children }: { children: ReactNode }) {
         motoristas,
         destinosPorId,
         status,
+        carregando: status === 'carregando',
+        erro: status === 'erro',
         modoDemo: MODO_DEMO,
         recarregar: carregar,
       }}

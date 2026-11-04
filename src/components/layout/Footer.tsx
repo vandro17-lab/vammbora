@@ -3,13 +3,12 @@ import { Logo } from '@/components/brand/Logo';
 
 export function Footer() {
   return (
-    <footer className="mt-20 bg-navy-900 text-navy-100">
+    <footer className="mt-8 bg-navy-900 text-navy-100">
       <div className="container-page grid gap-10 py-14 sm:grid-cols-2 lg:grid-cols-4">
         <div className="sm:col-span-2 lg:col-span-1">
           <Logo variant="light" />
           <p className="mt-4 max-w-xs text-sm leading-relaxed text-navy-300">
-            Conectamos famílias e estudantes de Araçatuba a vans com rota compatível, horário e vaga
-            — com contato direto e transparente.
+            Seu próximo caminho começa com uma boa escolha. Transporte escolar e universitário em Araçatuba.
           </p>
         </div>
 
@@ -62,11 +61,11 @@ export function Footer() {
 
       <div className="border-t border-navy-800">
         <div className="container-page flex flex-col items-center justify-between gap-2 py-6 text-xs text-navy-400 sm:flex-row">
-          <p>© {new Date().getFullYear()} Vambora — protótipo acadêmico.</p>
-          <p>
-            Protótipo com dados de <strong className="text-navy-200">demonstração</strong>. Não
-            representa serviço contratável ainda.
-          </p>
+          <p>© {new Date().getFullYear()} Vambora · Feito em Araçatuba.</p>
+          <details className="max-w-sm text-center sm:text-right">
+            <summary className="cursor-pointer text-navy-200">Sobre esta versão</summary>
+            <p className="mt-2 leading-relaxed">Protótipo acadêmico · Fatec Araçatuba. Perfis e informações ilustrativos, sem contratação disponível nesta versão.</p>
+          </details>
         </div>
       </div>
     </footer>

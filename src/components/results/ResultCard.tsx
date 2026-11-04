@@ -1,11 +1,10 @@
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { Snowflake, UserCheck, Accessibility, ShieldCheck, Users, Clock } from 'lucide-react';
 import type { ResultadoCompatibilidade } from '@/types';
 import { Avatar } from '@/components/brand/Avatar';
 import { VanIllustration } from '@/components/brand/VanIllustration';
 import { Stars } from '@/components/ui/Stars';
 import { CompatBadge } from '@/components/ui/CompatBadge';
-import { DemoBadge } from '@/components/ui/DemoBadge';
 import { formatBRL, plural } from '@/lib/utils';
 
 function textoPreco(r: ResultadoCompatibilidade): string {
@@ -17,8 +16,7 @@ function textoPreco(r: ResultadoCompatibilidade): string {
 
 export function ResultCard({ resultado }: { resultado: ResultadoCompatibilidade }) {
   const m = resultado.motorista;
-  const [sp] = useSearchParams();
-  const qs = sp.toString();
+  const { search } = useLocation();
   const recursos = [
     m.recursos.arCondicionado && { Icone: Snowflake, label: 'Ar-condicionado' },
     m.recursos.monitor && { Icone: UserCheck, label: 'Monitor(a)' },
@@ -36,27 +34,24 @@ export function ResultCard({ resultado }: { resultado: ResultadoCompatibilidade 
         <div className="absolute left-3 top-3 flex gap-2">
           <CompatBadge nivel={resultado.nivel} />
         </div>
-        {m.demo && <DemoBadge className="absolute right-3 top-3" />}
+        
       </div>
 
-      <div className="p-5">
+      <div className="p-6">
         <div className="flex items-start gap-3">
           <Avatar nome={m.nome} className="h-12 w-12 text-sm" />
           <div className="min-w-0 flex-1">
             <h3 className="truncate font-display text-lg font-bold text-navy-900">{m.nome}</h3>
-            <Stars media={m.avaliacao.media} quantidade={m.avaliacao.quantidade} className="mt-0.5" />
+            {!m.demo && m.avaliacao.quantidade > 0 && <Stars media={m.avaliacao.media} quantidade={m.avaliacao.quantidade} className="mt-0.5" />}
           </div>
         </div>
 
         <p className="mt-3 line-clamp-2 text-sm text-navy-600">{m.descricao}</p>
 
         <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
-          <div
-            className="flex items-center gap-2 text-navy-700"
-            title="Horário informado pelo motorista — não é um cálculo para o seu endereço."
-          >
+          <div className="flex items-center gap-2 text-navy-700">
             <Clock className="h-4 w-4 text-navy-400" />
-            <span>Motorista: {resultado.passagemAproximada}</span>
+            <span>{resultado.passagemAproximada ? `Horário: ${resultado.passagemAproximada}` : 'Horário a combinar'}</span>
           </div>
           <div className="flex items-center gap-2 text-navy-700">
             <Users className="h-4 w-4 text-navy-400" />
@@ -89,13 +84,10 @@ export function ResultCard({ resultado }: { resultado: ResultadoCompatibilidade 
                 <ShieldCheck className="h-3.5 w-3.5" /> Documentação verificada
               </span>
             ) : (
-              <span className="mt-0.5 text-xs text-navy-400">Documentação não verificada</span>
+              <span className="mt-0.5 text-xs text-navy-400">Confira os detalhes no perfil</span>
             )}
           </div>
-          <Link
-            to={`/van/${m.slug}${qs ? `?${qs}` : ''}`}
-            className="btn btn-sheen btn-md btn-navy shrink-0"
-          >
+          <Link to={`/van/${m.slug}${search}`} className="btn btn-sheen btn-md btn-navy shrink-0">
             Ver perfil
           </Link>
         </div>

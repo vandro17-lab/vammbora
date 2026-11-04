@@ -1,5 +1,7 @@
+import { nomeDestinoParaExibicao } from '@/lib/utils';
 import { useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
+
 import {
   ArrowLeft,
   MessageCircle,
@@ -22,7 +24,6 @@ import { paramsParaCriterios } from '@/lib/searchParams';
 import { Avatar } from '@/components/brand/Avatar';
 import { VanIllustration } from '@/components/brand/VanIllustration';
 import { Stars } from '@/components/ui/Stars';
-import { DemoBadge } from '@/components/ui/DemoBadge';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 import { montarLinkWhatsApp, montarMensagemWhatsApp } from '@/lib/whatsapp';
 import { formatBRL, TURNO_LABEL, plural } from '@/lib/utils';
@@ -100,7 +101,7 @@ export function DriverProfilePage() {
   ].filter(Boolean) as { Icone: typeof Snowflake; label: string }[];
 
   return (
-    <div className="container-page py-8">
+    <div className="container-page pb-28 pt-8 lg:pb-12">
       <Link
         to={voltarUrl}
         className="inline-flex items-center gap-1.5 text-sm font-medium text-navy-500 hover:text-navy-800"
@@ -113,15 +114,15 @@ export function DriverProfilePage() {
         <div>
           <div className="card overflow-hidden">
             <div className="relative">
-              <VanIllustration seedKey={m.slug} className="h-56 w-full sm:h-64" />
-              {m.demo && <DemoBadge className="absolute right-4 top-4" />}
+              <VanIllustration seedKey={m.slug} className="h-64 w-full sm:h-80" />
+              <span className="absolute bottom-4 left-5 rounded-full bg-white/95 px-4 py-2 text-xs font-semibold text-navy-700">Escolar e universitário · Araçatuba</span>
             </div>
             <div className="p-6">
               <div className="flex items-start gap-4">
                 <Avatar nome={m.nome} className="h-16 w-16 text-lg" />
                 <div className="min-w-0 flex-1">
                   <h1 className="font-display text-2xl font-bold">{m.nome}</h1>
-                  <Stars media={m.avaliacao.media} quantidade={m.avaliacao.quantidade} className="mt-1" />
+                  {!m.demo && m.avaliacao.quantidade > 0 && <Stars media={m.avaliacao.media} quantidade={m.avaliacao.quantidade} className="mt-1" />}
                   <p className="mt-1 inline-flex items-center gap-1.5 text-sm text-navy-500">
                     <MapPin className="h-4 w-4" /> Atende: {m.bairrosAtendidos.join(', ')}
                   </p>
@@ -137,7 +138,7 @@ export function DriverProfilePage() {
             <div className="mt-4 flex flex-wrap gap-2">
               {destinos.map((d) => (
                 <span key={d.id} className="chip bg-navy-50 text-navy-700">
-                  {d.nome}
+                  {nomeDestinoParaExibicao(d.nome)}
                 </span>
               ))}
             </div>
@@ -208,7 +209,7 @@ export function DriverProfilePage() {
                   <CalendarCheck className="h-4 w-4" /> Janela
                 </dt>
                 <dd className="font-semibold text-navy-900">
-                  −{m.janela.toleranciaAntesMin}/+{m.janela.toleranciaDepoisMin} min
+                  {m.janela.toleranciaAntesMin} min antes / {m.janela.toleranciaDepoisMin} min depois
                 </dd>
               </div>
             </dl>
@@ -216,7 +217,7 @@ export function DriverProfilePage() {
             <button
               type="button"
               onClick={abrirWhatsApp}
-              disabled={abrindoZap}
+              disabled={abrindoZap || m.demo}
               className="btn btn-sheen btn-lg btn-whatsapp mt-5 w-full"
             >
               {abrindoZap ? (
@@ -226,7 +227,7 @@ export function DriverProfilePage() {
               ) : (
                 <>
                   <MessageCircle className="h-5 w-5" />
-                  Falar no WhatsApp
+                  {m.demo ? 'Contato em breve' : 'Falar no WhatsApp'}
                 </>
               )}
             </button>
@@ -236,7 +237,7 @@ export function DriverProfilePage() {
               </p>
             )}
             <p className="mt-3 text-center text-xs text-navy-400">
-              Abrimos o WhatsApp com uma mensagem pronta. Você revisa antes de enviar.
+              {m.demo ? 'Explore o perfil e conheça a proposta de atendimento.' : 'Você revisa a mensagem antes de enviar. Sem compromisso.'}
             </p>
 
             {/* Status de verificação — honesto */}
@@ -250,21 +251,22 @@ export function DriverProfilePage() {
                 <>
                   <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
                   <span className="text-navy-600">
-                    Documentação ainda <strong>não verificada</strong>. Confira os documentos
-                    diretamente com o motorista.
+                    Verificação documental pendente. Confira os documentos antes de contratar.
                   </span>
                 </>
               )}
             </div>
           </div>
 
-          {m.demo && (
-            <p className="mt-4 text-center text-xs text-navy-400">
-              Perfil de demonstração. Telefone fictício — o WhatsApp abrirá, mas não há motorista
-              real do outro lado.
-            </p>
-          )}
         </aside>
+      </div>
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t border-navy-100 bg-white/95 px-5 pb-[max(16px,env(safe-area-inset-bottom))] pt-4 backdrop-blur lg:hidden">
+        <div className="mx-auto flex max-w-lg items-center justify-between gap-3">
+          <div className="min-w-0"><p className="truncate text-sm font-semibold">{m.nome}</p><p className="text-xs text-navy-500">Converse sobre sua rota</p></div>
+          <button type="button" onClick={abrirWhatsApp} disabled={abrindoZap || m.demo} className="btn btn-md btn-primary shrink-0">
+            <MessageCircle className="h-4 w-4" />{m.demo ? 'Em breve' : abrindoZap ? 'Abrindo…' : 'Conversar'}
+          </button>
+        </div>
       </div>
     </div>
   );

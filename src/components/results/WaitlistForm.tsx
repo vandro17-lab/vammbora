@@ -1,3 +1,4 @@
+import { nomeDestinoParaExibicao } from '@/lib/utils';
 import { useState } from 'react';
 import { CheckCircle2, Info, Loader2 } from 'lucide-react';
 import type { CriteriosBusca } from '@/types';
@@ -75,7 +76,7 @@ export function WaitlistForm({ criterios }: { criterios: CriteriosBusca }) {
     <form onSubmit={onSubmit} className="card mx-auto max-w-lg p-6 sm:p-8">
       <h3 className="font-display text-xl font-bold">Quer entrar na lista de interesse?</h3>
       <p className="mt-1.5 text-sm text-navy-600">
-        Deixe seu contato para {destino ? <strong>{destino.nome}</strong> : 'sua região'}
+        Deixe seu contato para {destino ? <strong>{nomeDestinoParaExibicao(destino.nome)}</strong> : 'sua região'}
         {criterios.turno && (
           <>
             {' '}
