@@ -203,3 +203,62 @@ export async function solicitarContatoWhatsapp(
   if (error || !data) return null;
   return data as string;
 }
+
+/* ============================ ÁREA ADMIN ============================ */
+/* Requerem Supabase configurado + usuário com papel admin (RLS cuida disso). */
+
+export interface MotoristaAdmin {
+  id: string;
+  slug: string;
+  name: string;
+  city_id: string;
+  seats_available: number;
+  capacity_total: number;
+  is_published: boolean;
+  is_suspended: boolean;
+  doc_verified: boolean;
+  is_demo: boolean;
+  rating_avg: number;
+  whatsapp: string | null;
+}
+
+export interface InteressadoAdmin {
+  id: string;
+  contact_name: string;
+  contact_whatsapp: string;
+  region: string | null;
+  turno: Turno | null;
+  destination_id: string | null;
+  created_at: string;
+}
+
+export async function adminListarMotoristas(): Promise<MotoristaAdmin[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from('drivers')
+    .select(
+      'id,slug,name,city_id,seats_available,capacity_total,is_published,is_suspended,doc_verified,is_demo,rating_avg,whatsapp',
+    )
+    .order('name');
+  if (error || !data) return [];
+  return data as unknown as MotoristaAdmin[];
+}
+
+export async function adminAtualizarMotorista(
+  id: string,
+  patch: Partial<Pick<MotoristaAdmin, 'is_published' | 'is_suspended' | 'seats_available'>>,
+): Promise<{ ok: boolean; erro?: string }> {
+  if (!supabase) return { ok: false, erro: 'Banco não configurado.' };
+  const { error } = await supabase.from('drivers').update(patch).eq('id', id);
+  return error ? { ok: false, erro: error.message } : { ok: true };
+}
+
+export async function adminListarInteressados(): Promise<InteressadoAdmin[]> {
+  if (!supabase) return [];
+  const { data, error } = await supabase
+    .from('waitlist_requests')
+    .select('id,contact_name,contact_whatsapp,region,turno,destination_id,created_at')
+    .order('created_at', { ascending: false });
+  if (error || !data) return [];
+  return data as unknown as InteressadoAdmin[];
+}

@@ -91,6 +91,18 @@ Após revisão do coordenador (visual precisava ser mais premium):
   teste navegador→banco ao vivo não pôde ser feito aqui; o fallback local manteve o app funcionando.
   No navegador do usuário e no Vercel a chamada funciona. O banco em si foi validado via conector MCP.
 
+### 04/11/2026 — Administração (base) + especificação do motor
+- **Especificação do motor de encaixe** (`docs/ESPEC-MOTOR-DE-ENCAIXE.md`): brief autossuficiente +
+  ~28 testes para outra IA implementar; integro depois via adaptador. (O motor original de uma
+  conversa anterior não foi salvo em nenhum repositório — confirmado por busca; será reconstruído.)
+- **Área de administração (fundação):** login por e-mail/senha (Supabase Auth) em `/admin/login`,
+  rota protegida `/admin` por papel admin (RLS + RPC `is_admin`), **sem botão público**.
+  Painel inicial: lista motoristas (publicar/ocultar, editar vagas) e interessados (waitlist),
+  lendo/gravando no banco. `AuthProvider` + `useAuth`.
+- Sem Supabase, o admin mostra aviso (precisa do banco). Validado: build exit 0, 19 testes, 0 erros.
+- Falta: conceder papel admin ao usuário (após ele criar a conta) e ampliar o CRUD (destinos, fotos,
+  revisão documental). Testar login ao vivo (sandbox bloqueia Supabase).
+
 ### Pendências abertas
 Ver [`PENDENCIAS.md`](PENDENCIAS.md). Principais: integrar motor real, configurar Supabase,
 importar escolas do INEP com fonte/data, confirmar requisitos legais de Araçatuba.
