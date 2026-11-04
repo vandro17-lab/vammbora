@@ -155,7 +155,7 @@ export function DriverProfilePage() {
                 href={linkZap}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="btn btn-lg btn-whatsapp mt-5 w-full"
+                className="btn btn-sheen btn-lg btn-whatsapp mt-5 w-full"
               >
                 <MessageCircle className="h-5 w-5" />
                 Falar no WhatsApp

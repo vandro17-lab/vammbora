@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 /* ===================================================================
-   Design System Vambora — camada base
+   Design System Vambora — camada base (premium)
    =================================================================== */
 @layer base {
   :root {
@@ -18,9 +18,10 @@
   body {
     @apply bg-navy-50 text-navy-900 font-sans antialiased;
     min-height: 100dvh;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
 
-  /* Foco visível e acessível em toda a aplicação */
   :where(a, button, input, select, textarea, [tabindex]):focus-visible {
     @apply outline-none ring-2 ring-mint-500 ring-offset-2 ring-offset-white rounded-sm;
   }
@@ -29,26 +30,38 @@
   h2,
   h3,
   h4 {
-    @apply font-display tracking-tight;
+    @apply font-display tracking-tightest;
     color: inherit;
     text-wrap: balance;
+  }
+
+  ::selection {
+    background: rgba(27, 166, 122, 0.22);
+  }
+
+  /* Scrollbar discreta (desktop) */
+  @media (pointer: fine) {
+    * {
+      scrollbar-width: thin;
+      scrollbar-color: #adc3e7 transparent;
+    }
   }
 }
 
 @layer components {
   .container-page {
-    @apply container mx-auto px-4 sm:px-6 lg:px-8;
+    @apply container mx-auto px-5 sm:px-6 lg:px-8;
   }
 
-  /* Botões do design system */
+  /* Botões do design system — com brilho (sheen) no hover */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-full font-semibold
-      transition-all duration-200 disabled:opacity-50 disabled:pointer-events-none
-      select-none;
+    @apply relative inline-flex items-center justify-center gap-2 overflow-hidden rounded-full
+      font-semibold transition-all duration-300 ease-premium
+      disabled:opacity-50 disabled:pointer-events-none select-none;
   }
   .btn-lg {
     @apply px-7 text-base;
-    height: 3.25rem;
+    height: 3.35rem;
   }
   .btn-md {
     @apply h-11 px-5 text-sm;
@@ -57,20 +70,36 @@
     @apply h-9 px-4 text-sm;
   }
   .btn-primary {
-    @apply bg-mint-500 text-white shadow-card hover:bg-mint-600 hover:shadow-card-hover active:scale-[0.98];
+    @apply bg-mint-500 text-white shadow-card hover:bg-mint-600 hover:shadow-glow
+      hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98];
   }
   .btn-navy {
-    @apply bg-navy-900 text-white shadow-card hover:bg-navy-800 active:scale-[0.98];
+    @apply bg-navy-900 text-white shadow-card hover:bg-navy-800 hover:-translate-y-0.5
+      active:translate-y-0 active:scale-[0.98];
   }
   .btn-ghost {
-    @apply bg-white/70 text-navy-800 ring-1 ring-navy-100 hover:bg-white hover:ring-navy-200;
+    @apply bg-white/70 text-navy-800 ring-1 ring-navy-100 backdrop-blur hover:bg-white hover:ring-navy-200;
   }
   .btn-whatsapp {
-    @apply bg-[#25D366] text-white shadow-card hover:brightness-95 active:scale-[0.98];
+    @apply bg-[#25D366] text-white shadow-card hover:brightness-95 hover:-translate-y-0.5
+      active:translate-y-0 active:scale-[0.98];
+  }
+  /* Brilho que cruza o botão no hover */
+  .btn-sheen::after {
+    content: '';
+    @apply pointer-events-none absolute inset-y-0 left-0 w-1/3;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+    transform: translateX(-130%) skewX(-18deg);
+  }
+  .btn-sheen:hover::after {
+    animation: sheen 0.9s ease-premium;
   }
 
   .card {
     @apply rounded-2xl bg-white shadow-card ring-1 ring-navy-100/70;
+  }
+  .card-interactive {
+    @apply transition-all duration-500 ease-premium hover:-translate-y-1.5 hover:shadow-card-hover;
   }
 
   .chip {
@@ -82,12 +111,17 @@
   }
   .field-input {
     @apply h-12 w-full rounded-xl border border-navy-100 bg-white px-4 text-navy-900
-      placeholder:text-navy-300 transition-colors focus:border-mint-400;
+      placeholder:text-navy-300 transition-all duration-200
+      focus:border-mint-400 focus:ring-4 focus:ring-mint-500/10;
   }
 
-  /* Faixa de demonstração — exigência do Ideathon: dados explicitamente simulados */
   .demo-ribbon {
-    @apply chip bg-amber-100 text-amber-800 ring-1 ring-amber-200;
+    @apply chip bg-amber-100/90 text-amber-800 ring-1 ring-amber-200 backdrop-blur;
+  }
+
+  /* Vidro fosco premium */
+  .glass {
+    @apply bg-white/10 ring-1 ring-white/15 backdrop-blur-xl;
   }
 }
 
@@ -95,16 +129,25 @@
   .text-balance {
     text-wrap: balance;
   }
-  /* Faixa de gradiente da marca */
+
+  /* Fundo premium da marca (mesh/aurora estático de base) */
   .bg-brand-gradient {
     background-image: radial-gradient(
-        1200px 600px at 15% -10%,
-        rgba(28, 166, 122, 0.18),
+        1200px 600px at 12% -10%,
+        rgba(28, 166, 122, 0.22),
         transparent 60%
       ),
-      radial-gradient(900px 500px at 110% 10%, rgba(79, 114, 191, 0.25), transparent 55%),
-      linear-gradient(180deg, #0b1f3a 0%, #102044 100%);
+      radial-gradient(1000px 560px at 112% 8%, rgba(79, 114, 191, 0.3), transparent 55%),
+      linear-gradient(180deg, #0b1f3a 0%, #09182f 55%, #07132a 100%);
   }
+
+  /* Textura de grão sutil (premium, reduz banding dos gradientes) */
+  .grain::before {
+    content: '';
+    @apply pointer-events-none absolute inset-0 opacity-[0.06] mix-blend-overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
   .shimmer {
     position: relative;
     overflow: hidden;
@@ -117,10 +160,15 @@
     background-image: linear-gradient(
       90deg,
       transparent,
-      rgba(255, 255, 255, 0.55),
+      rgba(255, 255, 255, 0.6),
       transparent
     );
     animation: shimmer 1.6s infinite;
+  }
+
+  .mask-fade-b {
+    -webkit-mask-image: linear-gradient(180deg, #000 72%, transparent);
+    mask-image: linear-gradient(180deg, #000 72%, transparent);
   }
 }
 
@@ -134,7 +182,8 @@
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
   }
-  .shimmer::after {
+  .shimmer::after,
+  .btn-sheen:hover::after {
     animation: none;
   }
 }

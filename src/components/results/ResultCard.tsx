@@ -24,9 +24,13 @@ export function ResultCard({ resultado }: { resultado: ResultadoCompatibilidade 
   ].filter(Boolean) as { Icone: typeof Snowflake; label: string }[];
 
   return (
-    <article className="card group overflow-hidden transition-shadow hover:shadow-card-hover">
-      <div className="relative">
-        <VanIllustration seedKey={m.slug} className="h-40 w-full" />
+    <article className="card card-interactive group overflow-hidden">
+      <div className="relative overflow-hidden">
+        <VanIllustration
+          seedKey={m.slug}
+          className="h-44 w-full transition-transform duration-700 ease-premium group-hover:scale-[1.07]"
+        />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-navy-950/15 to-transparent" />
         <div className="absolute left-3 top-3 flex gap-2">
           <CompatBadge nivel={resultado.nivel} />
         </div>
@@ -83,7 +87,7 @@ export function ResultCard({ resultado }: { resultado: ResultadoCompatibilidade 
               <span className="mt-0.5 text-xs text-navy-400">Documentação não verificada</span>
             )}
           </div>
-          <Link to={`/van/${m.slug}`} className="btn btn-md btn-navy shrink-0">
+          <Link to={`/van/${m.slug}`} className="btn btn-sheen btn-md btn-navy shrink-0">
             Ver perfil
           </Link>
         </div>

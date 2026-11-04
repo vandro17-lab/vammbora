@@ -38,6 +38,21 @@ Registro cronológico, honesto, do que foi feito.
 - **Bug corrigido:** títulos sobre fundo escuro ficavam invisíveis (regra base forçava cor);
   ajustado para herdar a cor do contexto.
 
+### 04/11/2026 — Elevação visual premium (iteração da Etapa 1)
+Após revisão do coordenador (visual precisava ser mais premium):
+- **Ilustrações de van premium**: carroceria com gradiente e brilho, vidros com reflexo,
+  rodas com aro metálico, farol/lanterna, sombra de contato e cena de fundo com brilho de sol
+  (substituindo os blocos chapados). Continuam fictícias e vetoriais (sem fotos reais).
+- **Tela de busca cinematográfica** (`SearchLoadingScreen`): overlay em tela cheia (via portal),
+  van dirigindo com rodas girando e suspensão, estrada com parallax, cidade ao fundo, aurora
+  animada, barra de progresso e mensagens honestas. Respeita `prefers-reduced-motion`.
+- **Transições modernas**: revelações com blur + escala (`Reveal`) e transição de página
+  (`PageTransition`), substituindo o "subir" básico. Microinterações (sheen nos botões, zoom
+  na van, elevação dos cards).
+- **Correção**: overlay de carregamento não cobria a tela por causa do `transform/filter` da
+  transição de página — resolvido renderizando via portal no `body`.
+- Revalidado: `npm run build` (exit 0), 19 testes passando, 0 erros de console (Playwright).
+
 ### Pendências abertas
 Ver [`PENDENCIAS.md`](PENDENCIAS.md). Principais: integrar motor real, configurar Supabase,
 importar escolas do INEP com fonte/data, confirmar requisitos legais de Araçatuba.

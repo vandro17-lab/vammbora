@@ -158,7 +158,7 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
         </fieldset>
       </div>
 
-      <button type="submit" className="btn btn-lg btn-primary mt-6 w-full">
+      <button type="submit" className="btn btn-sheen btn-lg btn-primary mt-6 w-full">
         <Search className="h-5 w-5" />
         Buscar vans compatíveis
       </button>
