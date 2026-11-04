@@ -32,8 +32,9 @@ export function SearchLoadingScreen({ totalConsultados, cidade }: Props) {
   ];
 
   useEffect(() => {
-    const t1 = setTimeout(() => setPasso(1), 760);
-    const t2 = setTimeout(() => setPasso(2), 1500);
+    // Tempo suficiente para LER cada mensagem (~1,3s cada).
+    const t1 = setTimeout(() => setPasso(1), 1300);
+    const t2 = setTimeout(() => setPasso(2), 2600);
     return () => {
       clearTimeout(t1);
       clearTimeout(t2);
@@ -56,8 +57,8 @@ export function SearchLoadingScreen({ totalConsultados, cidade }: Props) {
       {/* Aurora atrás */}
       {!reduzir && (
         <>
-          <div className="pointer-events-none absolute -left-24 top-10 h-80 w-80 rounded-full bg-mint-500/30 blur-3xl animate-aurora-a" />
-          <div className="pointer-events-none absolute -right-20 bottom-8 h-96 w-96 rounded-full bg-navy-400/30 blur-3xl animate-aurora-b" />
+          <div className="pointer-events-none absolute -left-32 top-16 h-72 w-72 rounded-full bg-mint-500/20 blur-3xl animate-aurora-a" />
+          <div className="pointer-events-none absolute -right-40 bottom-12 h-72 w-72 rounded-full bg-navy-400/15 blur-3xl animate-aurora-b" />
         </>
       )}
 
@@ -99,14 +100,15 @@ export function SearchLoadingScreen({ totalConsultados, cidade }: Props) {
           </motion.div>
         )}
 
-        {/* Van (com suspensão) */}
-        <motion.div
-          className="absolute bottom-10 left-1/2 -translate-x-1/2"
-          animate={reduzir ? undefined : { y: [0, -4, 0, -2, 0] }}
-          transition={reduzir ? undefined : { duration: 1.1, ease: 'easeInOut', repeat: Infinity }}
-        >
-          <LoaderVan spinning={!reduzir} />
-        </motion.div>
+        {/* Van (centralizada via flex; só a suspensão usa transform, sem conflito) */}
+        <div className="absolute inset-x-0 bottom-10 flex justify-center">
+          <motion.div
+            animate={reduzir ? undefined : { y: [0, -4, 0, -2, 0] }}
+            transition={reduzir ? undefined : { duration: 1.1, ease: 'easeInOut', repeat: Infinity }}
+          >
+            <LoaderVan spinning={!reduzir} />
+          </motion.div>
+        </div>
 
         {/* Estrada */}
         <div className="absolute inset-x-0 bottom-0 h-10 rounded-t-xl bg-navy-950/60 ring-1 ring-white/5" />
@@ -144,7 +146,7 @@ export function SearchLoadingScreen({ totalConsultados, cidade }: Props) {
           className="h-full rounded-full bg-gradient-to-r from-mint-400 to-mint-500"
           initial={{ width: '8%' }}
           animate={{ width: '100%' }}
-          transition={{ duration: 2.1, ease: [0.4, 0, 0.2, 1] }}
+          transition={{ duration: 3.7, ease: [0.4, 0, 0.2, 1] }}
         />
       </div>
       <p className="relative z-10 mt-3 text-xs text-navy-300">
@@ -162,7 +164,7 @@ function LoaderVan({ spinning }: { spinning: boolean }) {
     transformOrigin: 'center' as const,
   };
   return (
-    <svg width="208" height="112" viewBox="0 0 208 112" fill="none" aria-hidden="true">
+    <svg width="170" height="92" viewBox="0 0 208 112" fill="none" aria-hidden="true">
       <defs>
         <linearGradient id="lv-corpo" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor="#5c84cf" />

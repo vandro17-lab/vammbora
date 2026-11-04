@@ -30,7 +30,7 @@ export function SearchResultsPage() {
   // terminou E os dados já chegaram (do banco ou locais).
   useEffect(() => {
     setTempoAnimacao(true);
-    const t = setTimeout(() => setTempoAnimacao(false), 2300);
+    const t = setTimeout(() => setTempoAnimacao(false), 3800);
     return () => clearTimeout(t);
   }, [sp]);
 
