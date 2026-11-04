@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+# Vambora — protótipo acadêmico (Ideathon Fatec 2026)
