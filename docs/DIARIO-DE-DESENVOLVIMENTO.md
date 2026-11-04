@@ -103,6 +103,25 @@ Após revisão do coordenador (visual precisava ser mais premium):
 - Falta: conceder papel admin ao usuário (após ele criar a conta) e ampliar o CRUD (destinos, fotos,
   revisão documental). Testar login ao vivo (sandbox bloqueia Supabase).
 
+### 04/11/2026 — Revisão: segurança, jornada da busca, erros honestos e UX (branch `revisao/seguranca-busca-erros`)
+Trabalho isolado do motor (não toquei em `src/engine/`, na especificação, nem em `src/lib/matching.ts`).
+1. **Permissões no banco (migração 0006 — APLICADA):** gatilho `trg_proteger_driver` impede não-admin
+   de se autoconceder `doc_verified`, mexer em `rating_*`, tirar a própria `is_suspended`, mudar
+   `is_demo`/`owner_id`/`slug` — no INSERT e no UPDATE. Script de teste em
+   `supabase/tests/permissoes_driver.sql`. **Teste automatizado de acessos ficou PENDENTE** de execução
+   (o pop-up de autorização do conector não foi respondido a tempo).
+2. **Jornada da busca → WhatsApp:** critérios (escola, turno, mensal/avulso, data, ida/volta) preservados
+   na URL ao ir ao perfil e voltar (verificado por Playwright). Mensagem do WhatsApp inclui os critérios e
+   **não** envia o endereço livre (privacidade); a família combina o ponto de embarque na conversa.
+3. **Erros honestos:** `VitrineProvider` agora tem status (carregando/pronto/erro) + "tentar de novo";
+   com Supabase ativo, falha NÃO cai em demonstração escondido (as leituras lançam erro). Admin verifica
+   cada gravação e avisa em caso de falha; falha de carregamento tem retry. Lista de interesse distingue
+   gravação real de simulação e não promete aviso automático (não implementado).
+4. **UX/linguagem:** a interface não afirma que "traçou a rota" nem "calculou a passagem no endereço";
+   horário é rotulado como "informado pelo motorista". Campo de endereço vira "bairro/região (opcional)".
+5. Validado: `npm run build` exit 0; `vitest` 20 testes; Playwright (mobile) 0 erros; fluxo avulso/data/
+   filtro/volta OK.
+
 ### Pendências abertas
 Ver [`PENDENCIAS.md`](PENDENCIAS.md). Principais: integrar motor real, configurar Supabase,
 importar escolas do INEP com fonte/data, confirmar requisitos legais de Araçatuba.

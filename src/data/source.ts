@@ -115,7 +115,14 @@ function mapDestino(r: LinhaDestino): Destino {
   };
 }
 
-/* ---------------------------- Leituras ---------------------------- */
+/* ---------------------------- Leituras ----------------------------
+ * HONESTIDADE: com o Supabase ATIVO, uma falha de consulta LANÇA erro — nunca
+ * substitui silenciosamente por dados de demonstração. Só o modo demo (sem
+ * Supabase) devolve os dados de exemplo locais. Quem chama decide como mostrar
+ * (carregando / vazio / erro-com-tentar-de-novo / demonstração).
+ */
+export const MODO_DEMO = !USE_SUPABASE;
+
 export async function listarDestinos(): Promise<Destino[]> {
   if (!USE_SUPABASE || !supabase) return DESTINOS;
   const { data, error } = await supabase
@@ -123,15 +130,15 @@ export async function listarDestinos(): Promise<Destino[]> {
     .select('*')
     .eq('is_published', true)
     .order('name');
-  if (error || !data) return DESTINOS;
-  return (data as LinhaDestino[]).map(mapDestino);
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((r) => mapDestino(r as LinhaDestino));
 }
 
 export async function listarMotoristas(): Promise<Motorista[]> {
   if (!USE_SUPABASE || !supabase) return MOTORISTAS;
   const { data, error } = await supabase.from('public_listings').select('*');
-  if (error || !data) return MOTORISTAS;
-  return (data as LinhaListing[]).map(mapMotorista);
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((r) => mapMotorista(r as unknown as LinhaListing));
 }
 
 export async function obterMotoristaPorSlug(slug: string): Promise<Motorista | null> {
@@ -141,8 +148,8 @@ export async function obterMotoristaPorSlug(slug: string): Promise<Motorista | n
     .select('*')
     .eq('slug', slug)
     .maybeSingle();
-  if (error || !data) return null;
-  return mapMotorista(data as unknown as LinhaListing);
+  if (error) throw new Error(error.message);
+  return data ? mapMotorista(data as unknown as LinhaListing) : null;
 }
 
 /* ---------------------------- Escritas (RPCs seguras) ---------------------------- */
@@ -158,10 +165,10 @@ export interface InteressePayload {
 
 export async function registrarInteresse(
   p: InteressePayload,
-): Promise<{ ok: boolean; id?: string; erro?: string }> {
+): Promise<{ ok: boolean; id?: string; erro?: string; demo?: boolean }> {
   if (!USE_SUPABASE || !supabase) {
-    // Modo demo: não há servidor; apenas confirma localmente.
-    return { ok: true };
+    // Modo demo: NÃO há servidor; o envio é apenas simulado (não gravado).
+    return { ok: true, demo: true };
   }
   const { data, error } = await supabase.rpc('registrar_interesse', {
     p_city_id: p.cidadeId,
@@ -240,8 +247,8 @@ export async function adminListarMotoristas(): Promise<MotoristaAdmin[]> {
       'id,slug,name,city_id,seats_available,capacity_total,is_published,is_suspended,doc_verified,is_demo,rating_avg,whatsapp',
     )
     .order('name');
-  if (error || !data) return [];
-  return data as unknown as MotoristaAdmin[];
+  if (error) throw new Error(error.message);
+  return (data ?? []) as unknown as MotoristaAdmin[];
 }
 
 export async function adminAtualizarMotorista(
@@ -259,6 +266,6 @@ export async function adminListarInteressados(): Promise<InteressadoAdmin[]> {
     .from('waitlist_requests')
     .select('id,contact_name,contact_whatsapp,region,turno,destination_id,created_at')
     .order('created_at', { ascending: false });
-  if (error || !data) return [];
-  return data as unknown as InteressadoAdmin[];
+  if (error) throw new Error(error.message);
+  return (data ?? []) as unknown as InteressadoAdmin[];
 }

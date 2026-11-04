@@ -20,15 +20,15 @@ export function SearchLoadingScreen({ totalConsultados, cidade }: Props) {
   const [passo, setPasso] = useState(0);
 
   const passos = [
-    { Icone: Route, texto: 'Buscando opções para seu destino' },
+    { Icone: Route, texto: 'Buscando vans para o seu destino' },
     {
       Icone: Clock3,
       texto:
         totalConsultados > 0
-          ? `Verificando horários e vagas de ${plural(totalConsultados, 'motorista', 'motoristas')} em ${cidade}`
+          ? `Conferindo vagas de ${plural(totalConsultados, 'motorista', 'motoristas')} em ${cidade}`
           : `Procurando motoristas em ${cidade}`,
     },
-    { Icone: Sparkles, texto: 'Comparando as melhores opções para você' },
+    { Icone: Sparkles, texto: 'Organizando as melhores opções para você' },
   ];
 
   useEffect(() => {
@@ -150,7 +150,7 @@ export function SearchLoadingScreen({ totalConsultados, cidade }: Props) {
         />
       </div>
       <p className="relative z-10 mt-3 text-xs text-navy-300">
-        Reunindo as informações para sua escolha.
+        Mostramos vagas e horários informados pelos motoristas.
       </p>
     </motion.div>,
     document.body,

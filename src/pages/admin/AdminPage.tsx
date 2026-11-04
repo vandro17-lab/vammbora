@@ -97,35 +97,49 @@ function AdminDashboard({ onSair }: { onSair: () => void }) {
   const [interessados, setInteressados] = useState<InteressadoAdmin[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [salvandoId, setSalvandoId] = useState<string | null>(null);
+  const [erroCarregar, setErroCarregar] = useState(false);
+  const [aviso, setAviso] = useState<{ tipo: 'ok' | 'erro'; texto: string } | null>(null);
 
   const recarregar = useCallback(async () => {
     setCarregando(true);
-    const [m, i] = await Promise.all([adminListarMotoristas(), adminListarInteressados()]);
-    setMotoristas(m);
-    setInteressados(i);
-    setCarregando(false);
+    setErroCarregar(false);
+    try {
+      const [m, i] = await Promise.all([adminListarMotoristas(), adminListarInteressados()]);
+      setMotoristas(m);
+      setInteressados(i);
+    } catch {
+      setErroCarregar(true);
+    } finally {
+      setCarregando(false);
+    }
   }, []);
 
   useEffect(() => {
     recarregar();
   }, [recarregar]);
 
-  async function alternar(
+  async function aplicar(
     id: string,
     patch: Partial<Pick<MotoristaAdmin, 'is_published' | 'is_suspended' | 'seats_available'>>,
   ) {
     setSalvandoId(id);
-    await adminAtualizarMotorista(id, patch);
-    await recarregar();
+    setAviso(null);
+    const r = await adminAtualizarMotorista(id, patch);
+    if (r.ok) {
+      await recarregar();
+      setAviso({ tipo: 'ok', texto: 'Alteração salva.' });
+    } else {
+      setAviso({ tipo: 'erro', texto: `Não foi possível salvar: ${r.erro ?? 'erro desconhecido'}` });
+    }
     setSalvandoId(null);
   }
 
-  async function salvarVagas(id: string, valor: number) {
-    setSalvandoId(id);
-    await adminAtualizarMotorista(id, { seats_available: Math.max(0, valor) });
-    await recarregar();
-    setSalvandoId(null);
-  }
+  const alternar = (
+    id: string,
+    patch: Partial<Pick<MotoristaAdmin, 'is_published' | 'is_suspended' | 'seats_available'>>,
+  ) => aplicar(id, patch);
+  const salvarVagas = (id: string, valor: number) =>
+    aplicar(id, { seats_available: Math.max(0, valor) });
 
   return (
     <AdminShell onSair={onSair}>
@@ -138,6 +152,28 @@ function AdminDashboard({ onSair }: { onSair: () => void }) {
           <RefreshCw className={`h-4 w-4 ${carregando ? 'animate-spin' : ''}`} /> Atualizar
         </button>
       </div>
+
+      {/* Feedback de gravação */}
+      {aviso && (
+        <p
+          role="status"
+          className={`mt-4 rounded-xl p-3 text-sm ${
+            aviso.tipo === 'ok' ? 'bg-mint-50 text-mint-800' : 'bg-red-50 text-red-700'
+          }`}
+        >
+          {aviso.texto}
+        </p>
+      )}
+
+      {/* Falha de carregamento */}
+      {erroCarregar && (
+        <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl bg-red-50 p-3 text-sm text-red-700">
+          <span>Não foi possível carregar os dados (falha de conexão).</span>
+          <button className="btn btn-sm btn-navy" onClick={recarregar}>
+            <RefreshCw className="h-4 w-4" /> Tentar de novo
+          </button>
+        </div>
+      )}
 
       {/* Resumo */}
       <div className="mt-6 grid gap-4 sm:grid-cols-3">

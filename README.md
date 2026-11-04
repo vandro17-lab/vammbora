@@ -15,13 +15,22 @@ O Vambora conecta famílias e estudantes a vans que realmente conseguem buscar o
 - **Estado de busca premium**: animação original de uma van percorrendo a rota, com mensagens honestas e respeito a `prefers-reduced-motion`.
 - **Resultados** com filtro de compatibilidade (adaptador **simulado**, claramente marcado), cards com avaliação, vagas, horário de passagem, recursos e preço.
 - **Perfil do motorista** com recursos do veículo, janela de embarque, status de verificação honesto e **CTA de WhatsApp com mensagem pronta**.
-- **Lista de interesse** quando não há van compatível (com consentimento; gravação real virá na Etapa 2).
+- **Lista de interesse** quando não há van compatível (com consentimento). Distingue gravação real
+  × simulação e **não** promete aviso automático (não implementado).
 - **Prévia do painel do motorista** (estrutura preparada para a Etapa 3).
 - **PWA instalável** (manifesto, ícones 192/512 + maskable, service worker versionado).
-- **Testes automatizados** da lógica central (19 testes).
-- **Banco de dados Supabase preparado** (Etapa 2 — Parte A): migrações SQL versionadas, RLS,
-  storage, RPCs seguras e seed. Opcional e desligado por padrão (a demo roda sem ele). Veja
+- **Testes automatizados** da lógica central (20 testes).
+- **Banco de dados Supabase** (Etapa 2): migrações versionadas, RLS, storage, RPCs seguras e seed —
+  **aplicados**; a vitrine e o admin leem/gravam no banco quando configurado. Veja
   [`docs/GUIA-SUPABASE.md`](docs/GUIA-SUPABASE.md).
+- **Administração** (`/admin`): login por papel (Supabase Auth), publicar/ocultar motoristas e
+  editar vagas. Sem botão público.
+
+> **Estados separados (honestidade):** _implementado_ (UI + lógica, testado com build/vitest/
+> Playwright) · _depende de config_ (variáveis do Supabase no Vercel) · _demonstração_ (dados de
+> exemplo quando o Supabase está desligado) · _simulado_ (motor de encaixe — ver
+> [`docs/ESPEC-MOTOR-DE-ENCAIXE.md`](docs/ESPEC-MOTOR-DE-ENCAIXE.md)). Detalhes em
+> [`docs/PENDENCIAS.md`](docs/PENDENCIAS.md).
 
 ## 🧰 Stack
 

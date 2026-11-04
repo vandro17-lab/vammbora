@@ -1,9 +1,20 @@
-import type { CriteriosBusca, Motorista, Destino } from '@/types';
+import type { CriteriosBusca, Motorista, Destino, ModalidadeTrajeto } from '@/types';
 import { TURNO_LABEL } from '@/lib/utils';
 
+const MODALIDADE_LABEL: Record<ModalidadeTrajeto, string> = {
+  ida: 'somente ida',
+  volta: 'somente volta',
+  ambos: 'ida e volta',
+};
+
 /**
- * Monta a mensagem pronta de WhatsApp SEM expor dados sensíveis desnecessários.
- * Nunca inclui endereço completo do aluno — apenas a região/bairro informado.
+ * Monta a mensagem pronta de WhatsApp, incluindo os critérios da busca
+ * (escola, turno, mensal/avulso + data, ida/volta).
+ *
+ * PRIVACIDADE: NÃO inclui o endereço/ponto de embarque automaticamente. Mesmo que
+ * a família tenha digitado um endereço livre na busca, ele NÃO é enviado — a
+ * própria família decide o que revelar ao combinar o embarque na conversa.
+ * A mensagem é só uma sugestão: a família revisa e envia por conta própria.
  */
 export function montarMensagemWhatsApp(
   motorista: Motorista,
@@ -26,11 +37,11 @@ export function montarMensagemWhatsApp(
         : `Contratação: avulso${criterios.dataAvulso ? ` (${formatarData(criterios.dataAvulso)})` : ''}.`,
     );
   }
-  if (criterios?.endereco) {
-    // Apenas região/referência — a pessoa decide o que detalhar na conversa.
-    linhas.push(`Região de embarque: ${criterios.endereco}.`);
+  if (criterios?.modalidade) {
+    linhas.push(`Trajeto: ${MODALIDADE_LABEL[criterios.modalidade]}.`);
   }
-  linhas.push('Essa rota tem vaga e passa perto? Podemos combinar os detalhes por aqui?');
+  // Não enviamos o endereço: a família combina o ponto de embarque na conversa.
+  linhas.push('Essa rota tem vaga e passa perto de mim? Combino o ponto de embarque por aqui.');
 
   return linhas.join('\n');
 }

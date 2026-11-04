@@ -1,7 +1,7 @@
 import { nomeDestinoParaExibicao } from '@/lib/utils';
 import { useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { paramsParaCriterios } from '@/lib/searchParams';
+
 import {
   ArrowLeft,
   MessageCircle,
@@ -15,9 +15,12 @@ import {
   MapPin,
   CalendarCheck,
   Loader2,
+  WifiOff,
+  RefreshCw,
 } from 'lucide-react';
 import { useVitrine } from '@/data/VitrineProvider';
 import { solicitarContatoWhatsapp } from '@/data/source';
+import { paramsParaCriterios } from '@/lib/searchParams';
 import { Avatar } from '@/components/brand/Avatar';
 import { VanIllustration } from '@/components/brand/VanIllustration';
 import { Stars } from '@/components/ui/Stars';
@@ -28,16 +31,31 @@ import { formatBRL, TURNO_LABEL, plural } from '@/lib/utils';
 export function DriverProfilePage() {
   const { slug } = useParams();
   const [sp] = useSearchParams();
-  const criterios = sp.size ? paramsParaCriterios(sp) : null;
-  const busca = sp.size ? `?${sp.toString()}` : '';
-  const { motoristas, destinosPorId, carregando } = useVitrine();
+  const { motoristas, destinosPorId, status, recarregar } = useVitrine();
   const [abrindoZap, setAbrindoZap] = useState(false);
   const [erroZap, setErroZap] = useState(false);
 
+  // Critérios vindos da busca (preservados na URL): escola, turno, mensal/avulso, data, ida/volta.
+  const criterios = paramsParaCriterios(sp);
+  const voltarUrl = sp.toString() ? `/resultados?${sp.toString()}` : '/resultados';
+
   const m = slug ? motoristas.find((x) => x.slug === slug) : undefined;
 
+  // Falha de conexão (Supabase ativo): não escondemos — oferecemos tentar de novo.
+  if (!m && status === 'erro') {
+    return (
+      <div className="container-page flex flex-col items-center py-24 text-center">
+        <WifiOff className="h-12 w-12 text-navy-300" />
+        <h1 className="mt-4 font-display text-xl font-bold">Falha ao carregar o perfil</h1>
+        <p className="mt-2 max-w-sm text-navy-600">Houve um problema de conexão. Tente novamente.</p>
+        <button className="btn btn-md btn-primary mt-5" onClick={recarregar}>
+          <RefreshCw className="h-4 w-4" /> Tentar de novo
+        </button>
+      </div>
+    );
+  }
   // Ainda carregando os dados da vitrine (do banco ou locais).
-  if (!m && carregando) {
+  if (!m && status === 'carregando') {
     return (
       <div className="container-page flex items-center justify-center py-32 text-navy-400">
         <Loader2 className="h-6 w-6 animate-spin" />
@@ -48,16 +66,23 @@ export function DriverProfilePage() {
 
   const motorista = m;
   const destinos = motorista.destinosIds.map((id) => destinosPorId[id]).filter(Boolean);
+  const destinoBusca = criterios.destinoId ? destinosPorId[criterios.destinoId] ?? null : null;
 
   // Abre o WhatsApp de forma segura (popup aberto no clique) e registra o lead.
   // O telefone vem do banco via RPC quando o Supabase está ligado; senão, local.
+  // A mensagem leva os critérios da busca; a família revisa e envia por conta própria.
   async function abrirWhatsApp() {
     setErroZap(false);
     setAbrindoZap(true);
     const janela = window.open('about:blank', '_blank');
-    const fone = await solicitarContatoWhatsapp(motorista.slug, true, { destinoId: criterios?.destinoId, turno: criterios?.turno, contratacao: criterios?.contratacao });
+    const fone = await solicitarContatoWhatsapp(motorista.slug, true, {
+      destinoId: criterios.destinoId,
+      turno: criterios.turno,
+      contratacao: criterios.contratacao,
+      regiao: criterios.endereco || null,
+    });
     const link = fone
-      ? montarLinkWhatsApp(fone, montarMensagemWhatsApp(motorista, criterios, criterios?.destinoId ? destinosPorId[criterios.destinoId] ?? null : null))
+      ? montarLinkWhatsApp(fone, montarMensagemWhatsApp(motorista, criterios, destinoBusca))
       : null;
     setAbrindoZap(false);
     if (link && janela) {
@@ -78,7 +103,7 @@ export function DriverProfilePage() {
   return (
     <div className="container-page pb-28 pt-8 lg:pb-12">
       <Link
-        to={`/resultados${busca}`}
+        to={voltarUrl}
         className="inline-flex items-center gap-1.5 text-sm font-medium text-navy-500 hover:text-navy-800"
       >
         <ArrowLeft className="h-4 w-4" /> Voltar aos resultados
@@ -163,8 +188,11 @@ export function DriverProfilePage() {
 
             <dl className="mt-5 space-y-3 border-t border-navy-100 pt-5 text-sm">
               <div className="flex items-center justify-between">
-                <dt className="inline-flex items-center gap-2 text-navy-500">
-                  <Clock className="h-4 w-4" /> Horário informado
+                <dt
+                  className="inline-flex items-center gap-2 text-navy-500"
+                  title="Horário informado pelo motorista — não é um cálculo para o seu endereço."
+                >
+                  <Clock className="h-4 w-4" /> Horário do motorista
                 </dt>
                 <dd className="font-semibold text-navy-900">{m.janela.horario}</dd>
               </div>

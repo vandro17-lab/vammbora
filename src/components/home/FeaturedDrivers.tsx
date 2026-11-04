@@ -7,7 +7,8 @@ import { Stars } from '@/components/ui/Stars';
 import { Reveal } from '@/components/motion/Reveal';
 
 export function FeaturedDrivers() {
-  const { motoristas, carregando } = useVitrine();
+  const { motoristas, status } = useVitrine();
+  const carregando = status === 'carregando';
   const destaque = [...motoristas]
     .sort((a, b) => b.avaliacao.media - a.avaliacao.media)
     .slice(0, 3);
