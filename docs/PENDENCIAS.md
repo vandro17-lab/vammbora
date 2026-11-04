@@ -8,14 +8,19 @@ Lista honesta do que **falta**, o que é **risco** e o que é **dívida técnica
 |---|---|---|---|
 | 1 | **Motor de encaixe real ausente** (`motor/`, `motor-van-bora.md`) | Compatibilidade é simulada | Receber os arquivos, ler a API real, rodar os testes, criar adaptador |
 | 2 | **Documento mestre e PDF do Ideathon ausentes** | Risco de divergência de regras/cronograma | Adicionar ao repo; revisar `PLANO-MESTRE.md` |
-| 3 | **Projeto Supabase não configurado** | Sem persistência real | Criar projeto, obter URL + chave publishable, aplicar migrações |
+| 3 | **Projeto Supabase não criado/aplicado** | Migrações prontas, mas sem persistência até aplicar | Usuário: criar projeto e seguir `docs/GUIA-SUPABASE.md` (rodar SQL + variáveis). Depois: validar ponta a ponta |
 | 4 | **Requisitos legais de transporte escolar (Araçatuba)** | Não podemos afirmar conformidade | Pesquisa documental (municipal/estadual/federal); status "pendente de verificação" |
 
 ## 🟡 A fazer nas próximas etapas
 
-- **Etapa 2 (Supabase):** migrações do núcleo, RLS, buckets (público p/ imagens, privado p/
-  documentos), seed idempotente, integração real, CRUD/admin mínimo, auth por papel.
-  Persistir `waitlist_requests` e `leads` (hoje o formulário de interesse só confirma localmente).
+- **Etapa 2 — Parte A (FEITA, pendente de aplicar):** migrações do núcleo, RLS, buckets, RPCs e
+  seed já escritos em `supabase/`. Falta o usuário criar o projeto e aplicar (ver guia).
+- **Etapa 2 — Parte B (depois de aplicar):** migrar a vitrine (home/busca/resultados/perfil) para
+  ler do `source.ts` com `await` (hoje a vitrine usa o seed local por padrão, para a demo);
+  CRUD/admin mínimo com UI; autenticação por papel (motorista/admin); ligar o botão de WhatsApp à
+  RPC no modo Supabase. Validar tudo contra o projeto real.
+- **Rate-limit das RPCs públicas:** `solicitar_contato_whatsapp`/`registrar_interesse` precisam de
+  limite por IP/app na borda (ex.: Edge Function ou proteção do Supabase) para evitar abuso.
 - **Etapa 3 (Motorista):** onboarding completo, cadastro de veículo/rotas visual, vagas por trecho,
   oportunidades agregadas (sem expor dados das famílias), simulador com o **motor real**.
 - **Importação INEP:** escolas reais com `fonte`, `data` e `codigoInep` verdadeiros.

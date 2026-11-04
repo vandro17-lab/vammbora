@@ -53,6 +53,22 @@ Após revisão do coordenador (visual precisava ser mais premium):
   transição de página — resolvido renderizando via portal no `body`.
 - Revalidado: `npm run build` (exit 0), 19 testes passando, 0 erros de console (Playwright).
 
+### 04/11/2026 — Etapa 2 (Parte A): fundação do banco Supabase
+- **Migrações SQL versionadas** (`supabase/migrations/`): núcleo (profiles, user_roles, cities,
+  destinations, drivers, driver_destinations, verification_reviews, leads, waitlist_requests,
+  audit_events), com enums, índices, FKs, constraints e triggers.
+- **RLS** em todas as tabelas; **view `public_listings`** para a vitrine pública sem telefone/
+  documento/endereço; funções de papel (`is_admin`, `has_role`).
+- **Storage**: buckets `public-media` (público) e `driver-docs` (privado) com políticas.
+- **RPCs seguras**: `solicitar_contato_whatsapp` (registra lead e devolve o telefone) e
+  `registrar_interesse` (waitlist). Ambas exigem consentimento.
+- **Seed idempotente** espelhando a demo (is_demo=true, telefones fictícios).
+- **App**: cliente `@supabase/supabase-js`, `src/lib/supabase.ts` (flag), camada única
+  `src/data/source.ts` com **fallback local**, e `WaitlistForm` gravando via RPC quando ligado.
+- **Guia** `docs/GUIA-SUPABASE.md` (passo a passo para iniciante) e `supabase/README.md`.
+- Validado: `npm run build` (exit 0), 19 testes passando. **Migrações ainda NÃO aplicadas**
+  (dependem do usuário criar o projeto Supabase — sem acesso remoto nesta sessão).
+
 ### Pendências abertas
 Ver [`PENDENCIAS.md`](PENDENCIAS.md). Principais: integrar motor real, configurar Supabase,
 importar escolas do INEP com fonte/data, confirmar requisitos legais de Araçatuba.

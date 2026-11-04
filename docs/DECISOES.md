@@ -56,3 +56,22 @@ oferecida ao usuário.
 co-autora, com declaração em `docs/USO-DE-IA.md`.
 **Justificativa:** honestidade do Ideathon; cada integrante deve commitar com sua própria conta
 para que a entrega tenha contribuições autênticas de pelo menos 3 pessoas.
+
+### ADR-009 — Vitrine pública lê por VIEW + telefone via RPC (Supabase)
+**Data:** 04/11/2026 · **Status:** aceita
+**Contexto:** a vitrine precisa ser pública, mas não pode expor telefone, documentos nem endereço.
+**Decisão:** o público lê apenas a view `public_listings` (sem telefone/documento/owner). O telefone
+do motorista é devolvido só pela RPC `solicitar_contato_whatsapp`, que **registra o lead** com
+consentimento. Buckets: imagens no público, documentos no privado.
+**Justificativa:** protege dados sensíveis e dá rastreio de contato, cumprindo as regras de segurança
+e LGPD do projeto.
+**Consequências:** evita varredura em massa de telefones; rate-limit fica como pendência de borda.
+
+### ADR-010 — Supabase é opcional (flag); a demo roda sem chave
+**Data:** 04/11/2026 · **Status:** aceita
+**Decisão:** a camada Supabase é ativada por `VITE_USE_SUPABASE` + URL + chave anon. Sem isso, o app
+usa os dados de exemplo locais. Uma camada única (`src/data/source.ts`) esconde a fonte das telas.
+**Justificativa:** o Ideathon exige rodar no navegador **sem serviço pago nem chave privada**; o
+Supabase entra como diferencial, sem quebrar a demonstração.
+**Consequências:** o mesmo código serve demo e produção; a vitrine pode migrar para dados reais sem
+reescrever telas.

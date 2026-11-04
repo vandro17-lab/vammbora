@@ -21,10 +21,16 @@ até o banco real no **Supabase (PostgreSQL)**. Os tipos vivem em `src/types/ind
 - `Motorista.documentacaoVerificada` — só `true` com verificação **real** registrada.
 - `Motorista.demo` — marca registros de demonstração.
 
-## Esquema planejado para o Supabase (Etapa 2)
+## Esquema no Supabase (Etapa 2 — Parte A: IMPLEMENTADO)
 
-Núcleo a criar via **migrações SQL versionadas** (`supabase/migrations/`), com índices, FKs,
-constraints, RLS e seed idempotente:
+✅ O núcleo abaixo **já existe** em **migrações SQL versionadas** em `supabase/migrations/`
+(com índices, FKs, constraints, RLS, storage e RPCs) e no seed `supabase/seed.sql`.
+Falta apenas **aplicar** num projeto Supabase — ver [`GUIA-SUPABASE.md`](GUIA-SUPABASE.md).
+Tabelas implementadas: `profiles`, `user_roles`, `cities`, `destinations`, `drivers`,
+`driver_destinations`, `verification_reviews`, `leads`, `waitlist_requests`, `audit_events`,
+mais a view pública `public_listings` e os buckets `public-media`/`driver-docs`.
+
+Estrutura (resumo):
 
 ```
 profiles (1:1 auth.users)

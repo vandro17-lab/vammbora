@@ -19,6 +19,9 @@ O Vambora conecta famílias e estudantes a vans que realmente conseguem buscar o
 - **Prévia do painel do motorista** (estrutura preparada para a Etapa 3).
 - **PWA instalável** (manifesto, ícones 192/512 + maskable, service worker versionado).
 - **Testes automatizados** da lógica central (19 testes).
+- **Banco de dados Supabase preparado** (Etapa 2 — Parte A): migrações SQL versionadas, RLS,
+  storage, RPCs seguras e seed. Opcional e desligado por padrão (a demo roda sem ele). Veja
+  [`docs/GUIA-SUPABASE.md`](docs/GUIA-SUPABASE.md).
 
 ## 🧰 Stack
 
@@ -65,6 +68,8 @@ docs/             # documentação do projeto e pesquisas
 - [`docs/PLANO-MESTRE.md`](docs/PLANO-MESTRE.md) — plano e referência à visão original
 - [`docs/ARQUITETURA.md`](docs/ARQUITETURA.md) — arquitetura e decisões técnicas
 - [`docs/MODELO-DE-DADOS.md`](docs/MODELO-DE-DADOS.md) — entidades e evolução até Supabase
+- [`docs/GUIA-SUPABASE.md`](docs/GUIA-SUPABASE.md) — configurar o banco Supabase (passo a passo)
+- [`supabase/`](supabase/) — migrações SQL, RLS, storage e seed
 - [`docs/DECISOES.md`](docs/DECISOES.md) — registro de decisões (ADR)
 - [`docs/GUIA-PARA-INICIANTES.md`](docs/GUIA-PARA-INICIANTES.md) — passo a passo para quem está começando
 - [`docs/PENDENCIAS.md`](docs/PENDENCIAS.md) — o que falta e riscos
