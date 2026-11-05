@@ -7,6 +7,7 @@ import { CIDADE_PADRAO } from '@/data/cidades';
 import { useVitrine } from '@/data/VitrineProvider';
 import { TURNO_LABEL, cn } from '@/lib/utils';
 import { criteriosParaParams } from '@/lib/searchParams';
+import { AutocompleteEndereco } from '@/components/search/AutocompleteEndereco';
 
 const TITULOS = ['De onde vamos sair?', 'Qual é o destino?', 'Como é sua rotina?'];
 const DESCRICOES = ['Comece pelo bairro de embarque.', 'Escolha a escola ou a faculdade.', 'Falta pouco para encontrar suas opções.'];
@@ -16,6 +17,7 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
   const { destinos, carregando, erro } = useVitrine();
   const [passo, setPasso] = useState(0);
   const [endereco, setEndereco] = useState('');
+  const [origemCoord, setOrigemCoord] = useState<{ lat: number; lng: number } | null>(null);
   const [destinoId, setDestinoId] = useState('');
   const [turno, setTurno] = useState<Turno | ''>('');
   const [contratacao, setContratacao] = useState<Contratacao>('mensal');
@@ -26,7 +28,7 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
   function enviar(e: React.FormEvent) {
     e.preventDefault();
     if (passo < 2) { ir(passo + 1); return; }
-    const params = criteriosParaParams({ cidadeId: CIDADE_PADRAO.id, endereco: endereco.trim(), destinoId: destinoId || null, turno: turno || null, contratacao, dataAvulso: contratacao === 'avulso' ? dataAvulso : undefined, modalidade });
+    const params = criteriosParaParams({ cidadeId: CIDADE_PADRAO.id, endereco: endereco.trim(), destinoId: destinoId || null, turno: turno || null, contratacao, dataAvulso: contratacao === 'avulso' ? dataAvulso : undefined, modalidade, origemLat: origemCoord?.lat, origemLng: origemCoord?.lng });
     navigate(`/resultados?${params}`);
   }
   return (
@@ -46,7 +48,7 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
         <p className="mt-2 text-sm leading-relaxed text-navy-500">{DESCRICOES[passo]}</p>
         {passo === 0 && <div className="mt-6 space-y-5">
           <div className="flex items-center gap-3 rounded-xl bg-navy-50 p-4"><MapPin className="h-5 w-5 text-mint-700" /><div><span className="block text-xs text-navy-500">Sua cidade</span><span className="text-sm font-semibold">Araçatuba, SP</span></div></div>
-          <div><label className="field-label" htmlFor="endereco">Bairro ou região de embarque</label><input id="endereco" className="field-input" placeholder="Ex.: Centro, São João…" value={endereco} onChange={e => setEndereco(e.target.value)} autoComplete="off" /><p className="mt-2 text-xs text-navy-500">O ponto exato você combina com o motorista.</p></div>
+          <div><label className="field-label" htmlFor="endereco">Endereço ou bairro de embarque</label><AutocompleteEndereco id="endereco" value={endereco} placeholder="Ex.: Rua Floriano Peixoto, Centro…" onChange={(texto, coord) => { setEndereco(texto); setOrigemCoord(coord ?? null); }} /><p className="mt-2 text-xs text-navy-500">Digite para ver sugestões de Araçatuba. O ponto exato você combina com o motorista.</p></div>
         </div>}
         {passo === 1 && <div className="mt-6">
           <label className="field-label" htmlFor="destino">Escola, faculdade ou destino</label>

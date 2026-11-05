@@ -17,6 +17,16 @@ describe('searchParams (ida e volta)', () => {
     expect(voltou).toEqual(c);
   });
 
+  it('leva e traz as coordenadas exatas da origem (autocomplete)', () => {
+    const c: CriteriosBusca = {
+      cidadeId: 'aracatuba-sp', endereco: 'Av. Prestes Maia, 1764', destinoId: null,
+      turno: 'manha', contratacao: 'mensal', modalidade: 'ida', origemLat: -21.2089, origemLng: -50.4328,
+    };
+    const voltou = paramsParaCriterios(new URLSearchParams(criteriosParaParams(c)));
+    expect(voltou.origemLat).toBeCloseTo(-21.2089, 4);
+    expect(voltou.origemLng).toBeCloseTo(-50.4328, 4);
+  });
+
   it('aplica valores padrão seguros para params ausentes', () => {
     const c = paramsParaCriterios(new URLSearchParams(''));
     expect(c.cidadeId).toBe('aracatuba-sp');

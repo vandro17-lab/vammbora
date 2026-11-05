@@ -103,6 +103,10 @@ export interface CriteriosBusca {
   /** Data (YYYY-MM-DD) quando contratacao === 'avulso'. */
   dataAvulso?: string;
   modalidade: ModalidadeTrajeto;
+  /** Coordenadas exatas da origem, quando a família escolhe um endereço do
+   *  autocomplete (geocodificado). Quando ausentes, estima-se pela região. */
+  origemLat?: number;
+  origemLng?: number;
 }
 
 /** Resultado de uma avaliação de compatibilidade para um motorista. */

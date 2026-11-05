@@ -111,7 +111,10 @@ function elegivel(m: Motorista, criterios: CriteriosBusca): boolean {
 /** Avalia um motorista com o motor real. Nunca inventa horário. */
 function avaliar(m: Motorista, criterios: CriteriosBusca, destino: Destino | null): ResultadoCompatibilidade {
   const semVaga = m.vagasDisponiveis <= 0;
-  const origem = coordDaOrigem(criterios.endereco);
+  // Preferência: coordenada exata do autocomplete; senão, estimativa pela região.
+  const origem = (Number.isFinite(criterios.origemLat) && Number.isFinite(criterios.origemLng))
+    ? { lat: criterios.origemLat as number, lng: criterios.origemLng as number }
+    : coordDaOrigem(criterios.endereco);
   const turno = criterios.turno ?? (m.turnos[0] as Turno | undefined) ?? 'manha';
   const limite = LIMITE_POR_TURNO[turno];
 

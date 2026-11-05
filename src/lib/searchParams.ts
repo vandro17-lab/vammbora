@@ -14,6 +14,10 @@ export function criteriosParaParams(c: CriteriosBusca): string {
   p.set('contratacao', c.contratacao);
   if (c.dataAvulso) p.set('data', c.dataAvulso);
   p.set('modalidade', c.modalidade);
+  if (Number.isFinite(c.origemLat) && Number.isFinite(c.origemLng)) {
+    p.set('olat', String(c.origemLat));
+    p.set('olng', String(c.origemLng));
+  }
   return p.toString();
 }
 
@@ -34,5 +38,13 @@ export function paramsParaCriterios(sp: URLSearchParams): CriteriosBusca {
       modalidade && (MODALIDADES_VALIDAS as string[]).includes(modalidade)
         ? (modalidade as ModalidadeTrajeto)
         : 'ida',
+    origemLat: numeroOuUndef(sp.get('olat')),
+    origemLng: numeroOuUndef(sp.get('olng')),
   };
+}
+
+function numeroOuUndef(v: string | null): number | undefined {
+  if (v == null) return undefined;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : undefined;
 }
