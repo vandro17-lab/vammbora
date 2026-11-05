@@ -51,8 +51,8 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     const data = JSON.parse(raw) as { operacao?: string; texto?: string; pontos?: Point[] };
     const op = data.operacao;
 
-    // Roteamento é mais caro: exige sessão Supabase (motorista logado).
-    if (op === 'rota') {
+    // Roteamento e matriz são mais caros: exigem sessão Supabase (motorista logado).
+    if (op === 'rota' || op === 'matriz') {
       const supabaseUrl = process.env.VITE_SUPABASE_URL;
       const anonKey = process.env.VITE_SUPABASE_ANON_KEY;
       const token = req.headers.authorization?.match(/^Bearer (.+)$/)?.[1];
@@ -60,6 +60,55 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       if (!token) return reply(res, 401, { erro: 'Faça login como motorista para calcular trajetos.' });
       const authResponse = await fetch(new URL('/auth/v1/user', supabaseUrl), { headers: { apikey: anonKey, Authorization: 'Bearer ' + token } });
       if (!authResponse.ok) return reply(res, 401, { erro: 'Sessão expirada. Faça login novamente.' });
+    }
+
+    // Matriz viária (sources x targets): usada pelo simulador de encaixe.
+    if (op === 'matriz') {
+      const pontos = data.pontos;
+      if (!Array.isArray(pontos) || pontos.length < 2 || pontos.length > 25 || !pontos.every(valid)) {
+        return reply(res, 400, { erro: 'Informe de 2 a 25 pontos geográficos válidos.' });
+      }
+      const matrizUrl = new URL('https://api.geoapify.com/v1/routematrix');
+      matrizUrl.searchParams.set('apiKey', key);
+      const corpo = {
+        mode: 'drive',
+        sources: pontos.map((p) => ({ location: [p.lng, p.lat] })),
+        targets: pontos.map((p) => ({ location: [p.lng, p.lat] })),
+      };
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 15000);
+      let upstream: Response;
+      try {
+        upstream = await fetch(matrizUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(corpo),
+          signal: controller.signal,
+        });
+      } finally { clearTimeout(timer); }
+      if (!upstream.ok) {
+        return reply(res, upstream.status === 429 ? 429 : 502, {
+          erro: upstream.status === 429 ? 'Limite de consultas do mapa atingido. Tente mais tarde.' : 'Serviço de mapas indisponível. Tente novamente.',
+        });
+      }
+      const json = (await upstream.json()) as { sources_to_targets?: Array<Array<{ source_index?: number; target_index?: number; distance?: number | null; time?: number | null }>> };
+      const linhas = json.sources_to_targets;
+      if (!Array.isArray(linhas) || linhas.length !== pontos.length) {
+        return reply(res, 422, { erro: 'Não foi possível calcular a matriz de trajetos pelas ruas.' });
+      }
+      const n = pontos.length;
+      const tempos: (number | null)[][] = Array.from({ length: n }, () => Array<number | null>(n).fill(null));
+      const distancias: (number | null)[][] = Array.from({ length: n }, () => Array<number | null>(n).fill(null));
+      for (const linha of linhas) {
+        for (const celula of linha) {
+          const i = celula.source_index;
+          const j = celula.target_index;
+          if (typeof i !== 'number' || typeof j !== 'number' || i < 0 || j < 0 || i >= n || j >= n) continue;
+          if (typeof celula.time === 'number' && Number.isFinite(celula.time)) tempos[i][j] = Math.max(0, Math.ceil(celula.time / 60));
+          if (typeof celula.distance === 'number' && Number.isFinite(celula.distance)) distancias[i][j] = Math.max(0, Math.round(celula.distance));
+        }
+      }
+      return reply(res, 200, { tempos, distancias, fonte: 'Geoapify / OpenStreetMap', estimativa: true });
     }
 
     let url: URL;

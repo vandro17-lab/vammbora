@@ -33,11 +33,11 @@ export interface PlanoDoCadastro {
 const ROTULOS: Record<string, string> = {
   capacidadePassageiros: 'capacidade de passageiros da van',
   assentosReservados: 'lugares reservados',
-  chegadaFinalAte: 'horário máximo de chegada à última escola',
+  chegadaFinalAte: 'o horário em que você precisa deixar o último aluno',
   saidaPermitida: 'horário mais cedo e mais tarde em que a van pode iniciar a rota',
   limiteABordoMin: 'tempo máximo que cada aluno pode permanecer dentro da van',
   paradas: 'paradas suficientes (saída + pelo menos uma parada)',
-  temposTrechosMin: 'tempo de deslocamento, em minutos, entre cada endereço da rota',
+  temposTrechosMin: 'os minutos entre as paradas (tempo de deslocamento entre cada endereço)',
 };
 
 function amigavel(erros: string[]): string[] {
