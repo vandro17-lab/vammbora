@@ -5,9 +5,9 @@ import { supabase } from '@/lib/supabase';
 type Sugestao = { rotulo: string; lat: number; lng: number };
 type Resposta = { resultados?: Sugestao[]; trechos?: { minutos: number; metros: number }[]; erro?: string };
 async function consultar(body: unknown): Promise<Resposta> {
-  const { data } = await supabase?.auth.getSession() ?? { data: { session: null } };
-  if (!data.session?.access_token) throw new Error('Entre na conta de motorista com Supabase ativo para usar o mapa real.');
-  const response = await fetch('/api/mapas', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + data.session.access_token }, body: JSON.stringify(body), cache: 'no-store' });
+  const { data: sessao } = await supabase?.auth.getSession() ?? { data: { session: null } };
+  if (!sessao.session?.access_token) throw new Error('Entre na conta de motorista com Supabase ativo para usar o mapa real.');
+  const response = await fetch('/api/mapas', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + sessao.session.access_token }, body: JSON.stringify(body), cache: 'no-store' });
   const data = await response.json() as Resposta;
   if (!response.ok) throw new Error(data.erro ?? 'Falha ao consultar mapa.');
   return data;
@@ -32,7 +32,7 @@ export function MapaRotaMotorista({ rota, setRota }: { rota: Rota; setRota: (r: 
     finally { setOcupado(false); }
   }
   function selecionar(s: Sugestao) {
-    setRota({ ...rota, paradas: rota.paradas.map(p=>p.id===editando?{...p,rotulo:s.rotulo,lat:s.lat,lng:s.lng,confirmado:true,tempoAteProximaMin:null}:p).map((p,i,a)=>i>0?{...p,tempoAteProximaMin:null}:p) });
+    setRota({ ...rota, paradas: rota.paradas.map(p=>p.id===editando?{...p,rotulo:s.rotulo,lat:s.lat,lng:s.lng,confirmado:true,tempoAteProximaMin:null}:p).map((p,i)=>i>0?{...p,tempoAteProximaMin:null}:p) });
     setEditando(null);setSugestoes([]);setMostrarMapa(false);setAviso('Ponto confirmado no mapa. Recalcule os tempos de deslocamento.');
   }
   async function calcular() {
@@ -48,7 +48,7 @@ export function MapaRotaMotorista({ rota, setRota }: { rota: Rota; setRota: (r: 
     finally {setOcupado(false);}
   }
   const centro=localizadas[0];
-  const src=centro ? 'https://www.openstreetmap.org/export/embed.html?bbox='+encodeURIComponent((centro.lng-0.012)+','+(centro.lat-0.012)+','+(centro.lng+0.012)+','+(centro.lat+0.012))+'&layer=mapnik&marker='+encodeURIComponent(centro.lat+','+centro.lng):'';
+  const src=centro ? 'https://www.openstreetmap.org/export/embed.html?bbox='+encodeURIComponent((centro.lng!-0.012)+','+(centro.lat!-0.012)+','+(centro.lng!+0.012)+','+(centro.lat!+0.012))+'&layer=mapnik&marker='+encodeURIComponent(centro.lat!+','+centro.lng!):'';
   return <section className="card mt-4 p-5" aria-label="Localização real das paradas">
     <div className="flex items-center gap-2"><Navigation className="h-5 w-5 text-mint-600"/><h2 className="font-display text-lg font-bold">Mapa da sua rota</h2></div>
     <p className="mt-2 text-sm text-navy-600">Localize cada endereço no mapa. Depois, calculamos automaticamente os minutos de deslocamento pelas ruas.</p>
