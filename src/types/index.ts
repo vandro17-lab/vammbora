@@ -24,6 +24,17 @@ export interface Cidade {
   uf: string;
 }
 
+export type RedeEnsino = 'estadual' | 'municipal' | 'privada' | 'federal';
+
+export type NivelEnsino =
+  | 'infantil'
+  | 'fundamental_anos_iniciais'
+  | 'fundamental_anos_finais'
+  | 'medio'
+  | 'tecnico'
+  | 'eja'
+  | 'superior';
+
 export interface Destino {
   id: string;
   tipo: TipoDestino;
@@ -35,8 +46,15 @@ export interface Destino {
   turnos: Turno[];
   /** Fonte/origem do dado — exigência de honestidade (INEP, cadastro manual, demo). */
   fonte: string;
-  lat: number;
-  lng: number;
+  /** Coordenadas; `null` quando ainda não geocodificadas (endereço real já consta). */
+  lat: number | null;
+  lng: number | null;
+  /** Rede de ensino (quando conhecida). */
+  rede?: RedeEnsino;
+  /** Níveis de ensino atendidos (quando informados). */
+  nivel?: NivelEnsino[];
+  /** Endereço real por extenso (para exibição e geocodificação). */
+  endereco?: string;
 }
 
 export interface Preco {

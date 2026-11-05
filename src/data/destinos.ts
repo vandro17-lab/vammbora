@@ -1,74 +1,52 @@
 import type { Destino } from '@/types';
 
 /**
- * Destinos de DEMONSTRAÇÃO para Araçatuba/SP.
- *
- * IMPORTANTE (honestidade / Ideathon): estes registros são EXEMPLOS.
- * Os códigos INEP aqui NÃO foram importados oficialmente — por isso a `fonte`
- * é "demonstração". Quando houver importação real do Censo/INEP, guardar
- * fonte, data e código verdadeiros (ver docs/pesquisas/escolas-inep).
+ * Destinos REAIS de Araçatuba/SP (escolas e faculdades), com endereço e
+ * coordenadas verdadeiras. Pesquisa colaborativa; coordenadas obtidas por
+ * geocodificação (Geoapify). Fonte de cada registro citada em `fonte`.
  */
 export const DESTINOS: Destino[] = [
-  {
-    id: 'esc-paineiras',
-    tipo: 'escola',
-    nome: 'Colégio Paineiras (demonstração)',
-    bairro: 'Centro',
-    cidadeId: 'aracatuba-sp',
-    codigoInep: null,
-    turnos: ['manha', 'tarde'],
-    fonte: 'demonstração',
-    lat: -21.2086,
-    lng: -50.4326,
-  },
-  {
-    id: 'esc-horizonte',
-    tipo: 'escola',
-    nome: 'Escola Novo Horizonte (demonstração)',
-    bairro: 'Jardim Nova Iorque',
-    cidadeId: 'aracatuba-sp',
-    codigoInep: null,
-    turnos: ['manha', 'tarde', 'integral'],
-    fonte: 'demonstração',
-    lat: -21.1962,
-    lng: -50.4601,
-  },
-  {
-    id: 'esc-sao-joao',
-    tipo: 'escola',
-    nome: 'Instituto São João (demonstração)',
-    bairro: 'Vila Mendonça',
-    cidadeId: 'aracatuba-sp',
-    codigoInep: null,
-    turnos: ['manha', 'tarde'],
-    fonte: 'demonstração',
-    lat: -21.2155,
-    lng: -50.4489,
-  },
-  {
-    id: 'fac-unifatec',
-    tipo: 'faculdade',
-    nome: 'Fatec Araçatuba (demonstração)',
-    bairro: 'Jardim Alvorada',
-    cidadeId: 'aracatuba-sp',
-    codigoInep: null,
-    turnos: ['noite'],
-    fonte: 'demonstração',
-    lat: -21.2228,
-    lng: -50.4178,
-  },
-  {
-    id: 'fac-unimed-campus',
-    tipo: 'faculdade',
-    nome: 'Campus Universitário Leste (demonstração)',
-    bairro: 'Água Branca',
-    cidadeId: 'aracatuba-sp',
-    codigoInep: null,
-    turnos: ['manha', 'noite'],
-    fonte: 'demonstração',
-    lat: -21.1889,
-    lng: -50.4012,
-  },
+  { id: 'ee-clovis-de-arruda-campos', tipo: 'escola', nome: "EE Clóvis de Arruda Campos", bairro: "Amizade", cidadeId: 'aracatuba-sp', codigoInep: null, turnos: [], fonte: "https://www.educacao.sp.gov.br/", rede: 'estadual', endereco: "Rua Augusto Keller, 139 - Amizade, Araçatuba/SP · CEP 16074-300", lat: -21.188754, lng: -50.452534 },
+  { id: 'ee-conjunto-habitacional-ezequiel-barbos', tipo: 'escola', nome: "EE Conjunto Habitacional Ezequiel Barbosa", bairro: "São José", cidadeId: 'aracatuba-sp', codigoInep: null, turnos: [], fonte: "https://www.educacao.sp.gov.br/", rede: 'estadual', endereco: "Rua Serviliano da Silva Junior, 410 - São José, Araçatuba/SP · CEP 16070-383", lat: -21.194352, lng: -50.480089 },
+  { id: 'ee-genesio-de-assis', tipo: 'escola', nome: "EE Genésio de Assis", bairro: "Paraíso", cidadeId: 'aracatuba-sp', codigoInep: null, turnos: [], fonte: "https://www.educacao.sp.gov.br/", rede: 'estadual', endereco: "Rua Vereador Aldo Campos, 870 - Paraíso, Araçatuba/SP · CEP 16050-145", lat: -21.197701, lng: -50.447781 },
+  { id: 'ee-jorge-correa', tipo: 'escola', nome: "EE Jorge Corrêa", bairro: "Jardim Sumaré", cidadeId: 'aracatuba-sp', codigoInep: null, turnos: [], fonte: "https://www.educacao.sp.gov.br/", rede: 'estadual', endereco: "Rua São Paulo, s/n - Jardim Sumaré, Araçatuba/SP · CEP 16015-263", lat: -21.211871, lng: -50.431694 },
+  { id: 'ee-jose-arantes-terra', tipo: 'escola', nome: "EE José Arantes Terra", bairro: "Jardim Alvorada", cidadeId: 'aracatuba-sp', codigoInep: null, turnos: [], fonte: "https://www.educacao.sp.gov.br/", rede: 'estadual', endereco: "Rua Alvorada, 412 - Jardim Alvorada, Araçatuba/SP · CEP 16016-005", lat: -21.22845, lng: -50.422285 },
+  { id: 'ee-jose-augusto-lopes-borges', tipo: 'escola', nome: "EE José Augusto Lopes Borges", bairro: "Vila Nova", cidadeId: 'aracatuba-sp', codigoInep: null, turnos: [], fonte: "https://www.educacao.sp.gov.br/", rede: 'estadual', endereco: "Rua Cristiano Olsen, 3525 - Vila Nova, Araçatuba/SP · CEP 16025-335", lat: -21.214566, lng: -50.459926 },
+  { id: 'ee-jose-candido', tipo: 'escola', nome: "EE José Cândido", bairro: "Higienópolis", cidadeId: 'aracatuba-sp', codigoInep: null, turnos: [], fonte: "https://www.educacao.sp.gov.br/", rede: 'estadual', endereco: "Rua Rintaro Takahashi, 250 - Higienópolis, Araçatuba/SP · CEP 16010-620", lat: -21.210622, lng: -50.446117 },
+  { id: 'ee-joubert-de-carvalho', tipo: 'escola', nome: "EE Joubert de Carvalho", bairro: "Jardim Paulista", cidadeId: 'aracatuba-sp', codigoInep: null, turnos: [], fonte: "https://www.educacao.sp.gov.br/", rede: 'estadual', endereco: "Rua Pará, 469 - Jardim Paulista, Araçatuba/SP · CEP 16011-015", lat: -21.20868, lng: -50.426068 },
+  { id: 'ee-licolina-villela-reis-alves', tipo: 'escola', nome: "EE Licolina Villela Reis Alves", bairro: "Vila Estádio", cidadeId: 'aracatuba-sp', codigoInep: null, turnos: [], fonte: "https://www.educacao.sp.gov.br/", rede: 'estadual', endereco: "Rua Laurindo Caetano de Andrade, 483 - Vila Estádio, Araçatuba/SP · CEP 16020-030", lat: -21.220508, lng: -50.442039 },
+  { id: 'ee-luiz-gama', tipo: 'escola', nome: "EE Luiz Gama", bairro: "São Joaquim", cidadeId: 'aracatuba-sp', codigoInep: null, turnos: [], fonte: "https://www.educacao.sp.gov.br/", rede: 'estadual', endereco: "Rua Rubião Junior, 214 - São Joaquim, Araçatuba/SP · CEP 16050-290", lat: -21.203964, lng: -50.441511 },
+  { id: 'ee-manoel-bento-da-cruz', tipo: 'escola', nome: "EE Manoel Bento da Cruz", bairro: "Higienópolis", cidadeId: 'aracatuba-sp', codigoInep: null, turnos: [], fonte: "https://www.educacao.sp.gov.br/", rede: 'estadual', endereco: "Rua Carlos Gomes, 732 - Higienópolis, Araçatuba/SP · CEP 16010-713", lat: -21.211763, lng: -50.443782 },
+  { id: 'ee-maria-apparecida', tipo: 'escola', nome: "EE Maria Apparecida", bairro: "Jardim Monte Carlo", cidadeId: 'aracatuba-sp', codigoInep: null, turnos: [], fonte: "https://www.educacao.sp.gov.br/", rede: 'estadual', endereco: "Rua Clarismundo de Mello, 267 - Jardim Monte Carlo, Araçatuba/SP · CEP 16071-100", lat: -21.204747, lng: -50.462435 },
+  { id: 'emeb-prof-alvino-barbosa', tipo: 'escola', nome: "EMEB Prof. Alvino Barbosa", bairro: "Etemp", cidadeId: 'aracatuba-sp', codigoInep: null, turnos: [], fonte: "https://aracatuba.sp.gov.br/", rede: 'municipal', nivel: ['infantil'], endereco: "Rua Almirante Petrole, 185 - Etemp, Araçatuba/SP", lat: -21.160235, lng: -50.450805 },
+  { id: 'emeb-prof-ana-maria-neri-landre', tipo: 'escola', nome: "EMEB Prof.ª Ana Maria Néri Landre", bairro: "José Saran", cidadeId: 'aracatuba-sp', codigoInep: null, turnos: [], fonte: "https://aracatuba.sp.gov.br/", rede: 'municipal', nivel: ['infantil'], endereco: "Rua Manoel dos Passos Amorim, 301 - José Saran, Araçatuba/SP", lat: -21.224001, lng: -50.470117 },
+  { id: 'emeb-antonio-jose-cazerta', tipo: 'escola', nome: "EMEB Antonio José Cazerta", bairro: "Águas Claras", cidadeId: 'aracatuba-sp', codigoInep: null, turnos: [], fonte: "https://aracatuba.sp.gov.br/", rede: 'municipal', nivel: ['infantil'], endereco: "Rua Luiz Grenge, 285 - Águas Claras, Araçatuba/SP", lat: -21.167288, lng: -50.474193 },
+  { id: 'emeb-prof-apparecida-garcia-carvalho-ric', tipo: 'escola', nome: "EMEB Prof.ª Apparecida Garcia Carvalho Rico", bairro: "Aviação", cidadeId: 'aracatuba-sp', codigoInep: null, turnos: [], fonte: "https://aracatuba.sp.gov.br/", rede: 'municipal', nivel: ['infantil'], endereco: "Rua Dona Ida, s/n - Aviação, Araçatuba/SP", lat: -21.1934, lng: -50.4304 },
+  { id: 'emeb-lucilene-do-nascimento', tipo: 'escola', nome: "EMEB Lucilene do Nascimento", bairro: "São José", cidadeId: 'aracatuba-sp', codigoInep: null, turnos: [], fonte: "https://aracatuba.sp.gov.br/", rede: 'municipal', nivel: ['infantil'], endereco: "Praça Álvaro Carvalho Santana, 187 - São José, Araçatuba/SP", lat: -21.201391, lng: -50.473445 },
+  { id: 'emeb-prof-luiz-aparecido-bertolucci', tipo: 'escola', nome: "EMEB Prof. Luiz Aparecido Bertolucci", bairro: "Jardim Monte Carlo", cidadeId: 'aracatuba-sp', codigoInep: null, turnos: [], fonte: "https://aracatuba.sp.gov.br/", rede: 'municipal', nivel: ['infantil'], endereco: "Rua Canjiro Takebe, 667 - Jardim Monte Carlo, Araçatuba/SP", lat: -21.205707, lng: -50.465425 },
+  { id: 'emeb-prof-maria-aparecida-pimentel-ferra', tipo: 'escola', nome: "EMEB Prof.ª Maria Aparecida Pimentel Ferraz", bairro: "Jardim Rosele", cidadeId: 'aracatuba-sp', codigoInep: null, turnos: [], fonte: "https://aracatuba.sp.gov.br/", rede: 'municipal', nivel: ['infantil'], endereco: "Rua Noel Rosa, 457 - Jardim Rosele, Araçatuba/SP", lat: -21.18418, lng: -50.462912 },
+  { id: 'emeb-prof-maria-helena-de-freitas-carli', tipo: 'escola', nome: "EMEB Prof.ª Maria Helena de Freitas Carli", bairro: "Vista Verde", cidadeId: 'aracatuba-sp', codigoInep: null, turnos: [], fonte: "https://aracatuba.sp.gov.br/", rede: 'municipal', nivel: ['infantil'], endereco: "Rua Arlindo Esquiçato, 230 - Vista Verde, Araçatuba/SP", lat: -21.211345, lng: -50.396578 },
+  { id: 'emeb-prof-odete-costa-bodstein', tipo: 'escola', nome: "EMEB Prof.ª Odete Costa Bodstein", bairro: "Ivo Tozzi", cidadeId: 'aracatuba-sp', codigoInep: null, turnos: [], fonte: "https://aracatuba.sp.gov.br/", rede: 'municipal', nivel: ['infantil'], endereco: "Rua Vicentino Coelho, 534 - Ivo Tozzi, Araçatuba/SP", lat: -21.217832, lng: -50.401748 },
+  { id: 'emeb-roseli-de-oliveira', tipo: 'escola', nome: "EMEB Roseli de Oliveira", bairro: "Etemp", cidadeId: 'aracatuba-sp', codigoInep: null, turnos: [], fonte: "https://aracatuba.sp.gov.br/", rede: 'municipal', nivel: ['infantil'], endereco: "Rua Pedro Viola, 184 - Etemp, Araçatuba/SP", lat: -21.157786, lng: -50.45035 },
+  { id: 'emeb-sergio-esgalha', tipo: 'escola', nome: "EMEB Sérgio Esgalha", bairro: "Guanabara", cidadeId: 'aracatuba-sp', codigoInep: null, turnos: [], fonte: "https://aracatuba.sp.gov.br/", rede: 'municipal', nivel: ['infantil'], endereco: "Rua Sebastião Carvalho Rico, s/n - Guanabara, Araçatuba/SP", lat: -21.218437, lng: -50.471859 },
+  { id: 'emeb-prof-silene-maria-barreto', tipo: 'escola', nome: "EMEB Prof.ª Silene Maria Barreto", bairro: "São Rafael", cidadeId: 'aracatuba-sp', codigoInep: null, turnos: [], fonte: "https://aracatuba.sp.gov.br/", rede: 'municipal', nivel: ['infantil'], endereco: "Rua Afrânio F. Ruil, 580 - São Rafael, Araçatuba/SP", lat: -21.166609, lng: -50.458472 },
+  { id: 'emeb-prof-sonia-maria-correa', tipo: 'escola', nome: "EMEB Prof.ª Sônia Maria Corrêa", bairro: "Jardim Pinheiro", cidadeId: 'aracatuba-sp', codigoInep: null, turnos: [], fonte: "https://aracatuba.sp.gov.br/", rede: 'municipal', nivel: ['infantil'], endereco: "Rua Buritis, 360 - Jardim Pinheiro, Araçatuba/SP", lat: -21.206424, lng: -50.409468 },
+  { id: 'emeb-prof-suzana-echelon-ortiz', tipo: 'escola', nome: "EMEB Profª. Suzana Echelon Ortiz", bairro: "Jardim Presidente", cidadeId: 'aracatuba-sp', codigoInep: null, turnos: [], fonte: "https://aracatuba.sp.gov.br/", rede: 'municipal', nivel: ['infantil'], endereco: "Rua Emília Santos, 1889 - Jardim Presidente, Araçatuba/SP", lat: -21.193684, lng: -50.465888 },
+  { id: 'colegio-alameda', tipo: 'escola', nome: "Colégio Alameda", bairro: "Jardim Sumaré", cidadeId: 'aracatuba-sp', codigoInep: null, turnos: [], fonte: "https://aracatuba.sp.gov.br/", rede: 'privada', nivel: ['infantil'], endereco: "Rua Maestro Pedro Novais, 557 - Jardim Sumaré, Araçatuba/SP · CEP 16015-300", lat: -21.216457, lng: -50.430758 },
+  { id: 'colegio-anjinhos', tipo: 'escola', nome: "Colégio Anjinhos", bairro: "Jardim Sumaré", cidadeId: 'aracatuba-sp', codigoInep: null, turnos: [], fonte: "https://aracatuba.sp.gov.br/", rede: 'privada', nivel: ['infantil'], endereco: "Rua Antônio Afonso de Toledo, 1158 - Jardim Sumaré, Araçatuba/SP · CEP 16015-270", lat: -21.213389, lng: -50.436106 },
+  { id: 'colegio-bem-te-vi', tipo: 'escola', nome: "Colégio Bem-Te-Vi", bairro: "São Joaquim", cidadeId: 'aracatuba-sp', codigoInep: null, turnos: [], fonte: "https://aracatuba.sp.gov.br/", rede: 'privada', nivel: ['infantil'], endereco: "Avenida João Arruda Brasil, 1555 - São Joaquim, Araçatuba/SP · CEP 16074-200", lat: -21.200409, lng: -50.444228 },
+  { id: 'colegio-canarinho', tipo: 'escola', nome: "Colégio Canarinho", bairro: "Ipanema", cidadeId: 'aracatuba-sp', codigoInep: null, turnos: [], fonte: "https://aracatuba.sp.gov.br/", rede: 'privada', nivel: ['infantil'], endereco: "Avenida José Ferreira Baptista, 2225 - Ipanema, Araçatuba/SP · CEP 16052-000", lat: -21.17331, lng: -50.444198 },
+  { id: 'colegio-educare', tipo: 'escola', nome: "Colégio Educare", bairro: "Dona Amélia", cidadeId: 'aracatuba-sp', codigoInep: null, turnos: [], fonte: "https://aracatuba.sp.gov.br/", rede: 'privada', nivel: ['infantil'], endereco: "Rua Luiza de Marilac, 369 - Dona Amélia, Araçatuba/SP · CEP 16050-720", lat: -21.188197, lng: -50.442818 },
+  { id: 'colegio-geracao-raizes', tipo: 'escola', nome: "Colégio Geração Raízes", bairro: "Jardim Nova Yorque", cidadeId: 'aracatuba-sp', codigoInep: null, turnos: [], fonte: "https://aracatuba.sp.gov.br/", rede: 'privada', nivel: ['infantil'], endereco: "Rua Prof. Jorge Corrêa, 463 - Jardim Nova Yorque, Araçatuba/SP · CEP 16018-480", lat: -21.227819, lng: -50.435649 },
+  { id: 'colegio-kantele', tipo: 'escola', nome: "Colégio Kantele", bairro: "Jardim Sumaré", cidadeId: 'aracatuba-sp', codigoInep: null, turnos: [], fonte: "https://aracatuba.sp.gov.br/", rede: 'privada', nivel: ['infantil'], endereco: "Rua São Marcos, 308 - Jardim Sumaré, Araçatuba/SP · CEP 16050-525", lat: -21.213635, lng: -50.42794 },
+  { id: 'colegio-santos-dumont', tipo: 'escola', nome: "Colégio Santos Dumont", bairro: "Novo Paraíso", cidadeId: 'aracatuba-sp', codigoInep: null, turnos: [], fonte: "https://aracatuba.sp.gov.br/", rede: 'privada', nivel: ['infantil'], endereco: "Rua Wandenkolk, 1857 - Novo Paraíso, Araçatuba/SP · CEP 16074-170", lat: -21.19264, lng: -50.45623 },
+  { id: 'l-abri-desenvolvimento-infantil', tipo: 'escola', nome: "L'abri Desenvolvimento Infantil", bairro: "Santana", cidadeId: 'aracatuba-sp', codigoInep: null, turnos: [], fonte: "https://aracatuba.sp.gov.br/", rede: 'privada', nivel: ['infantil'], endereco: "Rua Antonio de Freitas Menezes, 509 - Santana, Araçatuba/SP · CEP 16050-490", lat: -21.194648, lng: -50.440498 },
+  { id: 'colegio-arca-de-noe-aracatuba', tipo: 'escola', nome: "Colégio Arca de Noé Araçatuba", bairro: "Ipanema", cidadeId: 'aracatuba-sp', codigoInep: null, turnos: [], fonte: "https://aracatuba.sp.gov.br/", rede: 'privada', nivel: ['infantil'], endereco: "Avenida Dois de Dezembro, 1340 - Ipanema, Araçatuba/SP · CEP 16052-115", lat: -21.18353, lng: -50.449855 },
+  { id: 'fatec-aracatuba-prof-fernando-amaral-de', tipo: 'faculdade', nome: "Fatec Araçatuba – Prof. Fernando Amaral de Almeida Prado", bairro: "Jardim Ipanema", cidadeId: 'aracatuba-sp', codigoInep: null, turnos: [], fonte: "https://www.cps.sp.gov.br/", rede: 'estadual', nivel: ['superior'], endereco: "Avenida Prestes Maia, 1764 - Jardim Ipanema, Araçatuba/SP · CEP 16052-045", lat: -21.18166, lng: -50.450395 },
+  { id: 'etec-de-aracatuba', tipo: 'escola', nome: "Etec de Araçatuba", bairro: "Jardim Ipanema", cidadeId: 'aracatuba-sp', codigoInep: null, turnos: [], fonte: "https://www.cps.sp.gov.br/", rede: 'estadual', nivel: ['medio', 'tecnico'], endereco: "Avenida Prestes Maia, 1764 - Jardim Ipanema, Araçatuba/SP · CEP 16052-045", lat: -21.18166, lng: -50.450395 },
+  { id: 'unesp-campus-de-aracatuba', tipo: 'faculdade', nome: "UNESP – Campus de Araçatuba", bairro: "Vila Mendonça", cidadeId: 'aracatuba-sp', codigoInep: null, turnos: [], fonte: "https://www.unesp.br/", rede: 'estadual', nivel: ['superior'], endereco: "Rua José Bonifácio, 1193 - Vila Mendonça, Araçatuba/SP", lat: -21.209271, lng: -50.429249 },
+  { id: 'unitoledo-centro-universitario-toledo', tipo: 'faculdade', nome: "UniToledo (Centro Universitário Toledo)", bairro: "Jardim Sumaré", cidadeId: 'aracatuba-sp', codigoInep: null, turnos: [], fonte: "https://qualfacul.com.br/", rede: 'privada', nivel: ['superior'], endereco: "Rua Antônio Afonso de Toledo, 595 - Jardim Sumaré, Araçatuba/SP", lat: -21.213113, lng: -50.430596 },
+  { id: 'unip-aracatuba', tipo: 'faculdade', nome: "UNIP Araçatuba", bairro: "Parque Baguaçu", cidadeId: 'aracatuba-sp', codigoInep: null, turnos: [], fonte: "https://qualfacul.com.br/", rede: 'privada', nivel: ['superior'], endereco: "Rua Baguaçu, 1939 - Parque Baguaçu, Araçatuba/SP", lat: -21.224932, lng: -50.425563 },
 ];
 
 export const DESTINOS_POR_ID: Record<string, Destino> = Object.fromEntries(
