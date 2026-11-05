@@ -8,8 +8,8 @@ O cadastro existente em `/painel/rota/:id` ganhou a seção **Mapa da sua rota**
 ## Como ativar
 1. Criar uma conta no [Geoapify](https://www.geoapify.com/) e gerar uma API key para Geocoding API e Routing API. Consultar o plano gratuito, cotas e termos vigentes.
 2. Na Vercel, abrir **o projeto correto** (há mais de um projeto conectado ao mesmo repositório), ir a **Settings > Environment Variables**, criar `GEOAPIFY_API_KEY` com o valor da chave, selecionando Preview e Production conforme necessário. **Não** prefixar com `VITE_`.
-3. Fazer novo deployment da branch que contém `api/mapas.ts` e verificar a resposta de `POST /api/mapas` (não GET). A chave permanece no servidor.
-4. No cadastro da rota, localizar as paradas individualmente e calcular os trechos. Revisar a sequência, os horários e salvar.
+3. Confirmar que VITE_USE_SUPABASE=true, VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY estão configuradas na Vercel e que o motorista está autenticado. O proxy rejeita requisições sem token válido.\n4. Fazer novo deployment da branch que contém `api/mapas.ts` e verificar a resposta de `POST /api/mapas` (não GET). A chave permanece no servidor.
+5. No cadastro da rota, localizar as paradas individualmente e calcular os trechos. Revisar a sequência, os horários e salvar.
 
 ## Limitações explícitas
 - O mapa incorporado exibe **apenas o primeiro ponto** da rota; não desenha ainda a linha completa com geometria. O cálculo usa os pontos em ordem e a Routing API.
@@ -17,7 +17,7 @@ O cadastro existente em `/painel/rota/:id` ganhou a seção **Mapa da sua rota**
 - Os tempos são estimativas rodoviárias sem garantia de trânsito em tempo real; não são previsão exata de horário de chegada.
 - Ao abrir o mapa incorporado, o primeiro ponto é enviado ao OpenStreetMap. Não abrir com dados sensíveis sem necessidade.
 - A busca está limitada inicialmente a Araçatuba, SP. Para cidades da região, ampliar o contexto de busca e validar a área.
-- Não há controle de autenticação/cotas por usuário no endpoint. **Antes de ativar em produção pública**, adicionar verificação de sessão, rate limit e monitoramento de consumo para evitar abuso da chave e cobrança.
+- Há verificação de sessão Supabase no proxy, mas **ainda falta autorização específica do papel motorista e rate limit por usuário**. Antes de ativar em produção pública, adicionar essas proteções e monitoramento de consumo para evitar abuso da chave e cobrança.
 - Não existe integração automática desta funcionalidade com a busca pública das famílias. A próxima fase dependerá de persistência dos pontos e validação do motor.
 - O armazenamento de rotas com Supabase segue as permissões/RLS já existentes. Não expor dados de estudantes em endpoints públicos.
 - Nenhuma variável da Vercel foi configurada automaticamente por este PR.
