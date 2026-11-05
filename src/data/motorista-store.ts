@@ -43,6 +43,8 @@ export async function listarVeiculos(): Promise<Veiculo[]> {
     const { data, error } = await supabase
       .from('vehicles')
       .select('id,model,year,plate,seats_passenger,feature_ac,feature_accessible,feature_seatbelt,photo_urls')
+      // Esconde veículos de demonstração do painel do motorista real (RLS já limita ao dono).
+      .eq('is_demo', false)
       .order('created_at');
     if (error) throw new Error(error.message);
     return (data ?? []).map((r) => ({
@@ -98,6 +100,8 @@ export async function listarRotas(): Promise<Rota[]> {
           'route_stops(id,ordem,type,label,lat,lng,confirmed,destination_id,leg_time_min),' +
           'route_passengers(id,identificacao,board_stop_id,alight_stop_id,destination_id)',
       )
+      // Esconde rotas de demonstração do painel do motorista real (RLS já limita ao dono).
+      .eq('is_demo', false)
       .order('updated_at', { ascending: false });
     if (error) throw new Error(error.message);
     return (data ?? []).map(mapRotaDoBanco);

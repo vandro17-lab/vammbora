@@ -8,7 +8,7 @@ import { CIDADE_PADRAO } from '@/data/cidades';
 
 export function ContaMotoristaPage() {
   const navigate = useNavigate();
-  const { entrar, cadastrar } = useAuth();
+  const { entrar, cadastrar, entrarComProvedor } = useAuth();
   const [modo, setModo] = useState<'entrar' | 'criar'>('criar');
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
@@ -17,6 +17,23 @@ export function ContaMotoristaPage() {
   const [erro, setErro] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
+  const [emailAberto, setEmailAberto] = useState(false);
+
+  async function entrarGoogle() {
+    setErro(null);
+    setAviso(null);
+    if (!USE_SUPABASE) {
+      navigate('/painel');
+      return;
+    }
+    setEnviando(true);
+    const r = await entrarComProvedor('google');
+    // Em caso de sucesso o navegador é redirecionado; só tratamos o erro.
+    if (!r.ok) {
+      setEnviando(false);
+      setErro(r.erro ?? 'Não foi possível entrar com o Google.');
+    }
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -64,7 +81,9 @@ export function ContaMotoristaPage() {
             <h1 className="mt-3 font-display text-xl font-bold">
               {modo === 'criar' ? 'Criar minha conta' : 'Entrar'}
             </h1>
-            <p className="mt-1 text-sm text-navy-500">Para motoristas de van.</p>
+            <p className="mt-1 text-sm text-navy-500">
+              {USE_SUPABASE ? 'Entre com o Google para gerenciar suas rotas.' : 'Para motoristas de van.'}
+            </p>
           </div>
 
           {!USE_SUPABASE && (
@@ -74,56 +93,115 @@ export function ContaMotoristaPage() {
             </p>
           )}
 
-          <form onSubmit={onSubmit} className="mt-5 space-y-3.5">
-            {USE_SUPABASE && modo === 'criar' && (
-              <div>
-                <label className="field-label" htmlFor="nome">Seu nome completo</label>
-                <input id="nome" className="field-input" value={nome} onChange={(e) => setNome(e.target.value)} required />
-              </div>
+          {/* CTA principal: entrar com o Google (login social do motorista). */}
+          <button
+            type="button"
+            onClick={entrarGoogle}
+            disabled={enviando}
+            className="mt-6 flex w-full items-center justify-center gap-3 rounded-xl border border-navy-200 bg-white px-4 py-3 text-sm font-semibold text-navy-800 shadow-sm transition hover:bg-navy-50 disabled:opacity-60"
+          >
+            {enviando ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : (
+              <GoogleIcon className="h-5 w-5" />
             )}
-            {USE_SUPABASE && (
-              <>
-                <div>
-                  <label className="field-label" htmlFor="email">E-mail</label>
-                  <input id="email" type="email" className="field-input" value={email} onChange={(e) => setEmail(e.target.value)} required />
-                </div>
-                <div>
-                  <label className="field-label" htmlFor="senha">Senha</label>
-                  <input id="senha" type="password" className="field-input" value={senha} onChange={(e) => setSenha(e.target.value)} minLength={6} required />
-                </div>
-              </>
-            )}
-            {USE_SUPABASE && modo === 'criar' && (
-              <>
-                <div>
-                  <label className="field-label" htmlFor="whats">WhatsApp</label>
-                  <input id="whats" className="field-input" placeholder="(18) 99999-0000" value={whats} onChange={(e) => setWhats(e.target.value)} inputMode="tel" />
-                </div>
-                <div>
-                  <label className="field-label" htmlFor="cidade">Cidade</label>
-                  <input id="cidade" className="field-input" defaultValue={`${CIDADE_PADRAO.nome} — ${CIDADE_PADRAO.uf}`} />
-                </div>
-              </>
-            )}
+            Entrar com o Google
+          </button>
 
-            {erro && <p className="rounded-xl bg-red-50 p-2.5 text-sm text-red-700">{erro}</p>}
-            {aviso && <p className="rounded-xl bg-mint-50 p-2.5 text-sm text-mint-800">{aviso}</p>}
-
-            <button type="submit" className="btn btn-sheen btn-lg btn-primary w-full" disabled={enviando}>
-              {enviando ? <><Loader2 className="h-5 w-5 animate-spin" /> Aguarde…</> : !USE_SUPABASE ? 'Entrar no painel' : modo === 'criar' ? 'Criar conta' : 'Entrar'}
-            </button>
-          </form>
+          {erro && <p className="mt-3 rounded-xl bg-red-50 p-2.5 text-sm text-red-700" role="alert">{erro}</p>}
+          {aviso && <p className="mt-3 rounded-xl bg-mint-50 p-2.5 text-sm text-mint-800">{aviso}</p>}
 
           {USE_SUPABASE && (
-            <button
-              className="mt-3 w-full text-center text-sm font-medium text-navy-500 hover:text-navy-800"
-              onClick={() => { setModo((v) => (v === 'criar' ? 'entrar' : 'criar')); setErro(null); setAviso(null); }}
-            >
-              {modo === 'criar' ? 'Já tenho conta — entrar' : 'Criar uma conta'}
-            </button>
+            <>
+              <div className="my-5 flex items-center gap-3 text-xs text-navy-400">
+                <span className="h-px flex-1 bg-navy-100" /> ou com e-mail <span className="h-px flex-1 bg-navy-100" />
+              </div>
+
+              {!emailAberto ? (
+                <button
+                  type="button"
+                  onClick={() => { setEmailAberto(true); setErro(null); setAviso(null); }}
+                  className="w-full text-center text-sm font-medium text-navy-500 hover:text-navy-800"
+                >
+                  Usar e-mail e senha
+                </button>
+              ) : (
+                <>
+                  <form onSubmit={onSubmit} className="space-y-3.5">
+                    {modo === 'criar' && (
+                      <div>
+                        <label className="field-label" htmlFor="nome">Seu nome completo</label>
+                        <input id="nome" className="field-input" value={nome} onChange={(e) => setNome(e.target.value)} required />
+                      </div>
+                    )}
+                    <div>
+                      <label className="field-label" htmlFor="email">E-mail</label>
+                      <input id="email" type="email" className="field-input" value={email} onChange={(e) => setEmail(e.target.value)} required />
+                    </div>
+                    <div>
+                      <label className="field-label" htmlFor="senha">Senha</label>
+                      <input id="senha" type="password" className="field-input" value={senha} onChange={(e) => setSenha(e.target.value)} minLength={6} required />
+                    </div>
+                    {modo === 'criar' && (
+                      <>
+                        <div>
+                          <label className="field-label" htmlFor="whats">WhatsApp</label>
+                          <input id="whats" className="field-input" placeholder="(18) 99999-0000" value={whats} onChange={(e) => setWhats(e.target.value)} inputMode="tel" />
+                        </div>
+                        <div>
+                          <label className="field-label" htmlFor="cidade">Cidade</label>
+                          <input id="cidade" className="field-input" defaultValue={`${CIDADE_PADRAO.nome} — ${CIDADE_PADRAO.uf}`} />
+                        </div>
+                      </>
+                    )}
+                    <button type="submit" className="btn btn-sheen btn-lg btn-primary w-full" disabled={enviando}>
+                      {enviando ? <><Loader2 className="h-5 w-5 animate-spin" /> Aguarde…</> : modo === 'criar' ? 'Criar conta' : 'Entrar'}
+                    </button>
+                  </form>
+                  <button
+                    className="mt-3 w-full text-center text-sm font-medium text-navy-500 hover:text-navy-800"
+                    onClick={() => { setModo((v) => (v === 'criar' ? 'entrar' : 'criar')); setErro(null); setAviso(null); }}
+                  >
+                    {modo === 'criar' ? 'Já tenho conta — entrar' : 'Criar uma conta'}
+                  </button>
+                </>
+              )}
+            </>
+          )}
+
+          {!USE_SUPABASE && (
+            <form onSubmit={onSubmit} className="mt-4">
+              <button type="submit" className="btn btn-sheen btn-lg btn-primary w-full">
+                Entrar no painel
+              </button>
+            </form>
           )}
         </div>
       </div>
     </div>
+  );
+}
+
+/** Logotipo "G" do Google (multicolorido), para o botão de login social. */
+function GoogleIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        fill="#4285F4"
+        d="M23.52 12.27c0-.82-.07-1.6-.21-2.36H12v4.46h6.47a5.53 5.53 0 0 1-2.4 3.63v3h3.88c2.27-2.09 3.57-5.17 3.57-8.73z"
+      />
+      <path
+        fill="#34A853"
+        d="M12 24c3.24 0 5.96-1.07 7.95-2.91l-3.88-3c-1.08.72-2.45 1.15-4.07 1.15-3.13 0-5.78-2.11-6.73-4.96H1.26v3.09A12 12 0 0 0 12 24z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M5.27 14.28a7.2 7.2 0 0 1 0-4.56v-3.1H1.26a12 12 0 0 0 0 10.76l4.01-3.1z"
+      />
+      <path
+        fill="#EA4335"
+        d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.44-3.44A11.97 11.97 0 0 0 12 0 12 12 0 0 0 1.26 6.62l4.01 3.1C6.22 6.86 8.87 4.75 12 4.75z"
+      />
+    </svg>
   );
 }

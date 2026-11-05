@@ -1,23 +1,40 @@
 import { useEffect, useRef, useState } from 'react';
 import { MapPin, Loader2 } from 'lucide-react';
+import { buscarEnderecos, normalizarTexto, type SugestaoEndereco } from '@/lib/geocode';
 
-export interface SugestaoEndereco { rotulo: string; lat: number; lng: number }
+export type { SugestaoEndereco };
+
+/** Filtra a lista local (bairros/escolas de Araçatuba) pelo texto digitado. */
+function filtrarLocais(locais: SugestaoEndereco[], q: string): SugestaoEndereco[] {
+  const alvo = normalizarTexto(q);
+  if (!alvo) return [];
+  const out: SugestaoEndereco[] = [];
+  const vistos = new Set<string>();
+  for (const s of locais) {
+    if (!normalizarTexto(s.rotulo).includes(alvo) || vistos.has(s.rotulo)) continue;
+    vistos.add(s.rotulo);
+    out.push(s);
+    if (out.length >= 6) break;
+  }
+  return out;
+}
 
 /**
- * Campo de endereço com autocomplete de ruas de Araçatuba (Geoapify, via proxy
- * /api/mapas). Protegido: mínimo de 3 letras e atraso ao digitar (debounce).
+ * Campo de endereço com autocomplete de Araçatuba.
  *
- * Degrada com elegância: se o serviço de mapas não responder (ex.: sem a chave
- * no ambiente local), continua funcionando como um campo de texto normal, sem
- * sugestões e sem erro para o usuário.
+ * Refina a cada tecla: mostra na hora sugestões LOCAIS (bairros/escolas do
+ * catálogo) e busca endereços de RUA em paralelo — pelo proxy /api/mapas
+ * (Geoapify, se GEOAPIFY_API_KEY estiver na Vercel) ou, sem nenhuma chave,
+ * pelo Photon/OpenStreetMap. Degrada sem erro para o usuário.
  */
 export function AutocompleteEndereco({
-  id, value, onChange, placeholder,
+  id, value, onChange, placeholder, locais = [],
 }: {
   id?: string;
   value: string;
   onChange: (texto: string, coord?: { lat: number; lng: number }) => void;
   placeholder?: string;
+  locais?: SugestaoEndereco[];
 }) {
   const [sugestoes, setSugestoes] = useState<SugestaoEndereco[]>([]);
   const [aberto, setAberto] = useState(false);
@@ -26,30 +43,40 @@ export function AutocompleteEndereco({
 
   useEffect(() => {
     const q = value.trim();
-    if (q.length < 3 || ignorar.current === value) { setSugestoes([]); setCarregando(false); return; }
+    if (q.length < 2 || ignorar.current === value) {
+      setSugestoes([]); setCarregando(false); setAberto(false);
+      return;
+    }
+
+    // 1) Sugestões locais imediatas (atualizam a CADA tecla, refinando/limpando).
+    const base = filtrarLocais(locais, q);
+    setSugestoes(base);
+    setAberto(base.length > 0);
+
+    // 2) Endereços de rua (a partir de 3 letras), com debounce.
+    if (q.length < 3) { setCarregando(false); return; }
+    const controlador = new AbortController();
     let vivo = true;
     setCarregando(true);
     const t = setTimeout(async () => {
-      try {
-        const r = await fetch('/api/mapas', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ operacao: 'autocompletar', texto: q }),
-        });
-        if (!vivo) return;
-        if (!r.ok) { setSugestoes([]); setAberto(false); return; }
-        const d = (await r.json()) as { resultados?: SugestaoEndereco[] };
-        if (!vivo) return;
-        const lista = Array.isArray(d.resultados) ? d.resultados.slice(0, 5) : [];
-        setSugestoes(lista);
-        setAberto(lista.length > 0);
-      } catch {
-        if (vivo) { setSugestoes([]); setAberto(false); }
-      } finally {
-        if (vivo) setCarregando(false);
+      const remoto = await buscarEnderecos(q, controlador.signal);
+      if (!vivo) return;
+      const vistos = new Set<string>();
+      const merge: SugestaoEndereco[] = [];
+      for (const s of [...remoto, ...base]) {
+        if (vistos.has(s.rotulo)) continue;
+        vistos.add(s.rotulo);
+        merge.push(s);
+        if (merge.length >= 6) break;
       }
-    }, 350);
-    return () => { vivo = false; clearTimeout(t); };
-  }, [value]);
+      setSugestoes(merge);
+      setAberto(merge.length > 0);
+      setCarregando(false);
+    }, 250);
+
+    return () => { vivo = false; controlador.abort(); clearTimeout(t); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value, locais]);
 
   function escolher(s: SugestaoEndereco) {
     ignorar.current = s.rotulo;
@@ -81,7 +108,7 @@ export function AutocompleteEndereco({
       {aberto && sugestoes.length > 0 && (
         <ul className="absolute z-20 mt-1 w-full overflow-hidden rounded-xl border border-navy-100 bg-white shadow-float" role="listbox">
           {sugestoes.map((s, i) => (
-            <li key={i} role="option" aria-selected={false}>
+            <li key={`${s.rotulo}-${i}`} role="option" aria-selected={false}>
               <button
                 type="button"
                 className="flex w-full items-start gap-2 px-3 py-2.5 text-left text-sm hover:bg-mint-50"
