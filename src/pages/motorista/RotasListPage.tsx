@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Route as RouteIcon, Plus, Loader2, ChevronRight } from 'lucide-react';
+import { Route as RouteIcon, Plus, Loader2, ChevronRight, UserPlus } from 'lucide-react';
 import { MotoristaShell, ExigirMotorista } from './MotoristaShell';
 import { listarRotas } from '@/data/motorista-store';
 import type { Rota } from '@/types/motorista';
@@ -54,6 +54,11 @@ function Lista() {
       <Link to="/painel/rota/nova" className="btn btn-lg btn-primary mt-5 flex w-full">
         <Plus className="h-5 w-5" /> Criar rota
       </Link>
+      {rotas.length > 0 && (
+        <Link to="/painel/simulador" className="btn btn-lg btn-ghost mt-3 flex w-full">
+          <UserPlus className="h-5 w-5" /> Simular novo aluno
+        </Link>
+      )}
     </MotoristaShell>
   );
 }
