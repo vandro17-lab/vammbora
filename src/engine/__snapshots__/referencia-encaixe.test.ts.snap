@@ -1,0 +1,482 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`referência do adaptador real (simularEncaixeRota) > golden — encaixe de novo aluno na ida (horários exatos) 1`] = `
+{
+  "chegadaEscolaBase": 415,
+  "elegivel": true,
+  "opcao": {
+    "alteracoes": [
+      {
+        "dif": 0,
+        "id": "emb:ana",
+      },
+      {
+        "dif": 3,
+        "id": "emb:bruno",
+      },
+      {
+        "dif": 4,
+        "id": "des:ana",
+      },
+      {
+        "dif": 4,
+        "id": "des:bruno",
+      },
+    ],
+    "buscaMin": 405,
+    "desembarque": 3,
+    "desvioMetros": 600,
+    "desvioMin": 4,
+    "embarque": 1,
+    "entregaMin": 418,
+    "minutosABordo": 12,
+  },
+  "partidaMin": 396,
+  "sentido": "ida",
+}
+`;
+
+exports[`referência do motor geográfico (valores exatos travados) > golden — todas as opções de encaixe na IDA (ordem e horários) 1`] = `
+{
+  "opcoes": [
+    {
+      "alteracoes": [
+        {
+          "dif": 0,
+          "id": "a",
+        },
+        {
+          "dif": 0,
+          "id": "b",
+        },
+        {
+          "dif": 5,
+          "id": "escola",
+        },
+        {
+          "dif": 5,
+          "id": "d-a",
+        },
+        {
+          "dif": 5,
+          "id": "d-b",
+        },
+      ],
+      "buscaMin": 401,
+      "desembarque": 3,
+      "desvioMetros": 1000,
+      "desvioMin": 5,
+      "embarque": 2,
+      "entregaMin": 405,
+      "minutosABordo": 3,
+    },
+    {
+      "alteracoes": [
+        {
+          "dif": 0,
+          "id": "a",
+        },
+        {
+          "dif": 4,
+          "id": "b",
+        },
+        {
+          "dif": 5,
+          "id": "escola",
+        },
+        {
+          "dif": 5,
+          "id": "d-a",
+        },
+        {
+          "dif": 5,
+          "id": "d-b",
+        },
+      ],
+      "buscaMin": 397,
+      "desembarque": 3,
+      "desvioMetros": 1000,
+      "desvioMin": 5,
+      "embarque": 1,
+      "entregaMin": 405,
+      "minutosABordo": 7,
+    },
+    {
+      "alteracoes": [
+        {
+          "dif": 4,
+          "id": "a",
+        },
+        {
+          "dif": 4,
+          "id": "b",
+        },
+        {
+          "dif": 5,
+          "id": "escola",
+        },
+        {
+          "dif": 5,
+          "id": "d-a",
+        },
+        {
+          "dif": 5,
+          "id": "d-b",
+        },
+      ],
+      "buscaMin": 393,
+      "desembarque": 3,
+      "desvioMetros": 1000,
+      "desvioMin": 5,
+      "embarque": 0,
+      "entregaMin": 405,
+      "minutosABordo": 11,
+    },
+    {
+      "alteracoes": [
+        {
+          "dif": 8,
+          "id": "a",
+        },
+        {
+          "dif": 8,
+          "id": "b",
+        },
+        {
+          "dif": 8,
+          "id": "escola",
+        },
+        {
+          "dif": 8,
+          "id": "d-a",
+        },
+        {
+          "dif": 8,
+          "id": "d-b",
+        },
+      ],
+      "buscaMin": 393,
+      "desembarque": 1,
+      "desvioMetros": 2000,
+      "desvioMin": 8,
+      "embarque": 0,
+      "entregaMin": 397,
+      "minutosABordo": 3,
+    },
+    {
+      "alteracoes": [
+        {
+          "dif": 0,
+          "id": "a",
+        },
+        {
+          "dif": 8,
+          "id": "b",
+        },
+        {
+          "dif": 8,
+          "id": "escola",
+        },
+        {
+          "dif": 8,
+          "id": "d-a",
+        },
+        {
+          "dif": 8,
+          "id": "d-b",
+        },
+      ],
+      "buscaMin": 397,
+      "desembarque": 2,
+      "desvioMetros": 2000,
+      "desvioMin": 8,
+      "embarque": 1,
+      "entregaMin": 401,
+      "minutosABordo": 3,
+    },
+    {
+      "alteracoes": [
+        {
+          "dif": 4,
+          "id": "a",
+        },
+        {
+          "dif": 8,
+          "id": "b",
+        },
+        {
+          "dif": 8,
+          "id": "escola",
+        },
+        {
+          "dif": 8,
+          "id": "d-a",
+        },
+        {
+          "dif": 8,
+          "id": "d-b",
+        },
+      ],
+      "buscaMin": 393,
+      "desembarque": 2,
+      "desvioMetros": 2000,
+      "desvioMin": 8,
+      "embarque": 0,
+      "entregaMin": 401,
+      "minutosABordo": 7,
+    },
+  ],
+  "total": 6,
+}
+`;
+
+exports[`referência do motor geográfico (valores exatos travados) > golden — todas as opções de encaixe na VOLTA (ordem e horários) 1`] = `
+{
+  "opcoes": [
+    {
+      "alteracoes": [
+        {
+          "dif": 0,
+          "id": "e-a",
+        },
+        {
+          "dif": 1,
+          "id": "e-b",
+        },
+        {
+          "dif": 5,
+          "id": "d-a",
+        },
+        {
+          "dif": 5,
+          "id": "d-b",
+        },
+      ],
+      "buscaMin": 724,
+      "desembarque": 3,
+      "desvioMetros": 1000,
+      "desvioMin": 5,
+      "embarque": 1,
+      "entregaMin": 729,
+      "minutosABordo": 4,
+    },
+    {
+      "alteracoes": [
+        {
+          "dif": 1,
+          "id": "e-a",
+        },
+        {
+          "dif": 1,
+          "id": "e-b",
+        },
+        {
+          "dif": 5,
+          "id": "d-a",
+        },
+        {
+          "dif": 5,
+          "id": "d-b",
+        },
+      ],
+      "buscaMin": 723,
+      "desembarque": 3,
+      "desvioMetros": 1000,
+      "desvioMin": 5,
+      "embarque": 0,
+      "entregaMin": 729,
+      "minutosABordo": 5,
+    },
+    {
+      "alteracoes": [
+        {
+          "dif": 0,
+          "id": "e-a",
+        },
+        {
+          "dif": 1,
+          "id": "e-b",
+        },
+        {
+          "dif": 1,
+          "id": "d-a",
+        },
+        {
+          "dif": 5,
+          "id": "d-b",
+        },
+      ],
+      "buscaMin": 724,
+      "desembarque": 4,
+      "desvioMetros": 1000,
+      "desvioMin": 5,
+      "embarque": 1,
+      "entregaMin": 733,
+      "minutosABordo": 8,
+    },
+    {
+      "alteracoes": [
+        {
+          "dif": 1,
+          "id": "e-a",
+        },
+        {
+          "dif": 1,
+          "id": "e-b",
+        },
+        {
+          "dif": 1,
+          "id": "d-a",
+        },
+        {
+          "dif": 5,
+          "id": "d-b",
+        },
+      ],
+      "buscaMin": 723,
+      "desembarque": 4,
+      "desvioMetros": 1000,
+      "desvioMin": 5,
+      "embarque": 0,
+      "entregaMin": 733,
+      "minutosABordo": 9,
+    },
+    {
+      "alteracoes": [
+        {
+          "dif": 0,
+          "id": "e-a",
+        },
+        {
+          "dif": 1,
+          "id": "e-b",
+        },
+        {
+          "dif": 1,
+          "id": "d-a",
+        },
+        {
+          "dif": 1,
+          "id": "d-b",
+        },
+      ],
+      "buscaMin": 724,
+      "desembarque": 5,
+      "desvioMetros": 1000,
+      "desvioMin": 5,
+      "embarque": 1,
+      "entregaMin": 737,
+      "minutosABordo": 12,
+    },
+    {
+      "alteracoes": [
+        {
+          "dif": 1,
+          "id": "e-a",
+        },
+        {
+          "dif": 1,
+          "id": "e-b",
+        },
+        {
+          "dif": 1,
+          "id": "d-a",
+        },
+        {
+          "dif": 1,
+          "id": "d-b",
+        },
+      ],
+      "buscaMin": 723,
+      "desembarque": 5,
+      "desvioMetros": 1000,
+      "desvioMin": 5,
+      "embarque": 0,
+      "entregaMin": 737,
+      "minutosABordo": 13,
+    },
+    {
+      "alteracoes": [
+        {
+          "dif": 8,
+          "id": "e-a",
+        },
+        {
+          "dif": 8,
+          "id": "e-b",
+        },
+        {
+          "dif": 8,
+          "id": "d-a",
+        },
+        {
+          "dif": 8,
+          "id": "d-b",
+        },
+      ],
+      "buscaMin": 723,
+      "desembarque": 1,
+      "desvioMetros": 2000,
+      "desvioMin": 8,
+      "embarque": 0,
+      "entregaMin": 727,
+      "minutosABordo": 3,
+    },
+    {
+      "alteracoes": [
+        {
+          "dif": 0,
+          "id": "e-a",
+        },
+        {
+          "dif": 8,
+          "id": "e-b",
+        },
+        {
+          "dif": 8,
+          "id": "d-a",
+        },
+        {
+          "dif": 8,
+          "id": "d-b",
+        },
+      ],
+      "buscaMin": 724,
+      "desembarque": 2,
+      "desvioMetros": 2000,
+      "desvioMin": 8,
+      "embarque": 1,
+      "entregaMin": 728,
+      "minutosABordo": 3,
+    },
+    {
+      "alteracoes": [
+        {
+          "dif": 1,
+          "id": "e-a",
+        },
+        {
+          "dif": 8,
+          "id": "e-b",
+        },
+        {
+          "dif": 8,
+          "id": "d-a",
+        },
+        {
+          "dif": 8,
+          "id": "d-b",
+        },
+      ],
+      "buscaMin": 723,
+      "desembarque": 2,
+      "desvioMetros": 2000,
+      "desvioMin": 8,
+      "embarque": 0,
+      "entregaMin": 728,
+      "minutosABordo": 4,
+    },
+  ],
+  "total": 9,
+}
+`;

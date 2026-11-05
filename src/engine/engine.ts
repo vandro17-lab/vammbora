@@ -1,3 +1,12 @@
+// ============================================================================
+// ÓRFÃO (auditoria "Algoritmo Supremo", Fase 1) — AVALIADOR ALTERNATIVO
+// ----------------------------------------------------------------------------
+// `avaliarEncaixe` é um modelo de encaixe baseado em ÍNDICES/buffer, distinto do
+// motor ativo (`src/engine/encaixe-geografico.ts` + `src/engine/planejamento.ts`).
+// Hoje NÃO tem consumidores no app — só `engine.test.ts` o usa. Mantido sem
+// remover; é candidato a aposentadoria na Fase 8, após confirmar zero
+// dependências. NÃO adicionar novos consumidores: use o motor geográfico.
+// ============================================================================
 import type { ResultadoEncaixe, RotaInstancia, SolicitacaoAluno } from './types';
 
 const turnos = ['manha', 'tarde', 'noite', 'integral'];

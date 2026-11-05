@@ -1,3 +1,12 @@
+// ============================================================================
+// ÓRFÃO (auditoria "Algoritmo Supremo", Fase 1) — ADAPTADOR SIMULADO ANTIGO
+// ----------------------------------------------------------------------------
+// `buscarMotoristas` é um filtro simples (cidade/destino/turno/vagas) da Etapa 1.
+// A busca pública hoje usa `src/lib/busca-encaixe.ts` (motor real), NÃO este
+// módulo — só `matching.test.ts` o consome. Mantido sem remover; candidato a
+// aposentadoria na Fase 8 após confirmar zero dependências. NÃO adicionar novos
+// consumidores: use `busca-encaixe` / o motor geográfico.
+// ============================================================================
 import type {
   CriteriosBusca,
   Motorista,
