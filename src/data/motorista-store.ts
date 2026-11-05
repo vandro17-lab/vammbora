@@ -1,0 +1,215 @@
+import type { Rota, Veiculo } from '@/types/motorista';
+import { supabase, USE_SUPABASE } from '@/lib/supabase';
+
+/**
+ * Armazenamento do motorista (veículos e rotas).
+ * - Modo demonstração (sem Supabase): guarda no navegador (localStorage), para o
+ *   painel e o construtor de rotas funcionarem de verdade sem backend.
+ * - Com Supabase: grava nas tabelas reais (RLS garante que é só do dono).
+ *
+ * As gravações de rota são "tudo ou nada" no modo demo (um objeto por rota).
+ * No Supabase, a rota + paradas + passageiros são salvas via RPC transacional
+ * (ver observação em salvarRota).
+ */
+
+export const novoId = (): string =>
+  typeof crypto !== 'undefined' && 'randomUUID' in crypto
+    ? crypto.randomUUID()
+    : 'id-' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+
+/* --------------------------- localStorage (demo) --------------------------- */
+const K_VEIC = 'vambora.demo.veiculos';
+const K_ROTAS = 'vambora.demo.rotas';
+
+function lsGet<T>(k: string, fallback: T): T {
+  try {
+    const raw = localStorage.getItem(k);
+    return raw ? (JSON.parse(raw) as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+function lsSet<T>(k: string, v: T): void {
+  try {
+    localStorage.setItem(k, JSON.stringify(v));
+  } catch {
+    /* ignora cota/indisponível */
+  }
+}
+
+/* ------------------------------- VEÍCULOS -------------------------------- */
+export async function listarVeiculos(): Promise<Veiculo[]> {
+  if (USE_SUPABASE && supabase) {
+    const { data, error } = await supabase
+      .from('vehicles')
+      .select('id,model,year,plate,seats_passenger,feature_ac,feature_accessible,feature_seatbelt,photo_urls')
+      .order('created_at');
+    if (error) throw new Error(error.message);
+    return (data ?? []).map((r) => ({
+      id: r.id as string,
+      modelo: (r.model as string) ?? '',
+      ano: (r.year as number) ?? undefined,
+      placa: (r.plate as string) ?? undefined,
+      lugaresPassageiro: (r.seats_passenger as number) ?? 0,
+      arCondicionado: !!r.feature_ac,
+      acessivel: !!r.feature_accessible,
+      cintos: !!r.feature_seatbelt,
+      fotos: (r.photo_urls as string[]) ?? [],
+    }));
+  }
+  return lsGet<Veiculo[]>(K_VEIC, []);
+}
+
+export async function salvarVeiculo(v: Veiculo): Promise<Veiculo> {
+  if (USE_SUPABASE && supabase) {
+    const payload = {
+      id: v.id || undefined,
+      model: v.modelo,
+      year: v.ano ?? null,
+      plate: v.placa ?? null,
+      seats_passenger: v.lugaresPassageiro,
+      feature_ac: v.arCondicionado,
+      feature_accessible: v.acessivel,
+      feature_seatbelt: v.cintos,
+      photo_urls: v.fotos,
+    };
+    const { data, error } = await supabase.from('vehicles').upsert(payload).select('id').single();
+    if (error) throw new Error(error.message);
+    return { ...v, id: (data?.id as string) ?? v.id };
+  }
+  const lista = lsGet<Veiculo[]>(K_VEIC, []);
+  const id = v.id || novoId();
+  const novo = { ...v, id };
+  const i = lista.findIndex((x) => x.id === id);
+  if (i >= 0) lista[i] = novo;
+  else lista.push(novo);
+  lsSet(K_VEIC, lista);
+  return novo;
+}
+
+/* -------------------------------- ROTAS ---------------------------------- */
+export async function listarRotas(): Promise<Rota[]> {
+  if (USE_SUPABASE && supabase) {
+    // Lê rotas + paradas + passageiros do dono (RLS cuida do escopo).
+    const { data, error } = await supabase
+      .from('routes')
+      .select(
+        'id,name,direction,turno,days,vehicle_id,monitor,monitor_ocupa_lugar,reserved_seats,last_dropoff_min,early_leave_limit_min,status,updated_at,' +
+          'route_stops(id,ordem,type,label,lat,lng,confirmed,destination_id,leg_time_min),' +
+          'route_passengers(id,identificacao,board_stop_id,alight_stop_id,destination_id)',
+      )
+      .order('updated_at', { ascending: false });
+    if (error) throw new Error(error.message);
+    return (data ?? []).map(mapRotaDoBanco);
+  }
+  return lsGet<Rota[]>(K_ROTAS, []);
+}
+
+export async function obterRota(id: string): Promise<Rota | null> {
+  const todas = await listarRotas();
+  return todas.find((r) => r.id === id) ?? null;
+}
+
+export async function salvarRota(rota: Rota): Promise<Rota> {
+  const atualizada = { ...rota, atualizadoEm: new Date().toISOString() };
+  if (USE_SUPABASE && supabase) {
+    // Salvamento transacional via RPC (criada na migração de rotas).
+    const { data, error } = await supabase.rpc('salvar_rota_completa', {
+      p_rota: rotaParaBanco(atualizada),
+    });
+    if (error) throw new Error(error.message);
+    return { ...atualizada, id: (data as string) ?? atualizada.id };
+  }
+  const lista = lsGet<Rota[]>(K_ROTAS, []);
+  const id = atualizada.id || novoId();
+  const nova = { ...atualizada, id };
+  const i = lista.findIndex((x) => x.id === id);
+  if (i >= 0) lista[i] = nova;
+  else lista.push(nova);
+  lsSet(K_ROTAS, lista);
+  return nova;
+}
+
+export async function excluirRota(id: string): Promise<void> {
+  if (USE_SUPABASE && supabase) {
+    const { error } = await supabase.from('routes').delete().eq('id', id);
+    if (error) throw new Error(error.message);
+    return;
+  }
+  const lista = lsGet<Rota[]>(K_ROTAS, []).filter((r) => r.id !== id);
+  lsSet(K_ROTAS, lista);
+}
+
+/* ------------------------- mapeadores Supabase --------------------------- */
+interface LinhaStop {
+  id: string; ordem: number; type: string; label: string | null;
+  lat: number | null; lng: number | null; confirmed: boolean; destination_id: string | null; leg_time_min: number | null;
+}
+interface LinhaPax {
+  id: string; identificacao: string; board_stop_id: string | null;
+  alight_stop_id: string | null; destination_id: string | null;
+}
+interface LinhaRota {
+  id: string; name: string | null; direction: string; turno: string | null; days: string[] | null;
+  vehicle_id: string | null; monitor: boolean; monitor_ocupa_lugar: boolean; reserved_seats: number;
+  last_dropoff_min: number | null; early_leave_limit_min: number | null; status: string; updated_at: string;
+  route_stops: LinhaStop[]; route_passengers: LinhaPax[];
+}
+
+function mapRotaDoBanco(r: unknown): Rota {
+  const x = r as LinhaRota;
+  return {
+    id: x.id,
+    nome: x.name ?? '',
+    sentido: (x.direction as Rota['sentido']) ?? 'ida',
+    turno: (x.turno as Rota['turno']) ?? null,
+    dias: x.days ?? [],
+    veiculoId: x.vehicle_id,
+    monitor: x.monitor,
+    monitorOcupaLugar: x.monitor_ocupa_lugar,
+    lugaresReservados: x.reserved_seats,
+    ultimoDesembarqueMin: x.last_dropoff_min,
+    limiteAntecipacaoMin: x.early_leave_limit_min,
+    status: (x.status as Rota['status']) ?? 'rascunho',
+    atualizadoEm: x.updated_at,
+    paradas: (x.route_stops ?? [])
+      .map((s) => ({
+        id: s.id, ordem: s.ordem, tipo: s.type as 'saida' | 'casa' | 'escola',
+        rotulo: s.label ?? '', lat: s.lat ?? undefined, lng: s.lng ?? undefined,
+        confirmado: s.confirmed, destinoId: s.destination_id, tempoAteProximaMin: s.leg_time_min,
+      }))
+      .sort((a, b) => a.ordem - b.ordem),
+    passageiros: (x.route_passengers ?? []).map((p) => ({
+      id: p.id, identificacao: p.identificacao,
+      embarqueParadaId: p.board_stop_id, desembarqueParadaId: p.alight_stop_id,
+      destinoId: p.destination_id,
+    })),
+  };
+}
+
+function rotaParaBanco(r: Rota): unknown {
+  return {
+    id: r.id || null,
+    name: r.nome,
+    direction: r.sentido,
+    turno: r.turno,
+    days: r.dias,
+    vehicle_id: r.veiculoId,
+    monitor: r.monitor,
+    monitor_ocupa_lugar: r.monitorOcupaLugar,
+    reserved_seats: r.lugaresReservados,
+    last_dropoff_min: r.ultimoDesembarqueMin,
+    early_leave_limit_min: r.limiteAntecipacaoMin,
+    status: r.status,
+    stops: r.paradas.map((p) => ({
+      id: p.id, ordem: p.ordem, type: p.tipo, label: p.rotulo,
+      lat: p.lat ?? null, lng: p.lng ?? null, confirmed: p.confirmado,
+      destination_id: p.destinoId ?? null, leg_time_min: p.tempoAteProximaMin ?? null,
+    })),
+    passengers: r.passageiros.map((p) => ({
+      id: p.id, identificacao: p.identificacao,
+      board_stop_id: p.embarqueParadaId, alight_stop_id: p.desembarqueParadaId,
+      destination_id: p.destinoId ?? null,
+    })),
+  };
+}

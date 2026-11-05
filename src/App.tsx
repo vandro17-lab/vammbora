@@ -12,6 +12,13 @@ import { DriverLandingPage } from '@/pages/DriverLandingPage';
 import { NotFoundPage } from '@/pages/NotFoundPage';
 import { AdminLoginPage } from '@/pages/admin/AdminLoginPage';
 import { AdminPage } from '@/pages/admin/AdminPage';
+import { ContaMotoristaPage } from '@/pages/motorista/ContaMotoristaPage';
+import { PainelMotoristaPage } from '@/pages/motorista/PainelMotoristaPage';
+import { VeiculosPage } from '@/pages/motorista/VeiculosPage';
+import { RotasListPage } from '@/pages/motorista/RotasListPage';
+import { RotaBuilderPage } from '@/pages/motorista/RotaBuilderPage';
+import { PerfilMotoristaPage, DocumentosMotoristaPage, ProcuraMotoristaPage } from '@/pages/motorista/PaginasSimples';
+import { VamboraProPage } from '@/pages/vambora-pro/VamboraProPage';
 
 export default function App() {
   return (
@@ -31,6 +38,17 @@ export default function App() {
             {/* Administração — fora do layout público, protegida por papel */}
             <Route path="/admin/login" element={<AdminLoginPage />} />
             <Route path="/admin" element={<AdminPage />} />
+            {/* Motorista — conta e painel (chrome próprio) */}
+            <Route path="/motorista/conta" element={<ContaMotoristaPage />} />
+            <Route path="/painel" element={<PainelMotoristaPage />} />
+            <Route path="/painel/veiculos" element={<VeiculosPage />} />
+            <Route path="/painel/perfil" element={<PerfilMotoristaPage />} />
+            <Route path="/painel/documentos" element={<DocumentosMotoristaPage />} />
+            <Route path="/painel/procura" element={<ProcuraMotoristaPage />} />
+            <Route path="/painel/rotas" element={<RotasListPage />} />
+            <Route path="/painel/rota/:id" element={<RotaBuilderPage />} />
+            {/* Vambora Pro — app do motorista (experiência visual demonstrativa) */}
+            <Route path="/pro" element={<VamboraProPage />} />
           </Routes>
           </StartupExperience>
         </VitrineProvider>
