@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import { MapPin, Loader2, Navigation, CheckCircle2, AlertTriangle, ExternalLink } from 'lucide-react';
 import type { Rota } from '@/types/motorista';
+import { supabase } from '@/lib/supabase';
 type Sugestao = { rotulo: string; lat: number; lng: number };
 type Resposta = { resultados?: Sugestao[]; trechos?: { minutos: number; metros: number }[]; erro?: string };
 async function consultar(body: unknown): Promise<Resposta> {
-  const response = await fetch('/api/mapas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), cache: 'no-store' });
+  const { data } = await supabase?.auth.getSession() ?? { data: { session: null } };
+  if (!data.session?.access_token) throw new Error('Entre na conta de motorista com Supabase ativo para usar o mapa real.');
+  const response = await fetch('/api/mapas', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + data.session.access_token }, body: JSON.stringify(body), cache: 'no-store' });
   const data = await response.json() as Resposta;
   if (!response.ok) throw new Error(data.erro ?? 'Falha ao consultar mapa.');
   return data;
