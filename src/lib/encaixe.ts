@@ -84,7 +84,8 @@ export function rotaOperacionalDeCadastro(
     const ponto = pontoDeParada(p);
     if (!ponto) return null; // sem coordenada não há como estimar
     for (const pax of rota.passageiros.filter((x) => x.embarqueParadaId === p.id)) {
-      compromissos.push({ id: 'emb:' + pax.id, ponto, tipo: 'embarque', alunoId: pax.id, atendimentoMin: 1 });
+      // Atendimento por aluno (DEC-022); 1 min é só o provisório quando ausente.
+      compromissos.push({ id: 'emb:' + pax.id, ponto, tipo: 'embarque', alunoId: pax.id, atendimentoMin: pax.atendimentoMin ?? 1 });
     }
     if (p.tipo === 'escola') {
       compromissos.push({ id: 'escola:' + p.id, ponto, tipo: 'escola', atendimentoMin: 0, limiteEscolaMin: limite });

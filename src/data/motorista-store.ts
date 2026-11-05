@@ -1,4 +1,4 @@
-import type { Rota, Veiculo } from '@/types/motorista';
+import type { Rota, Veiculo, OrigemAtendimento } from '@/types/motorista';
 import { supabase, USE_SUPABASE } from '@/lib/supabase';
 
 /**
@@ -98,7 +98,8 @@ export async function listarRotas(): Promise<Rota[]> {
       .select(
         'id,name,direction,turno,days,vehicle_id,monitor,monitor_ocupa_lugar,reserved_seats,last_dropoff_min,early_leave_limit_min,status,updated_at,' +
           'route_stops(id,ordem,type,label,lat,lng,confirmed,destination_id,leg_time_min),' +
-          'route_passengers(id,identificacao,board_stop_id,alight_stop_id,destination_id)',
+          'route_passengers(id,identificacao,board_stop_id,alight_stop_id,destination_id,' +
+          'horario_habitual_min,ajuste_antes_min,ajuste_depois_min,atendimento_min,atendimento_origem)',
       )
       // Esconde rotas de demonstração do painel do motorista real (RLS já limita ao dono).
       .eq('is_demo', false)
@@ -152,6 +153,9 @@ interface LinhaStop {
 interface LinhaPax {
   id: string; identificacao: string; board_stop_id: string | null;
   alight_stop_id: string | null; destination_id: string | null;
+  horario_habitual_min?: number | null; ajuste_antes_min?: number | null;
+  ajuste_depois_min?: number | null; atendimento_min?: number | null;
+  atendimento_origem?: string | null;
 }
 interface LinhaRota {
   id: string; name: string | null; direction: string; turno: string | null; days: string[] | null;
@@ -160,7 +164,7 @@ interface LinhaRota {
   route_stops: LinhaStop[]; route_passengers: LinhaPax[];
 }
 
-function mapRotaDoBanco(r: unknown): Rota {
+export function mapRotaDoBanco(r: unknown): Rota {
   const x = r as LinhaRota;
   return {
     id: x.id,
@@ -187,11 +191,16 @@ function mapRotaDoBanco(r: unknown): Rota {
       id: p.id, identificacao: p.identificacao,
       embarqueParadaId: p.board_stop_id, desembarqueParadaId: p.alight_stop_id,
       destinoId: p.destination_id,
+      horarioHabitualMin: p.horario_habitual_min ?? null,
+      ajusteAntesMin: p.ajuste_antes_min ?? null,
+      ajusteDepoisMin: p.ajuste_depois_min ?? null,
+      atendimentoMin: p.atendimento_min ?? null,
+      atendimentoOrigem: (p.atendimento_origem as OrigemAtendimento | null) ?? null,
     })),
   };
 }
 
-function rotaParaBanco(r: Rota): unknown {
+export function rotaParaBanco(r: Rota): unknown {
   return {
     id: r.id || null,
     name: r.nome,
@@ -214,6 +223,11 @@ function rotaParaBanco(r: Rota): unknown {
       id: p.id, identificacao: p.identificacao,
       board_stop_id: p.embarqueParadaId, alight_stop_id: p.desembarqueParadaId,
       destination_id: p.destinoId ?? null,
+      horario_habitual_min: p.horarioHabitualMin ?? null,
+      ajuste_antes_min: p.ajusteAntesMin ?? null,
+      ajuste_depois_min: p.ajusteDepoisMin ?? null,
+      atendimento_min: p.atendimentoMin ?? null,
+      atendimento_origem: p.atendimentoOrigem ?? null,
     })),
   };
 }
