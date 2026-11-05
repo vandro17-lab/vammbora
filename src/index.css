@@ -19,6 +19,7 @@
     @apply text-navy-900 font-sans antialiased;
     background: #f6f7f5;
     min-height: 100dvh;
+    overflow-x: hidden; /* nunca rolar para o lado (evita "tela foge" no celular) */
     -webkit-font-smoothing: antialiased;
     text-rendering: optimizeLegibility;
   }
@@ -111,9 +112,10 @@
     @apply mb-1.5 block text-sm font-semibold text-navy-700;
   }
   .field-input {
-    @apply h-12 w-full rounded-xl border border-navy-100 bg-white px-4 text-navy-900
+    @apply h-12 w-full rounded-xl border border-navy-100 bg-white px-4 text-base text-navy-900
       placeholder:text-navy-300 transition-all duration-200
       focus:border-mint-400 focus:ring-4 focus:ring-mint-500/10;
+    font-size: 16px; /* >= 16px impede o zoom automático do iOS ao focar o campo */
   }
 
   .demo-ribbon {

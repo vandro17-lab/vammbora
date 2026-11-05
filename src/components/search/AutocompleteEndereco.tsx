@@ -88,7 +88,7 @@ export function AutocompleteEndereco({
                 onMouseDown={(e) => { e.preventDefault(); escolher(s); }}
               >
                 <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-mint-600" />
-                <span className="text-navy-700">{s.rotulo}</span>
+                <span className="min-w-0 break-words text-navy-700">{s.rotulo}</span>
               </button>
             </li>
           ))}
