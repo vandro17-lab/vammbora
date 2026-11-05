@@ -6,7 +6,7 @@ const matriz:MatrizViaria={ids:['saida','casa','escola','nova'],minutos:[
 [30,15,0,20],
 [11,4,20,0],
 ]};
-const base:Entrada={capacidade:3,reservados:0,saidaDe:360,saidaAte:420,fimAte:420,
+const base:Entrada={matriz,capacidade:3,reservados:0,saidaDe:360,saidaAte:420,fimAte:420,
  paradas:[
  {id:'saida',tipo:'saida',lat:-21.2,lng:-50.4,embarques:[],desembarques:[],atendimentoMin:0},
  {id:'casa',tipo:'casa',lat:-21.21,lng:-50.41,embarques:['antigo'],desembarques:[],atendimentoMin:1,chegadaOriginal:389},
