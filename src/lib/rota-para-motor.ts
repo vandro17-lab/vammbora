@@ -1,4 +1,4 @@
-import type { Rota, Veiculo } from '@/types/motorista';
+import type { Rota, Veiculo, PassageiroRota } from '@/types/motorista';
 import {
   planejarRota,
   avaliarRotaCandidata,
@@ -22,7 +22,23 @@ import { capacidadeAlunos } from '@/lib/ocupacao-rota';
  *  - temposTrechosMin[k] = minutos até a parada k (saída -> 1ª parada, etc.).
  */
 
-const DEFAULT_ATENDIMENTO_MIN = 1; // tempo parado em cada parada (embarque/desembarque)
+const DEFAULT_ATENDIMENTO_MIN = 1; // provisório quando o aluno não informou (nunca "confirmado")
+
+/** Interseção das janelas individuais (horário habitual ± ajuste) dos alunos
+ *  atendidos numa mesma parada. Sem janela se ninguém informou; `undefined`
+ *  também quando as janelas informadas são incompatíveis entre si (conflito de
+ *  dados — não vira falha dura aqui; a validação específica fica para fase futura). */
+function intersecaoJanelas(pax: PassageiroRota[]): { inicio: number; fim: number } | undefined {
+  let inicio = -Infinity, fim = Infinity, achou = false;
+  for (const x of pax) {
+    if (x.horarioHabitualMin == null) continue;
+    inicio = Math.max(inicio, x.horarioHabitualMin - (x.ajusteAntesMin ?? 0));
+    fim = Math.min(fim, x.horarioHabitualMin + (x.ajusteDepoisMin ?? 0));
+    achou = true;
+  }
+  if (!achou || inicio > fim) return undefined;
+  return { inicio: Math.max(0, inicio), fim };
+}
 
 export interface PlanoDoCadastro {
   plano: PlanoRota | null;
@@ -58,12 +74,20 @@ export function montarEntradaMotor(rota: Rota, veiculo: Veiculo | null): RotaPla
   const saida = ordenadas.find((p) => p.tipo === 'saida') ?? null;
   const paradasSeq = ordenadas.filter((p) => p.tipo !== 'saida');
 
-  const paradas: ParadaPlanejamento[] = paradasSeq.map((p) => ({
-    id: p.id,
-    embarques: rota.passageiros.filter((x) => x.embarqueParadaId === p.id).map((x) => x.id),
-    desembarques: rota.passageiros.filter((x) => x.desembarqueParadaId === p.id).map((x) => x.id),
-    atendimentoMin: DEFAULT_ATENDIMENTO_MIN,
-  }));
+  const paradas: ParadaPlanejamento[] = paradasSeq.map((p) => {
+    const embarques = rota.passageiros.filter((x) => x.embarqueParadaId === p.id).map((x) => x.id);
+    const desembarques = rota.passageiros.filter((x) => x.desembarqueParadaId === p.id).map((x) => x.id);
+    // O atendimento individual acontece na CASA do aluno (ida: embarque; volta:
+    // desembarque). CONSOLIDAÇÃO quando vários alunos partilham a parada: soma
+    // SEQUENCIAL (DEC-022), cada evento contado uma vez, sem presumir embarque
+    // simultâneo. Escola/saída: atendimento 0 (não é atendimento de aluno).
+    const atendidos = p.tipo === 'casa'
+      ? rota.passageiros.filter((x) => (rota.sentido === 'ida' ? x.embarqueParadaId : x.desembarqueParadaId) === p.id)
+      : [];
+    const atendimentoMin = atendidos.reduce((s, x) => s + (x.atendimentoMin ?? DEFAULT_ATENDIMENTO_MIN), 0);
+    const janela = intersecaoJanelas(atendidos);
+    return { id: p.id, embarques, desembarques, atendimentoMin, ...(janela ? { janela } : {}) };
+  });
 
   // temposTrechosMin: um por parada. O tempo até a parada k é o "tempoAteProximaMin"
   // da parada anterior (a saída para a 1ª; a parada k-1 para a k).

@@ -17,6 +17,26 @@ const valid = (p: Point) => p && Number.isFinite(p.lat) && Number.isFinite(p.lng
 // Centro aproximado de Araçatuba, para enviesar a geocodificação.
 const ARACATUBA = { lat: -21.2089, lng: -50.4328 };
 
+/**
+ * Separa a rua do número para a geocodificação ESTRUTURADA do Geoapify
+ * (parâmetros `street` + `housenumber`, que não podem ser combinados com `text`).
+ * Remove sufixos de cidade/estado/país e extrai um número embutido no texto
+ * ("Rua X, 123") quando o campo número vier vazio.
+ */
+function separarRuaNumero(texto: string, numero: string): { rua: string; num: string } {
+  let rua = texto
+    .replace(/,?\s*(ara[cç]atuba|s[aã]o paulo|\bsp\b|brasil|brazil)\b.*$/i, '')
+    .trim();
+  let num = String(numero ?? '').replace(/\D/g, '');
+  if (num) {
+    rua = rua.replace(new RegExp(`(?:,?\\s*n[º°o]?\\.?\\s*)?\\b${num}\\b`, 'i'), '').replace(/[,\s]+$/, '').trim();
+  } else {
+    const m = rua.match(/(?:,?\s*n[º°o]?\.?\s*)?(\d{1,6})\s*$/);
+    if (m) { num = m[1]; rua = rua.slice(0, m.index).replace(/[,\s]+$/, '').trim(); }
+  }
+  return { rua: rua || texto.trim(), num };
+}
+
 // Limite por IP (best-effort, por instância serverless). Reduz abuso da cota.
 const BUCKETS = new Map<string, { count: number; reset: number }>();
 function limitado(ip: string, max = 40, janelaMs = 60_000): boolean {
@@ -48,7 +68,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       raw += chunk.toString();
       if (raw.length > 12000) return reply(res, 413, { erro: 'Solicitação muito grande.' });
     }
-    const data = JSON.parse(raw) as { operacao?: string; texto?: string; pontos?: Point[] };
+    const data = JSON.parse(raw) as { operacao?: string; texto?: string; numero?: string; pontos?: Point[]; ponto?: Point };
     const op = data.operacao;
 
     // Roteamento e matriz são mais caros: exigem sessão Supabase (motorista logado).
@@ -123,6 +143,29 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       url.searchParams.set('bias', `proximity:${ARACATUBA.lng},${ARACATUBA.lat}`);
       url.searchParams.set('lang', 'pt');
       url.searchParams.set('limit', '5');
+    } else if (op === 'geocodificar') {
+      // Geocodificação ESTRUTURADA precisa (respeita o número da casa).
+      const texto = data.texto?.trim() ?? '';
+      if (texto.length < 3 || texto.length > 160) return reply(res, 400, { erro: 'Digite um pouco mais do endereço.' });
+      const { rua, num } = separarRuaNumero(texto, data.numero ?? '');
+      url = new URL('https://api.geoapify.com/v1/geocode/search');
+      url.searchParams.set('street', rua);
+      if (num) url.searchParams.set('housenumber', num);
+      url.searchParams.set('city', 'Araçatuba');
+      url.searchParams.set('state', 'São Paulo');
+      url.searchParams.set('country', 'Brasil');
+      url.searchParams.set('bias', `proximity:${ARACATUBA.lng},${ARACATUBA.lat}`);
+      url.searchParams.set('lang', 'pt');
+      url.searchParams.set('limit', '1');
+    } else if (op === 'reverso') {
+      // Geocodificação reversa: endereço aproximado do ponto que o motorista arrastou.
+      const pt = data.ponto;
+      if (!pt || !valid(pt)) return reply(res, 400, { erro: 'Ponto geográfico inválido.' });
+      url = new URL('https://api.geoapify.com/v1/geocode/reverse');
+      url.searchParams.set('lat', String(pt.lat));
+      url.searchParams.set('lon', String(pt.lng));
+      url.searchParams.set('lang', 'pt');
+      url.searchParams.set('limit', '1');
     } else if (op === 'rota') {
       const pontos = data.pontos;
       if (!Array.isArray(pontos) || pontos.length < 2 || pontos.length > 25 || !pontos.every(valid)) return reply(res, 400, { erro: 'Informe de 2 a 25 pontos geográficos válidos.' });
@@ -149,6 +192,25 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
         lat: Number(f.properties?.lat), lng: Number(f.properties?.lon),
       })).filter(r => r.rotulo && Number.isFinite(r.lat) && Number.isFinite(r.lng));
       return reply(res, 200, { resultados });
+    }
+
+    if (op === 'geocodificar') {
+      const f = json.features?.[0]?.properties as Record<string, unknown> | undefined;
+      const lat = Number(f?.lat), lng = Number(f?.lon);
+      if (!f || !Number.isFinite(lat) || !Number.isFinite(lng)) return reply(res, 200, { ponto: null });
+      const resultType = String(f.result_type ?? '');
+      const temNumero = f.housenumber != null && String(f.housenumber) !== '';
+      const confianca = Number((f.rank as { confidence?: number } | undefined)?.confidence ?? 0);
+      const precisao: 'exato' | 'rua' | 'aproximado' =
+        (resultType === 'building' || temNumero) ? 'exato'
+        : (resultType === 'street' || resultType === 'street_part') ? 'rua'
+        : 'aproximado';
+      return reply(res, 200, { ponto: { rotulo: String(f.formatted ?? ''), lat, lng, precisao, confianca } });
+    }
+
+    if (op === 'reverso') {
+      const f = json.features?.[0]?.properties as Record<string, unknown> | undefined;
+      return reply(res, 200, { rotulo: f ? String(f.formatted ?? '') : '' });
     }
 
     const props = json.features?.[0]?.properties;

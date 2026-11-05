@@ -3,6 +3,28 @@ import { nomeDestinoParaExibicao } from '@/lib/utils';
 
 export interface SugestaoEndereco { rotulo: string; lat: number; lng: number }
 
+/** Precisão de um ponto geográfico. 'ajustado' = movido à mão pelo motorista. */
+export type Precisao = 'exato' | 'rua' | 'aproximado' | 'ajustado';
+export interface PontoPreciso { rotulo: string; lat: number; lng: number; precisao: Precisao }
+
+/**
+ * Separa a rua do número do endereço (espelha a lógica do proxy). Puro e
+ * testável: usado no fallback sem chave e para montar a consulta.
+ */
+export function separarRuaNumero(texto: string, numero: string): { rua: string; num: string } {
+  let rua = texto
+    .replace(/,?\s*(ara[cç]atuba|s[aã]o paulo|\bsp\b|brasil|brazil)\b.*$/i, '')
+    .trim();
+  let num = String(numero ?? '').replace(/\D/g, '');
+  if (num) {
+    rua = rua.replace(new RegExp(`(?:,?\\s*n[º°o]?\\.?\\s*)?\\b${num}\\b`, 'i'), '').replace(/[,\s]+$/, '').trim();
+  } else {
+    const m = rua.match(/(?:,?\s*n[º°o]?\.?\s*)?(\d{1,6})\s*$/);
+    if (m) { num = m[1]; rua = rua.slice(0, m.index).replace(/[,\s]+$/, '').trim(); }
+  }
+  return { rua: rua || texto.trim(), num };
+}
+
 // Centro aproximado de Araçatuba e caixa (bbox) para filtrar resultados.
 export const ARACATUBA = { lat: -21.2089, lng: -50.4328 };
 const BBOX = { latMin: -21.7, latMax: -20.7, lngMin: -51.0, lngMax: -49.9 };
@@ -87,6 +109,94 @@ export async function buscarEnderecos(q: string, signal?: AbortSignal): Promise<
     return out;
   } catch {
     return [];
+  }
+}
+
+/**
+ * Geocodificação PRECISA que respeita o número da casa (geocodificação
+ * estruturada do Geoapify via proxy). Sem chave, cai para o Photon lendo o
+ * `housenumber` quando disponível. Devolve o ponto e a precisão, ou null.
+ */
+export async function geocodificarPreciso(texto: string, numero: string, signal?: AbortSignal): Promise<PontoPreciso | null> {
+  const rua = texto.trim();
+  if (rua.length < 3) return null;
+
+  if (!proxyIndisponivel) {
+    try {
+      const r = await fetch('/api/mapas', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ operacao: 'geocodificar', texto: rua, numero }), signal,
+      });
+      if (r.status === 503) {
+        proxyIndisponivel = true;
+      } else if (r.ok) {
+        const d = (await r.json()) as { ponto?: PontoPreciso | null };
+        if (d.ponto && Number.isFinite(d.ponto.lat) && Number.isFinite(d.ponto.lng)) return d.ponto;
+        return null; // o proxy respondeu, mas não achou o endereço
+      }
+    } catch {
+      /* segue para o fallback */
+    }
+  }
+
+  // Fallback SEM CHAVE: Photon. Lê housenumber para classificar a precisão.
+  try {
+    const { rua: via, num } = separarRuaNumero(rua, numero);
+    const u = new URL('https://photon.komoot.io/api/');
+    u.searchParams.set('q', `${[via, num].filter(Boolean).join(' ')}, Araçatuba`);
+    u.searchParams.set('lat', String(ARACATUBA.lat));
+    u.searchParams.set('lon', String(ARACATUBA.lng));
+    u.searchParams.set('limit', '1');
+    const r = await fetch(u, { signal });
+    if (!r.ok) return null;
+    const d = (await r.json()) as { features?: Array<{ geometry: { coordinates: [number, number] }; properties: Record<string, string> }> };
+    const f = d.features?.[0];
+    const [lng, lat] = f?.geometry?.coordinates ?? [NaN, NaN];
+    if (!f || !Number.isFinite(lat) || !Number.isFinite(lng) || !dentroDeAracatuba(lat, lng)) return null;
+    const p = f.properties ?? {};
+    const temNumero = !!p.housenumber;
+    const viaNome = p.street || p.name || via;
+    const rotulo = [`${viaNome}${p.housenumber ? ', ' + p.housenumber : (num ? ', ' + num : '')}`, p.district || p.suburb, p.city].filter(Boolean).join(', ');
+    return { rotulo, lat, lng, precisao: temNumero ? 'exato' : 'rua' };
+  } catch {
+    return null;
+  }
+}
+
+/** Geocodificação reversa: endereço aproximado de um ponto (após arrastar o alfinete). */
+export async function reverseGeocodificar(lat: number, lng: number, signal?: AbortSignal): Promise<string | null> {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  if (!proxyIndisponivel) {
+    try {
+      const r = await fetch('/api/mapas', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ operacao: 'reverso', ponto: { lat, lng } }), signal,
+      });
+      if (r.status === 503) {
+        proxyIndisponivel = true;
+      } else if (r.ok) {
+        const d = (await r.json()) as { rotulo?: string };
+        if (d.rotulo) return d.rotulo;
+      }
+    } catch {
+      /* segue para o fallback */
+    }
+  }
+  try {
+    const u = new URL('https://photon.komoot.io/reverse');
+    u.searchParams.set('lat', String(lat));
+    u.searchParams.set('lon', String(lng));
+    u.searchParams.set('limit', '1');
+    const r = await fetch(u, { signal });
+    if (!r.ok) return null;
+    const d = (await r.json()) as { features?: Array<{ properties: Record<string, string> }> };
+    const p = d.features?.[0]?.properties;
+    if (!p) return null;
+    const via = p.street || p.name || '';
+    const linha = via ? `${via}${p.housenumber ? ', ' + p.housenumber : ''}` : (p.name || '');
+    return [linha, p.district || p.suburb, p.city].filter(Boolean).join(', ') || null;
+  } catch {
+    return null;
   }
 }
 

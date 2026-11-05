@@ -144,6 +144,10 @@ function montarBase(rota: Rota, sentido: Sentido, atendimento: number): Montagem
     const embarcam = rota.passageiros.filter((x) => x.embarqueParadaId === parada.id);
     const descem = rota.passageiros.filter((x) => x.desembarqueParadaId === parada.id);
 
+    // Atendimento por ALUNO (DEC-022); `atendimento` é só o provisório quando o
+    // aluno não informou. Cada compromisso soma o seu tempo (sequencial, sem
+    // presumir simultaneidade; cada evento contado uma vez).
+    const atendimentoDe = (pax: { atendimentoMin?: number | null }) => pax.atendimentoMin ?? atendimento;
     // Desembarques liberam lugar antes dos embarques no mesmo ponto.
     for (const pax of descem) {
       const naEscola = parada.tipo === 'escola';
@@ -154,13 +158,13 @@ function montarBase(rota: Rota, sentido: Sentido, atendimento: number): Montagem
         tipo: 'desembarque',
         alunoId: pax.id,
         // Desembarque na escola (ida) é instantâneo; o limite real entra depois.
-        atendimentoMin: naEscola && sentido === 'ida' ? 0 : atendimento,
+        atendimentoMin: naEscola && sentido === 'ida' ? 0 : atendimentoDe(pax),
       });
       nomePorCompromisso[id] = pax.identificacao;
     }
     for (const pax of embarcam) {
       const id = 'emb:' + pax.id;
-      compromissos.push({ id, ponto, tipo: 'embarque', alunoId: pax.id, atendimentoMin: atendimento });
+      compromissos.push({ id, ponto, tipo: 'embarque', alunoId: pax.id, atendimentoMin: atendimentoDe(pax) });
       nomePorCompromisso[id] = pax.identificacao;
     }
   }

@@ -33,6 +33,9 @@ export interface ParadaRota {
   tempoAteProximaMin?: number | null;
 }
 
+/** Origem da estimativa do tempo de atendimento (DEC-021). */
+export type OrigemAtendimento = 'informado' | 'provisorio' | 'desconhecido';
+
 export interface PassageiroRota {
   id: string;
   /** Nome curto/apelido — PRIVADO. Identificação é por `id`, não pelo nome. */
@@ -40,6 +43,20 @@ export interface PassageiroRota {
   embarqueParadaId: string | null;
   desembarqueParadaId: string | null;
   destinoId?: string | null;
+  /* ---- Compromisso de atendimento do aluno (DEC-012, DEC-020..023) ----
+   * Pertencem ao ALUNO no seu sentido (ida: casa de embarque; volta: casa de
+   * desembarque), não à parada — por isso ficam aqui, não em ParadaRota.
+   * `null`/ausente = NÃO informado; nunca apresentar como confirmado. */
+  /** Horário habitual de atendimento (minuto do dia 0..1439). */
+  horarioHabitualMin?: number | null;
+  /** Tolerância, em minutos, ANTES do horário habitual (Fixo = 0). */
+  ajusteAntesMin?: number | null;
+  /** Tolerância, em minutos, DEPOIS do horário habitual (Fixo = 0). */
+  ajusteDepoisMin?: number | null;
+  /** Duração do atendimento deste aluno na parada (minutos). */
+  atendimentoMin?: number | null;
+  /** Origem de `atendimentoMin`. */
+  atendimentoOrigem?: OrigemAtendimento | null;
 }
 
 export interface Rota {
