@@ -37,12 +37,12 @@ export function PlanoMotor({
     <div className="card mt-4 p-5">
       <div className="flex items-center gap-2">
         <Gauge className="h-5 w-5 text-mint-600" />
-        <h2 className="font-display font-bold">Horários da viagem (calculado pelo sistema)</h2>
+        <h2 className="font-display font-bold">Horários de chegada e saída da van</h2>
       </div>
 
       {comProxima.length > 0 && (
         <div className="mt-3 space-y-2">
-          <p className="text-sm text-navy-600">Quanto tempo leva de uma parada até a próxima?</p>
+          <p className="text-sm text-navy-600">Informe quantos minutos a van leva para ir de cada endereço até o próximo. Inclua o trânsito normal do trajeto.</p>
           {comProxima.map((p, i) => (
             <div key={p.id} className="flex items-center gap-2 text-sm">
               <span className="min-w-0 flex-1 truncate text-navy-700">
@@ -65,11 +65,11 @@ export function PlanoMotor({
       {plano?.valido ? (
         <div className="mt-4 rounded-xl bg-mint-50 p-3">
           <p className="inline-flex items-center gap-1.5 text-sm font-semibold text-mint-800">
-            <CheckCircle2 className="h-4 w-4" /> Plano calculado pelo motor de compatibilidade
+            <CheckCircle2 className="h-4 w-4" /> Horários calculados para esta rota
           </p>
           {plano.saida != null && (
             <p className="mt-1 text-sm text-navy-700">
-              Horário de saída sugerido: <strong>{minutosParaTextoHora(plano.saida)}</strong>
+              Para chegar à última escola no horário, comece a rota às: <strong>{minutosParaTextoHora(plano.saida)}</strong>
             </p>
           )}
           <ul className="mt-2 space-y-1 text-sm text-navy-600">
@@ -79,7 +79,7 @@ export function PlanoMotor({
                   <Clock className="h-3.5 w-3.5 text-navy-400" />
                   {porId(pp.id) ? rotuloCurto(porId(pp.id)!) : pp.id}
                 </span>
-                <span className="font-medium text-navy-800">chega {minutosParaTextoHora(pp.chegada)}</span>
+                <span className="font-medium text-navy-800">Chegada prevista: {minutosParaTextoHora(pp.chegada)}</span>
               </li>
             ))}
           </ul>
@@ -95,7 +95,7 @@ export function PlanoMotor({
           <ul className="mt-1 list-disc pl-5">
             {dadosFaltantes.slice(0, 4).map((m, i) => <li key={i}>{m}</li>)}
           </ul>
-          <p className="mt-2 text-xs">Você pode salvar a rota assim mesmo — o cálculo entra quando os dados estiverem completos.</p>
+          <p className="mt-2 text-xs">Você pode salvar a rota mesmo sem esses dados. Os horários só serão calculados quando todas as informações necessárias forem preenchidas.</p>
         </div>
       )}
     </div>
