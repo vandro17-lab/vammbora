@@ -70,12 +70,12 @@ function Builder() {
   const ultimaOrdem = rota.paradas.reduce((m, p) => Math.max(m, p.ordem), -1);
   const aBordoFinal = ultimaOrdem >= 0 ? aBordoEm(rota, ultimaOrdem) : [];
 
-  async function salvar(status: Rota['status']) {
+  async function salvar(status: Rota['status'], rotaAtual: Rota = rota) {
     setSalvando(true);
     setAviso(null);
     try {
-      const nome = rota.nome || `Rota ${rota.sentido === 'ida' ? 'de ida' : 'de volta'}`;
-      const salva = await salvarRota({ ...rota, nome, status });
+      const nome = rotaAtual.nome || `Rota ${rotaAtual.sentido === 'ida' ? 'de ida' : 'de volta'}`;
+      const salva = await salvarRota({ ...rotaAtual, nome, status });
       setRota(salva);
       if (status === 'concluida') {
         navigate('/painel/rotas');
@@ -137,7 +137,7 @@ function Builder() {
           )}
 
           {etapa === 'horarios' && (
-            <Horarios rota={rota} setRota={setRota} onConfirmar={() => salvar('concluida')} salvando={salvando} />
+            <Horarios rota={rota} setRota={setRota} onConfirmar={(atualizada) => salvar('concluida', atualizada)} salvando={salvando} />
           )}
 
           {/* Rodapé de ações */}
@@ -499,28 +499,31 @@ function FormEscola({ rota, setRota, destinos, proxOrdem, aBordo, onFechar }: {
 }
 
 /* ----------------------------- Horários ----------------------------- */
-function Horarios({ rota, setRota, onConfirmar, salvando }: { rota: Rota; setRota: (r: Rota) => void; onConfirmar: () => void; salvando: boolean }) {
+function Horarios({ rota, setRota, onConfirmar, salvando }: { rota: Rota; setRota: (r: Rota) => void; onConfirmar: (atualizada: Rota) => void; salvando: boolean }) {
   const [hora, setHora] = useState(rota.ultimoDesembarqueMin != null ? minutosParaTextoHora(rota.ultimoDesembarqueMin).replace('h', ':') : '');
   const [antecip, setAntecip] = useState(rota.limiteAntecipacaoMin != null ? String(rota.limiteAntecipacaoMin) : '');
 
   function confirmar() {
     const min = /^\d{1,2}:\d{2}$/.test(hora) ? horaParaMinutos(hora) : null;
-    setRota({ ...rota, ultimoDesembarqueMin: min, limiteAntecipacaoMin: antecip ? Number(antecip) : null });
-    onConfirmar();
+    if (min === null || min < 0 || min >= 1440) return;
+    const atualizada = { ...rota, ultimoDesembarqueMin: min, limiteAntecipacaoMin: antecip ? Number(antecip) : null };
+    setRota(atualizada);
+    onConfirmar(atualizada);
   }
   return (
     <div className="card mt-4 p-5">
       <h2 className="font-display text-lg font-bold">Horários</h2>
       <div className="mt-4">
-        <label className="field-label">A que horas você precisa deixar o último aluno?</label>
+        <label className="field-label">Horário final obrigatório: até que horas sua van DEVE chegar à última parada?</label>
         <input className="field-input" type="time" value={hora} onChange={(e) => setHora(e.target.value)} />
       </div>
       <div className="mt-4">
         <label className="field-label">Se precisar, você pode sair mais cedo? Quantos minutos antes?</label>
         <input className="field-input" inputMode="numeric" placeholder="Ex.: 10" value={antecip} onChange={(e) => setAntecip(e.target.value.replace(/\D/g, ''))} />
       </div>
+      <p className="mt-2 text-sm font-medium text-amber-800">Este é um limite rígido: nenhum encaixe pode atrasar a chegada à última parada. Organize a última parada do percurso antes de concluir.</p>
       <p className="mt-3 text-xs text-navy-400">A previsão de horário de cada parada é calculada pelo sistema de compatibilidade (em preparação). Sair mais cedo não garante que um novo aluno caiba.</p>
-      <button className="btn btn-lg btn-primary mt-5 w-full" onClick={confirmar} disabled={salvando}>
+      <button className="btn btn-lg btn-primary mt-5 w-full" onClick={confirmar} disabled={salvando || !/^\\d{1,2}:\\d{2}$/.test(hora)}>
         {salvando ? <><Loader2 className="h-5 w-5 animate-spin" /> Salvando…</> : 'Concluir rota'}
       </button>
     </div>
