@@ -28,7 +28,7 @@ describe('montarMensagemWhatsApp', () => {
   const criterios: CriteriosBusca = {
     cidadeId: 'aracatuba-sp',
     endereco: 'Rua das Flores, 123, Centro',
-    destinoId: 'esc-paineiras',
+    destinoId: 'ee-manoel-bento-da-cruz',
     turno: 'manha',
     contratacao: 'avulso',
     dataAvulso: '2026-11-10',
@@ -36,8 +36,8 @@ describe('montarMensagemWhatsApp', () => {
   };
 
   it('inclui os critérios: destino, turno, contratação/data e trajeto', () => {
-    const msg = montarMensagemWhatsApp(motorista, criterios, DESTINOS_POR_ID['esc-paineiras']);
-    expect(msg).toContain('Colégio Paineiras');
+    const msg = montarMensagemWhatsApp(motorista, criterios, DESTINOS_POR_ID['ee-manoel-bento-da-cruz']);
+    expect(msg).toContain('Manoel Bento');
     expect(msg).toContain('Manhã');
     expect(msg).toContain('avulso');
     expect(msg).toContain('10/11/2026');
@@ -45,7 +45,7 @@ describe('montarMensagemWhatsApp', () => {
   });
 
   it('NÃO envia o endereço livre automaticamente (privacidade)', () => {
-    const msg = montarMensagemWhatsApp(motorista, criterios, DESTINOS_POR_ID['esc-paineiras']);
+    const msg = montarMensagemWhatsApp(motorista, criterios, DESTINOS_POR_ID['ee-manoel-bento-da-cruz']);
     // O endereço digitado (que pode ser completo) não vai na mensagem.
     expect(msg).not.toContain('Rua das Flores');
     expect(msg).not.toContain('123');
@@ -58,7 +58,7 @@ describe('montarMensagemWhatsApp', () => {
     const msg = montarMensagemWhatsApp(
       motorista,
       { ...criterios, modalidade: 'ida' },
-      DESTINOS_POR_ID['esc-paineiras'],
+      DESTINOS_POR_ID['ee-manoel-bento-da-cruz'],
     );
     expect(msg).toContain('somente ida');
   });

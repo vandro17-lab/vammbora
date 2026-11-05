@@ -1,0 +1,51 @@
+-- Vambora: destinos REAIS de Araçatuba na tabela destinations (idempotente)
+insert into public.destinations (id, type, name, neighborhood, city_id, inep_code, turnos, source, lat, lng, is_demo, is_published) values
+  ('ee-clovis-de-arruda-campos', 'escola', 'EE Clóvis de Arruda Campos', 'Amizade', 'aracatuba-sp', null, '{}', 'https://www.educacao.sp.gov.br/', -21.188754, -50.452534, false, true),
+  ('ee-conjunto-habitacional-ezequiel-barbos', 'escola', 'EE Conjunto Habitacional Ezequiel Barbosa', 'São José', 'aracatuba-sp', null, '{}', 'https://www.educacao.sp.gov.br/', -21.194352, -50.480089, false, true),
+  ('ee-genesio-de-assis', 'escola', 'EE Genésio de Assis', 'Paraíso', 'aracatuba-sp', null, '{}', 'https://www.educacao.sp.gov.br/', -21.197701, -50.447781, false, true),
+  ('ee-jorge-correa', 'escola', 'EE Jorge Corrêa', 'Jardim Sumaré', 'aracatuba-sp', null, '{}', 'https://www.educacao.sp.gov.br/', -21.211871, -50.431694, false, true),
+  ('ee-jose-arantes-terra', 'escola', 'EE José Arantes Terra', 'Jardim Alvorada', 'aracatuba-sp', null, '{}', 'https://www.educacao.sp.gov.br/', -21.228450, -50.422285, false, true),
+  ('ee-jose-augusto-lopes-borges', 'escola', 'EE José Augusto Lopes Borges', 'Vila Nova', 'aracatuba-sp', null, '{}', 'https://www.educacao.sp.gov.br/', -21.214566, -50.459926, false, true),
+  ('ee-jose-candido', 'escola', 'EE José Cândido', 'Higienópolis', 'aracatuba-sp', null, '{}', 'https://www.educacao.sp.gov.br/', -21.210622, -50.446117, false, true),
+  ('ee-joubert-de-carvalho', 'escola', 'EE Joubert de Carvalho', 'Jardim Paulista', 'aracatuba-sp', null, '{}', 'https://www.educacao.sp.gov.br/', -21.208680, -50.426068, false, true),
+  ('ee-licolina-villela-reis-alves', 'escola', 'EE Licolina Villela Reis Alves', 'Vila Estádio', 'aracatuba-sp', null, '{}', 'https://www.educacao.sp.gov.br/', -21.220508, -50.442039, false, true),
+  ('ee-luiz-gama', 'escola', 'EE Luiz Gama', 'São Joaquim', 'aracatuba-sp', null, '{}', 'https://www.educacao.sp.gov.br/', -21.203964, -50.441511, false, true),
+  ('ee-manoel-bento-da-cruz', 'escola', 'EE Manoel Bento da Cruz', 'Higienópolis', 'aracatuba-sp', null, '{}', 'https://www.educacao.sp.gov.br/', -21.211763, -50.443782, false, true),
+  ('ee-maria-apparecida', 'escola', 'EE Maria Apparecida', 'Jardim Monte Carlo', 'aracatuba-sp', null, '{}', 'https://www.educacao.sp.gov.br/', -21.204747, -50.462435, false, true),
+  ('emeb-prof-alvino-barbosa', 'escola', 'EMEB Prof. Alvino Barbosa', 'Etemp', 'aracatuba-sp', null, '{}', 'https://aracatuba.sp.gov.br/', -21.160235, -50.450805, false, true),
+  ('emeb-prof-ana-maria-neri-landre', 'escola', 'EMEB Prof.ª Ana Maria Néri Landre', 'José Saran', 'aracatuba-sp', null, '{}', 'https://aracatuba.sp.gov.br/', -21.224001, -50.470117, false, true),
+  ('emeb-antonio-jose-cazerta', 'escola', 'EMEB Antonio José Cazerta', 'Águas Claras', 'aracatuba-sp', null, '{}', 'https://aracatuba.sp.gov.br/', -21.167288, -50.474193, false, true),
+  ('emeb-prof-apparecida-garcia-carvalho-ric', 'escola', 'EMEB Prof.ª Apparecida Garcia Carvalho Rico', 'Aviação', 'aracatuba-sp', null, '{}', 'https://aracatuba.sp.gov.br/', -21.193400, -50.430400, false, true),
+  ('emeb-lucilene-do-nascimento', 'escola', 'EMEB Lucilene do Nascimento', 'São José', 'aracatuba-sp', null, '{}', 'https://aracatuba.sp.gov.br/', -21.201391, -50.473445, false, true),
+  ('emeb-prof-luiz-aparecido-bertolucci', 'escola', 'EMEB Prof. Luiz Aparecido Bertolucci', 'Jardim Monte Carlo', 'aracatuba-sp', null, '{}', 'https://aracatuba.sp.gov.br/', -21.205707, -50.465425, false, true),
+  ('emeb-prof-maria-aparecida-pimentel-ferra', 'escola', 'EMEB Prof.ª Maria Aparecida Pimentel Ferraz', 'Jardim Rosele', 'aracatuba-sp', null, '{}', 'https://aracatuba.sp.gov.br/', -21.184180, -50.462912, false, true),
+  ('emeb-prof-maria-helena-de-freitas-carli', 'escola', 'EMEB Prof.ª Maria Helena de Freitas Carli', 'Vista Verde', 'aracatuba-sp', null, '{}', 'https://aracatuba.sp.gov.br/', -21.211345, -50.396578, false, true),
+  ('emeb-prof-odete-costa-bodstein', 'escola', 'EMEB Prof.ª Odete Costa Bodstein', 'Ivo Tozzi', 'aracatuba-sp', null, '{}', 'https://aracatuba.sp.gov.br/', -21.217832, -50.401748, false, true),
+  ('emeb-roseli-de-oliveira', 'escola', 'EMEB Roseli de Oliveira', 'Etemp', 'aracatuba-sp', null, '{}', 'https://aracatuba.sp.gov.br/', -21.157786, -50.450350, false, true),
+  ('emeb-sergio-esgalha', 'escola', 'EMEB Sérgio Esgalha', 'Guanabara', 'aracatuba-sp', null, '{}', 'https://aracatuba.sp.gov.br/', -21.218437, -50.471859, false, true),
+  ('emeb-prof-silene-maria-barreto', 'escola', 'EMEB Prof.ª Silene Maria Barreto', 'São Rafael', 'aracatuba-sp', null, '{}', 'https://aracatuba.sp.gov.br/', -21.166609, -50.458472, false, true),
+  ('emeb-prof-sonia-maria-correa', 'escola', 'EMEB Prof.ª Sônia Maria Corrêa', 'Jardim Pinheiro', 'aracatuba-sp', null, '{}', 'https://aracatuba.sp.gov.br/', -21.206424, -50.409468, false, true),
+  ('emeb-prof-suzana-echelon-ortiz', 'escola', 'EMEB Profª. Suzana Echelon Ortiz', 'Jardim Presidente', 'aracatuba-sp', null, '{}', 'https://aracatuba.sp.gov.br/', -21.193684, -50.465888, false, true),
+  ('colegio-alameda', 'escola', 'Colégio Alameda', 'Jardim Sumaré', 'aracatuba-sp', null, '{}', 'https://aracatuba.sp.gov.br/', -21.216457, -50.430758, false, true),
+  ('colegio-anjinhos', 'escola', 'Colégio Anjinhos', 'Jardim Sumaré', 'aracatuba-sp', null, '{}', 'https://aracatuba.sp.gov.br/', -21.213389, -50.436106, false, true),
+  ('colegio-bem-te-vi', 'escola', 'Colégio Bem-Te-Vi', 'São Joaquim', 'aracatuba-sp', null, '{}', 'https://aracatuba.sp.gov.br/', -21.200409, -50.444228, false, true),
+  ('colegio-canarinho', 'escola', 'Colégio Canarinho', 'Ipanema', 'aracatuba-sp', null, '{}', 'https://aracatuba.sp.gov.br/', -21.173310, -50.444198, false, true),
+  ('colegio-educare', 'escola', 'Colégio Educare', 'Dona Amélia', 'aracatuba-sp', null, '{}', 'https://aracatuba.sp.gov.br/', -21.188197, -50.442818, false, true),
+  ('colegio-geracao-raizes', 'escola', 'Colégio Geração Raízes', 'Jardim Nova Yorque', 'aracatuba-sp', null, '{}', 'https://aracatuba.sp.gov.br/', -21.227819, -50.435649, false, true),
+  ('colegio-kantele', 'escola', 'Colégio Kantele', 'Jardim Sumaré', 'aracatuba-sp', null, '{}', 'https://aracatuba.sp.gov.br/', -21.213635, -50.427940, false, true),
+  ('colegio-santos-dumont', 'escola', 'Colégio Santos Dumont', 'Novo Paraíso', 'aracatuba-sp', null, '{}', 'https://aracatuba.sp.gov.br/', -21.192640, -50.456230, false, true),
+  ('l-abri-desenvolvimento-infantil', 'escola', 'L''abri Desenvolvimento Infantil', 'Santana', 'aracatuba-sp', null, '{}', 'https://aracatuba.sp.gov.br/', -21.194648, -50.440498, false, true),
+  ('colegio-arca-de-noe-aracatuba', 'escola', 'Colégio Arca de Noé Araçatuba', 'Ipanema', 'aracatuba-sp', null, '{}', 'https://aracatuba.sp.gov.br/', -21.183530, -50.449855, false, true),
+  ('fatec-aracatuba-prof-fernando-amaral-de', 'faculdade', 'Fatec Araçatuba – Prof. Fernando Amaral de Almeida Prado', 'Jardim Ipanema', 'aracatuba-sp', null, '{}', 'https://www.cps.sp.gov.br/', -21.181660, -50.450395, false, true),
+  ('etec-de-aracatuba', 'escola', 'Etec de Araçatuba', 'Jardim Ipanema', 'aracatuba-sp', null, '{}', 'https://www.cps.sp.gov.br/', -21.181660, -50.450395, false, true),
+  ('unesp-campus-de-aracatuba', 'faculdade', 'UNESP – Campus de Araçatuba', 'Vila Mendonça', 'aracatuba-sp', null, '{}', 'https://www.unesp.br/', -21.209271, -50.429249, false, true),
+  ('unitoledo-centro-universitario-toledo', 'faculdade', 'UniToledo (Centro Universitário Toledo)', 'Jardim Sumaré', 'aracatuba-sp', null, '{}', 'https://qualfacul.com.br/', -21.213113, -50.430596, false, true),
+  ('unip-aracatuba', 'faculdade', 'UNIP Araçatuba', 'Parque Baguaçu', 'aracatuba-sp', null, '{}', 'https://qualfacul.com.br/', -21.224932, -50.425563, false, true)
+on conflict (id) do update set
+  type = excluded.type, name = excluded.name, neighborhood = excluded.neighborhood,
+  source = excluded.source, lat = excluded.lat, lng = excluded.lng,
+  is_demo = excluded.is_demo, is_published = excluded.is_published;
+
+-- Esconde os 5 destinos de demonstração antigos (não apaga).
+update public.destinations set is_published = false
+where id in ('esc-paineiras','esc-horizonte','esc-sao-joao','fac-unifatec','fac-unimed-campus');

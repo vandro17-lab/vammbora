@@ -7,13 +7,17 @@ import {
   AlertTriangle, TrendingUp, Bus, School, MapPin, Star, Plus, ArrowRight,
 } from 'lucide-react';
 import { Avatar } from '@/components/brand/Avatar';
-import { montarEntradaMotor, avaliarRotaCandidata } from '@/lib/rota-para-motor';
+import { criarMatrizDemo, rotaOperacionalDeCadastro, partidaRetroativa, encontrarEncaixes } from '@/lib/encaixe';
 import { minutosParaTextoHora, formatBRL, cn } from '@/lib/utils';
 import {
   MOTORISTA_DEMO, VAN_DEMO, ALUNOS_DEMO, INDICADORES_DEMO, OPORTUNIDADES_DEMO, FINANCEIRO_DEMO,
   AVISOS_DEMO, CALENDARIO_DEMO, COMBUSTIVEL_DEMO, MANUTENCAO_DEMO, DOCUMENTOS_DEMO,
-  rotaDemoManha, rotaComOportunidade, VEICULO_DEMO, type OportunidadeDemo,
+  rotaDemoManha, pedidoDaOportunidade, type OportunidadeDemo,
 } from '@/data/motorista-demo';
+
+/** Folga de saída (min): a van parte um pouco antes do horário mais apertado,
+ *  deixando margem — é o que permite (ou não) encaixar um novo aluno. */
+const FOLGA_SAIDA_MIN = 8;
 
 type Aba = 'inicio' | 'rotas' | 'oportunidades' | 'financeiro' | 'mais';
 const EASE = [0.22, 1, 0.36, 1] as const;
@@ -190,6 +194,16 @@ function Inicio({ irPara, abrir }: { irPara: (a: Aba) => void; abrir: (m: string
         <div className="h-1 w-full bg-navy-50"><div className="h-full bg-gradient-to-r from-mint-400 to-mint-600" style={{ width: '75%' }} /></div>
       </button>
 
+      {/* Laboratório do motor (mesmo motor da busca) */}
+      <Link to="/pro/encaixe" className="card card-interactive flex items-center gap-3 overflow-hidden p-4">
+        <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-indigo-400 to-indigo-600 text-white shadow-card"><RouteIcon className="h-6 w-6" /></span>
+        <div className="min-w-0 flex-1">
+          <p className="font-display font-bold text-navy-900">Testar encaixe inteligente</p>
+          <p className="mt-0.5 text-xs text-navy-500">Ida, volta e horários — calculado pelo motor real</p>
+        </div>
+        <ChevronRight className="h-5 w-5 shrink-0 text-navy-300" />
+      </Link>
+
       {/* Avisos */}
       <div className="card p-5">
         <div className="flex items-center justify-between">
@@ -300,28 +314,25 @@ function Oportunidades() {
   );
 }
 
-/** Traduz os motivos técnicos do motor para linguagem simples (sem mudar o resultado). */
-function motivoAmigavel(m: string): string {
-  if (m.includes('tempo a bordo')) return 'Cabe nos horários. Falta só confirmar o tempo máximo a bordo (regra do transporte escolar).';
-  if (m.includes('Nenhum horário de saída')) return 'Essa região fica fora da rota atual — encaixar atrasaria os outros alunos.';
-  if (m.includes('Sequência compatível')) return 'Encaixa na rota sem atrasar os outros alunos.';
-  if (m.toLowerCase().includes('capacidade') || m.includes('ocupa')) return 'A van ficaria sem vaga nesse trecho.';
-  return m;
-}
-
 function SimuladorImpacto({ op, onFechar }: { op: OportunidadeDemo; onFechar: () => void }) {
   const reduce = useReducedMotion();
-  const resultado = useMemo(() => {
-    const base = rotaDemoManha();
-    const baseEntrada = montarEntradaMotor(base, VEICULO_DEMO);
-    const candidata = montarEntradaMotor(rotaComOportunidade(base, op), VEICULO_DEMO);
-    return avaliarRotaCandidata(baseEntrada, candidata, base.limiteAntecipacaoMin ?? 0);
+  const opcao = useMemo(() => {
+    // MESMO motor da busca das famílias (#7), sobre a rota demonstrativa com
+    // coordenadas. A matriz de tempos é de demonstração (não trânsito real).
+    const matriz = criarMatrizDemo();
+    const base0 = rotaOperacionalDeCadastro(rotaDemoManha(), { capacidade: VAN_DEMO.lugares, partidaMin: 0 });
+    if (!base0) return null;
+    const latest = partidaRetroativa(base0, matriz);
+    const base = { ...base0, partidaMin: (latest ?? op.limiteEscolaMin) - FOLGA_SAIDA_MIN };
+    return encontrarEncaixes(base, pedidoDaOportunidade(op), matriz)[0] ?? null;
   }, [op]);
 
-  const cor = resultado.nivel === 'disponivel' ? 'mint' : resultado.nivel === 'sob_consulta' ? 'amber' : 'red';
-  const Icone = resultado.nivel === 'indisponivel' ? AlertTriangle : CheckCircle2;
-  const titulo = resultado.nivel === 'disponivel' ? 'Cabe na rota'
-    : resultado.nivel === 'sob_consulta' ? 'Dá para encaixar (sob consulta)' : 'Não cabe sem prejudicar os outros';
+  const cabe = !!opcao;
+  const Icone = cabe ? CheckCircle2 : AlertTriangle;
+  const titulo = cabe ? 'Cabe na rota' : 'Não cabe sem prejudicar os outros';
+  const motivoNaoCabe = op.escola === 'Colégio Paineiras'
+    ? 'Essa casa fica fora do alcance da rota: encaixar atrasaria os outros alunos em mais de 10 minutos ou passaria do horário final.'
+    : 'Esta rota não atende essa escola. O motor só oferece escolas que já fazem parte do itinerário.';
 
   return (
     <motion.div className="fixed inset-0 z-50 flex items-end justify-center bg-navy-950/50 p-0 sm:items-center sm:p-5"
@@ -332,32 +343,40 @@ function SimuladorImpacto({ op, onFechar }: { op: OportunidadeDemo; onFechar: ()
         <div className="mx-auto mt-3 h-1.5 w-10 rounded-full bg-navy-100 sm:hidden" />
 
         {/* Cabeçalho colorido do resultado */}
-        <div className={cn('px-6 pb-5 pt-4', cor === 'mint' ? 'bg-mint-50' : cor === 'amber' ? 'bg-amber-50' : 'bg-red-50')}>
+        <div className={cn('px-6 pb-5 pt-4', cabe ? 'bg-mint-50' : 'bg-red-50')}>
           <p className="text-xs font-medium text-navy-500">E se eu aceitar este aluno?</p>
           <p className="mt-0.5 text-sm font-semibold text-navy-700">{op.regiao} → {op.escola} · {op.turno}</p>
           <div className="mt-3 flex items-center gap-3">
-            <span className={cn('grid h-11 w-11 shrink-0 place-items-center rounded-2xl text-white',
-              cor === 'mint' ? 'bg-mint-500' : cor === 'amber' ? 'bg-amber-500' : 'bg-red-500')}>
+            <span className={cn('grid h-11 w-11 shrink-0 place-items-center rounded-2xl text-white', cabe ? 'bg-mint-500' : 'bg-red-500')}>
               <Icone className="h-6 w-6" />
             </span>
-            <p className={cn('font-display text-lg font-bold leading-tight',
-              cor === 'mint' ? 'text-mint-800' : cor === 'amber' ? 'text-amber-800' : 'text-red-700')}>{titulo}</p>
+            <p className={cn('font-display text-lg font-bold leading-tight', cabe ? 'text-mint-800' : 'text-red-700')}>{titulo}</p>
           </div>
         </div>
 
         <div className="px-6 py-5">
-          <ul className="space-y-1.5 text-sm text-navy-700">
-            {resultado.motivos.map((m, i) => <li key={i} className="flex gap-2"><span className="text-navy-300">•</span>{motivoAmigavel(m)}</li>)}
-          </ul>
-          {resultado.plano.valido && resultado.plano.saida != null && (
-            <div className="mt-3 inline-flex items-center gap-2 rounded-xl bg-navy-50 px-3 py-2 text-sm text-navy-700">
-              <Clock className="h-4 w-4 text-navy-400" /> Nova saída sugerida: <strong>{minutosParaTextoHora(resultado.plano.saida)}</strong>
-              {typeof resultado.antecipacaoMin === 'number' && resultado.antecipacaoMin > 0 && (
-                <span className="text-navy-500">({resultado.antecipacaoMin} min mais cedo)</span>
-              )}
-            </div>
+          {cabe && opcao ? (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-2xl bg-navy-50 p-3">
+                  <p className="inline-flex items-center gap-1.5 text-xs text-navy-500"><Home className="h-3.5 w-3.5" /> Busca em casa</p>
+                  <p className="mt-1 font-display text-xl font-bold text-navy-900">{minutosParaTextoHora(opcao.horarioBuscaMin)}</p>
+                </div>
+                <div className="rounded-2xl bg-navy-50 p-3">
+                  <p className="inline-flex items-center gap-1.5 text-xs text-navy-500"><School className="h-3.5 w-3.5" /> Chega à escola</p>
+                  <p className="mt-1 font-display text-xl font-bold text-navy-900">{minutosParaTextoHora(opcao.horarioEntregaMin)}</p>
+                </div>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2 text-sm">
+                <span className="chip bg-navy-50 text-navy-600"><Clock className="h-3.5 w-3.5" /> {opcao.minutosABordo} min a bordo</span>
+                <span className="chip bg-navy-50 text-navy-600">+{opcao.desvioMin} min de desvio</span>
+                <span className="chip bg-mint-100 text-mint-800">outros alunos: até 10 min de variação</span>
+              </div>
+            </>
+          ) : (
+            <p className="text-sm text-navy-700">{motivoNaoCabe}</p>
           )}
-          <p className="mt-3 text-xs text-navy-400">Cálculo real do motor de compatibilidade, sobre a rota demonstrativa. Não reserva vaga nem substitui a aprovação dos documentos.</p>
+          <p className="mt-4 text-xs text-navy-400">Cálculo real do motor de compatibilidade, sobre a rota demonstrativa (matriz de tempos de exemplo). Sujeito à confirmação do motorista; não reserva vaga nem substitui a aprovação dos documentos.</p>
           <button className="btn btn-lg btn-navy mt-4 w-full" onClick={onFechar}>Entendi</button>
         </div>
       </motion.div>

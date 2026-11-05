@@ -21,10 +21,10 @@ describe('buscarMotoristas (adaptador simulado)', () => {
   });
 
   it('filtra por destino: só aparece quem atende aquele destino', () => {
-    const r = buscarMotoristas({ ...base, destinoId: 'fac-unifatec' }, MOTORISTAS, DESTINOS);
+    const r = buscarMotoristas({ ...base, destinoId: 'fatec-aracatuba-prof-fernando-amaral-de' }, MOTORISTAS, DESTINOS);
     expect(r.elegiveis.length).toBeGreaterThan(0);
     for (const res of r.elegiveis) {
-      expect(res.motorista.destinosIds).toContain('fac-unifatec');
+      expect(res.motorista.destinosIds).toContain('fatec-aracatuba-prof-fernando-amaral-de');
     }
   });
 
@@ -37,7 +37,7 @@ describe('buscarMotoristas (adaptador simulado)', () => {
 
   it('marca "sob_consulta" quando não há vaga', () => {
     const semVaga = buscarMotoristas(
-      { ...base, destinoId: 'esc-sao-joao' },
+      { ...base, destinoId: 'ee-manoel-bento-da-cruz' },
       MOTORISTAS,
       DESTINOS,
     );

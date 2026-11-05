@@ -10,6 +10,7 @@ import type { Turno } from '@/types';
 import { useVitrine } from '@/data/VitrineProvider';
 import { capacidadeAlunos, aBordoEm, validarRota, podeFinalizar } from '@/lib/ocupacao-rota';
 import { PlanoMotor } from '@/components/motorista/PlanoMotor';
+import { MapaRotaMotorista } from '@/components/motorista/MapaRotaMotorista';
 import { TURNO_LABEL, cn, minutosParaTextoHora, horaParaMinutos, nomeDestinoParaExibicao } from '@/lib/utils';
 
 const DIAS = [['seg', 'Seg'], ['ter', 'Ter'], ['qua', 'Qua'], ['qui', 'Qui'], ['sex', 'Sex']] as const;
@@ -123,6 +124,9 @@ function Builder() {
 
           {/* Linha do percurso */}
           <LinhaPercurso rota={rota} setRota={setRota} />
+
+          {/* Geocodificação e cálculo viário opcional: preserva o cadastro manual existente. */}
+          {rota.paradas.length > 0 && <MapaRotaMotorista rota={rota} setRota={setRota} />}
 
           {/* Motor real: horários da viagem (quando há paradas suficientes) */}
           {rota.paradas.length >= 2 && <PlanoMotor rota={rota} setRota={setRota} veiculo={veiculo} />}

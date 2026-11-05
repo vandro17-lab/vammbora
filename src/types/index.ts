@@ -24,6 +24,17 @@ export interface Cidade {
   uf: string;
 }
 
+export type RedeEnsino = 'estadual' | 'municipal' | 'privada' | 'federal';
+
+export type NivelEnsino =
+  | 'infantil'
+  | 'fundamental_anos_iniciais'
+  | 'fundamental_anos_finais'
+  | 'medio'
+  | 'tecnico'
+  | 'eja'
+  | 'superior';
+
 export interface Destino {
   id: string;
   tipo: TipoDestino;
@@ -35,8 +46,15 @@ export interface Destino {
   turnos: Turno[];
   /** Fonte/origem do dado — exigência de honestidade (INEP, cadastro manual, demo). */
   fonte: string;
-  lat: number;
-  lng: number;
+  /** Coordenadas; `null` quando ainda não geocodificadas (endereço real já consta). */
+  lat: number | null;
+  lng: number | null;
+  /** Rede de ensino (quando conhecida). */
+  rede?: RedeEnsino;
+  /** Níveis de ensino atendidos (quando informados). */
+  nivel?: NivelEnsino[];
+  /** Endereço real por extenso (para exibição e geocodificação). */
+  endereco?: string;
 }
 
 export interface Preco {
@@ -103,6 +121,10 @@ export interface CriteriosBusca {
   /** Data (YYYY-MM-DD) quando contratacao === 'avulso'. */
   dataAvulso?: string;
   modalidade: ModalidadeTrajeto;
+  /** Coordenadas exatas da origem, quando a família escolhe um endereço do
+   *  autocomplete (geocodificado). Quando ausentes, estima-se pela região. */
+  origemLat?: number;
+  origemLng?: number;
 }
 
 /** Resultado de uma avaliação de compatibilidade para um motorista. */
@@ -113,8 +135,13 @@ export interface ResultadoCompatibilidade {
   resumo: string;
   /** Horário aproximado de passagem, quando calculável. Ex: "passa por volta de 6h38". */
   passagemAproximada?: string;
-  /** Tempo estimado a bordo em minutos, quando calculável (simulado nesta fase). */
+  /** Horário estimado de chegada à escola (HhMM), quando o motor calcula. */
+  chegadaEscola?: string;
+  /** Tempo estimado a bordo em minutos, quando calculável pelo motor. */
   tempoABordoMin?: number;
+  /** Origem do horário: 'motor' (calculado pelo motor de encaixe, estimativa pela
+   *  região) ou 'motorista' (horário informado no cadastro). Para rótulo honesto. */
+  fonteHorario?: 'motor' | 'motorista';
 }
 
 /** Registro de interesse quando não há resultado (lista de espera). */

@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Snowflake, UserCheck, Accessibility, ShieldCheck, Users, Clock } from 'lucide-react';
+import { Snowflake, UserCheck, Accessibility, ShieldCheck, Users, Clock, School } from 'lucide-react';
 import type { ResultadoCompatibilidade } from '@/types';
 import { Avatar } from '@/components/brand/Avatar';
 import { VanIllustration } from '@/components/brand/VanIllustration';
@@ -51,7 +51,11 @@ export function ResultCard({ resultado }: { resultado: ResultadoCompatibilidade 
         <div className="mt-4 grid grid-cols-2 gap-2 text-sm">
           <div className="flex items-center gap-2 text-navy-700">
             <Clock className="h-4 w-4 text-navy-400" />
-            <span>{resultado.passagemAproximada ? `Horário: ${resultado.passagemAproximada}` : 'Horário a combinar'}</span>
+            <span>
+              {resultado.passagemAproximada
+                ? `${resultado.fonteHorario === 'motor' ? 'Passa ~' : 'Horário: '}${resultado.passagemAproximada}`
+                : 'Horário a combinar'}
+            </span>
           </div>
           <div className="flex items-center gap-2 text-navy-700">
             <Users className="h-4 w-4 text-navy-400" />
@@ -62,6 +66,20 @@ export function ResultCard({ resultado }: { resultado: ResultadoCompatibilidade 
             </span>
           </div>
         </div>
+
+        {resultado.fonteHorario === 'motor' && (
+          <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
+            {resultado.chegadaEscola && (
+              <span className="chip bg-mint-50 text-mint-700">
+                <School className="h-3.5 w-3.5" /> Chega ~{resultado.chegadaEscola}
+              </span>
+            )}
+            {typeof resultado.tempoABordoMin === 'number' && (
+              <span className="chip bg-navy-50 text-navy-600">{resultado.tempoABordoMin} min a bordo</span>
+            )}
+            <span className="text-navy-400">· estimativa pela região</span>
+          </div>
+        )}
 
         {recursos.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-1.5">
