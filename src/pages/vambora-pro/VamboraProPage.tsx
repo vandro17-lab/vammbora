@@ -190,6 +190,16 @@ function Inicio({ irPara, abrir }: { irPara: (a: Aba) => void; abrir: (m: string
         <div className="h-1 w-full bg-navy-50"><div className="h-full bg-gradient-to-r from-mint-400 to-mint-600" style={{ width: '75%' }} /></div>
       </button>
 
+      {/* Laboratório do motor (mesmo motor da busca) */}
+      <Link to="/pro/encaixe" className="card card-interactive flex items-center gap-3 overflow-hidden p-4">
+        <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-indigo-400 to-indigo-600 text-white shadow-card"><RouteIcon className="h-6 w-6" /></span>
+        <div className="min-w-0 flex-1">
+          <p className="font-display font-bold text-navy-900">Testar encaixe inteligente</p>
+          <p className="mt-0.5 text-xs text-navy-500">Ida, volta e horários — calculado pelo motor real</p>
+        </div>
+        <ChevronRight className="h-5 w-5 shrink-0 text-navy-300" />
+      </Link>
+
       {/* Avisos */}
       <div className="card p-5">
         <div className="flex items-center justify-between">
