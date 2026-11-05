@@ -17,6 +17,15 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
   const key = process.env.GEOAPIFY_API_KEY;
   if (!key) return reply(res, 503, { erro: 'Serviço de mapas ainda não configurado. Adicione GEOAPIFY_API_KEY na Vercel.' });
   try {
+    // Não permitir consumo anônimo da quota da API paga/gratuita.
+    const supabaseUrl = process.env.VITE_SUPABASE_URL;
+    const anonKey = process.env.VITE_SUPABASE_ANON_KEY;
+    const token = req.headers.authorization?.match(/^Bearer (.+)$/)?.[1];
+    if (!supabaseUrl || !anonKey) return reply(res, 503, { erro: 'Autenticação Supabase não configurada no servidor.' });
+    if (!token) return reply(res, 401, { erro: 'Faça login como motorista para consultar o mapa.' });
+    const authUrl = new URL('/auth/v1/user', supabaseUrl);
+    const authResponse = await fetch(authUrl, { headers: { apikey: anonKey, Authorization: 'Bearer ' + token } });
+    if (!authResponse.ok) return reply(res, 401, { erro: 'Sessão expirada. Faça login novamente.' });
     let raw = '';
     for await (const chunk of req) {
       raw += chunk.toString();
