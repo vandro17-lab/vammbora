@@ -71,7 +71,7 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
         <p className="mt-2 text-sm leading-relaxed text-navy-500">{DESCRICOES[passo]}</p>
         {passo === 0 && <div className="mt-6 space-y-5">
           <div className="flex items-center gap-3 rounded-xl bg-navy-50 p-4"><MapPin className="h-5 w-5 text-mint-700" /><div><span className="block text-xs text-navy-500">Sua cidade</span><span className="text-sm font-semibold">Araçatuba, SP</span></div></div>
-          <div><label className="field-label" htmlFor="endereco">Endereço ou bairro de embarque</label><AutocompleteEndereco id="endereco" value={endereco} locais={locaisBusca} placeholder="Ex.: Centro, Vila Mendonça, escola…" onChange={(texto, coord) => { setEndereco(texto); setOrigemCoord(coord ?? null); }} /><p className="mt-2 text-xs text-navy-500">Digite para ver sugestões de Araçatuba. O ponto exato você combina com o motorista.</p></div>
+          <div><label className="field-label" htmlFor="endereco">Endereço ou bairro de embarque</label><AutocompleteEndereco id="endereco" value={endereco} locais={locaisBusca} placeholder="Ex.: Rua José Geraldo, Centro, escola…" onChange={(texto, coord) => { setEndereco(texto); setOrigemCoord(coord ?? null); }} /><p className="mt-2 text-xs text-navy-500">Digite para ver sugestões de Araçatuba. O ponto exato você combina com o motorista.</p></div>
         </div>}
         {passo === 1 && <div className="mt-6">
           <label className="field-label" htmlFor="destino">Escola, faculdade ou destino</label>
