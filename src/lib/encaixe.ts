@@ -25,7 +25,7 @@ import {
 import type { Rota } from '@/types/motorista';
 
 export { encontrarEncaixes, encontrarIdaVolta, simularRota };
-export type { MatrizViaria, PontoGeo, RotaOperacional, PedidoEncaixe, OpcaoEncaixe };
+export type { MatrizViaria, PontoGeo, RotaOperacional, Compromisso, PedidoEncaixe, OpcaoEncaixe };
 
 /** Distância em metros entre dois pontos (fórmula de Haversine). */
 export function haversineMetros(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {

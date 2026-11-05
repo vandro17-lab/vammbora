@@ -113,8 +113,13 @@ export interface ResultadoCompatibilidade {
   resumo: string;
   /** Horário aproximado de passagem, quando calculável. Ex: "passa por volta de 6h38". */
   passagemAproximada?: string;
-  /** Tempo estimado a bordo em minutos, quando calculável (simulado nesta fase). */
+  /** Horário estimado de chegada à escola (HhMM), quando o motor calcula. */
+  chegadaEscola?: string;
+  /** Tempo estimado a bordo em minutos, quando calculável pelo motor. */
   tempoABordoMin?: number;
+  /** Origem do horário: 'motor' (calculado pelo motor de encaixe, estimativa pela
+   *  região) ou 'motorista' (horário informado no cadastro). Para rótulo honesto. */
+  fonteHorario?: 'motor' | 'motorista';
 }
 
 /** Registro de interesse quando não há resultado (lista de espera). */

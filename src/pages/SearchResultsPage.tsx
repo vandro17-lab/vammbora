@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import { SlidersHorizontal, ArrowLeft, SearchX, WifiOff, RefreshCw } from 'lucide-react';
 import { paramsParaCriterios } from '@/lib/searchParams';
-import { buscarMotoristas } from '@/lib/matching';
+import { buscarComMotor } from '@/lib/busca-encaixe';
 import { useVitrine } from '@/data/VitrineProvider';
 import { CIDADE_PADRAO } from '@/data/cidades';
 import { ResultCard } from '@/components/results/ResultCard';
@@ -26,7 +26,7 @@ export function SearchResultsPage() {
   const { motoristas, destinos, destinosPorId, status, modoDemo, recarregar } = useVitrine();
 
   const { elegiveis, totalConsultados } = useMemo(
-    () => buscarMotoristas(criterios, motoristas, destinos),
+    () => buscarComMotor(criterios, motoristas, destinos),
     [criterios, motoristas, destinos],
   );
 
@@ -128,8 +128,9 @@ export function SearchResultsPage() {
             )}
 
             <p className="mt-6 text-center text-xs text-navy-400">
-              Vagas e horários são informados pelos motoristas. A rota e o ponto de embarque você
-              combina no contato — a passagem no seu endereço ainda não é calculada automaticamente.
+              Os horários marcados como estimativa são calculados pelo mesmo motor de compatibilidade do
+              Vambora, pela sua região — valores aproximados, sujeitos à confirmação do motorista. Vagas e
+              preço são informados pelos motoristas.
             </p>
           </>
         )}
