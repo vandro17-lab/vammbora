@@ -7,7 +7,8 @@ import { CIDADE_PADRAO } from '@/data/cidades';
 import { useVitrine } from '@/data/VitrineProvider';
 import { TURNO_LABEL, cn } from '@/lib/utils';
 import { criteriosParaParams } from '@/lib/searchParams';
-import { AutocompleteEndereco, type SugestaoEndereco } from '@/components/search/AutocompleteEndereco';
+import { AutocompleteEndereco } from '@/components/search/AutocompleteEndereco';
+import { locaisDeDestinos } from '@/lib/geocode';
 
 const TITULOS = ['De onde vamos sair?', 'Qual é o destino?', 'Como é sua rotina?'];
 const DESCRICOES = ['Comece pelo bairro de embarque.', 'Escolha a escola ou a faculdade.', 'Falta pouco para encontrar suas opções.'];
@@ -18,25 +19,7 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
 
   // Lugares conhecidos de Araçatuba para o autocomplete funcionar sem depender
   // do serviço externo de mapas: cada escola/faculdade e um ponto por bairro.
-  const locaisBusca = useMemo<SugestaoEndereco[]>(() => {
-    const porBairro = new Map<string, { lat: number; lng: number; n: number }>();
-    const escolas: SugestaoEndereco[] = [];
-    for (const d of destinos) {
-      const lat = d.lat;
-      const lng = d.lng;
-      if (lat == null || lng == null || !Number.isFinite(lat) || !Number.isFinite(lng)) continue;
-      if (lat === 0 && lng === 0) continue;
-      escolas.push({ rotulo: `${nomeDestinoParaExibicao(d.nome)} — ${d.bairro}`, lat, lng });
-      if (d.bairro) {
-        const c = porBairro.get(d.bairro) ?? { lat: 0, lng: 0, n: 0 };
-        porBairro.set(d.bairro, { lat: c.lat + lat, lng: c.lng + lng, n: c.n + 1 });
-      }
-    }
-    const bairros: SugestaoEndereco[] = [...porBairro.entries()]
-      .map(([b, v]) => ({ rotulo: `${b} (bairro)`, lat: v.lat / v.n, lng: v.lng / v.n }))
-      .sort((a, b) => a.rotulo.localeCompare(b.rotulo, 'pt-BR'));
-    return [...bairros, ...escolas];
-  }, [destinos]);
+  const locaisBusca = useMemo(() => locaisDeDestinos(destinos), [destinos]);
 
   const [passo, setPasso] = useState(0);
   const [endereco, setEndereco] = useState('');

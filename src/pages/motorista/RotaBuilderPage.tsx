@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   Loader2, MapPin, Home, School, Plus, Check, X, ArrowUp, ArrowDown, Trash2, Users, Flag, CheckCircle2, AlertCircle,
@@ -10,7 +10,9 @@ import type { Turno } from '@/types';
 import { useVitrine } from '@/data/VitrineProvider';
 import { capacidadeAlunos, aBordoEm, validarRota, podeFinalizar } from '@/lib/ocupacao-rota';
 import { PlanoMotor } from '@/components/motorista/PlanoMotor';
-import { MapaRotaMotorista } from '@/components/motorista/MapaRotaMotorista';
+import { MapaInterativoRota } from '@/components/motorista/MapaInterativoRota';
+import { AutocompleteEndereco } from '@/components/search/AutocompleteEndereco';
+import { locaisDeDestinos, type SugestaoEndereco } from '@/lib/geocode';
 import { TURNO_LABEL, cn, minutosParaTextoHora, horaParaMinutos, nomeDestinoParaExibicao } from '@/lib/utils';
 
 const DIAS = [['seg', 'Seg'], ['ter', 'Ter'], ['qua', 'Qua'], ['qui', 'Qui'], ['sex', 'Sex']] as const;
@@ -69,6 +71,23 @@ function Builder() {
   const problemas = validarRota(rota, veiculo);
   const ultimaOrdem = rota.paradas.reduce((m, p) => Math.max(m, p.ordem), -1);
   const aBordoFinal = ultimaOrdem >= 0 ? aBordoEm(rota, ultimaOrdem) : [];
+  const locaisBusca = useMemo(() => locaisDeDestinos(destinos), [destinos]);
+
+  // Preenche os minutos de cada trecho a partir do trajeto real do mapa (OSRM),
+  // só quando todas as paradas estão localizadas. Guardado contra laços.
+  const aplicarTempos = useCallback((temposMin: number[]) => {
+    setRota((prev) => {
+      const ordenadas = [...prev.paradas].sort((a, b) => a.ordem - b.ordem);
+      if (ordenadas.length !== temposMin.length + 1) return prev;
+      let mudou = false;
+      const novas = ordenadas.map((p, i) => {
+        const t = i < temposMin.length ? temposMin[i] : null;
+        if (p.tempoAteProximaMin !== t) mudou = true;
+        return { ...p, tempoAteProximaMin: t };
+      });
+      return mudou ? { ...prev, paradas: novas } : prev;
+    });
+  }, []);
 
   async function salvar(status: Rota['status']) {
     setSalvando(true);
@@ -125,15 +144,15 @@ function Builder() {
           {/* Linha do percurso */}
           <LinhaPercurso rota={rota} setRota={setRota} />
 
-          {/* Geocodificação e cálculo viário opcional: preserva o cadastro manual existente. */}
-          {rota.paradas.length > 0 && <MapaRotaMotorista rota={rota} setRota={setRota} />}
+          {/* Mapa interativo: carrega sozinho e desenha o trajeto pelas ruas. */}
+          {rota.paradas.length > 0 && <MapaInterativoRota paradas={rota.paradas} onTempos={aplicarTempos} />}
 
           {/* Motor real: horários da viagem (quando há paradas suficientes) */}
           {rota.paradas.length >= 2 && <PlanoMotor rota={rota} setRota={setRota} veiculo={veiculo} />}
 
           {/* Ação */}
           {etapa === 'construindo' && (
-            <AcaoParada rota={rota} setRota={setRota} destinos={destinos} aBordo={aBordoFinal} capacidade={capacidade} />
+            <AcaoParada rota={rota} setRota={setRota} destinos={destinos} locais={locaisBusca} aBordo={aBordoFinal} capacidade={capacidade} />
           )}
 
           {etapa === 'horarios' && (
@@ -334,8 +353,10 @@ function LinhaPercurso({ rota, setRota }: { rota: Rota; setRota: (r: Rota) => vo
 }
 
 /* ----------------------------- Ação: adicionar parada ----------------------------- */
-function AcaoParada({ rota, setRota, destinos, aBordo, capacidade }: {
-  rota: Rota; setRota: (r: Rota) => void; destinos: { id: string; nome: string; bairro: string }[];
+function AcaoParada({ rota, setRota, destinos, locais, aBordo, capacidade }: {
+  rota: Rota; setRota: (r: Rota) => void;
+  destinos: { id: string; nome: string; bairro: string; lat?: number | null; lng?: number | null }[];
+  locais: SugestaoEndereco[];
   aBordo: { id: string; identificacao: string }[]; capacidade: number;
 }) {
   const [modo, setModo] = useState<null | TipoParada>(null);
@@ -343,18 +364,18 @@ function AcaoParada({ rota, setRota, destinos, aBordo, capacidade }: {
 
   function proxOrdem() { return rota.paradas.reduce((m, p) => Math.max(m, p.ordem), -1) + 1; }
 
-  function addSaida(rotulo: string) {
-    const parada: ParadaRota = { id: novoId(), ordem: 0, tipo: 'saida', rotulo, confirmado: true };
+  function addSaida(rotulo: string, coord?: { lat: number; lng: number }) {
+    const parada: ParadaRota = { id: novoId(), ordem: 0, tipo: 'saida', rotulo, confirmado: true, lat: coord?.lat, lng: coord?.lng };
     setRota({ ...rota, paradas: [parada, ...rota.paradas.map((p) => ({ ...p, ordem: p.ordem + 1 }))] });
     setModo(null);
   }
 
   if (!temSaida) {
-    return <FormEndereco titulo="De onde sua van sai?" dica="Esse endereço fica privado, mesmo que seja sua casa." botao="Confirmar saída" onConfirmar={addSaida} onCancelar={null} />;
+    return <FormEndereco titulo="De onde sua van sai?" dica="Esse endereço fica privado, mesmo que seja sua casa." botao="Confirmar saída" locais={locais} onConfirmar={addSaida} onCancelar={null} />;
   }
 
   if (modo === 'casa') {
-    return <FormCasa rota={rota} setRota={setRota} proxOrdem={proxOrdem()} capacidade={capacidade} aBordo={aBordo} onFechar={() => setModo(null)} />;
+    return <FormCasa rota={rota} setRota={setRota} locais={locais} proxOrdem={proxOrdem()} capacidade={capacidade} aBordo={aBordo} onFechar={() => setModo(null)} />;
   }
   if (modo === 'escola') {
     return <FormEscola rota={rota} setRota={setRota} destinos={destinos} proxOrdem={proxOrdem()} aBordo={aBordo} onFechar={() => setModo(null)} />;
@@ -375,40 +396,82 @@ function AcaoParada({ rota, setRota, destinos, aBordo, capacidade }: {
   );
 }
 
-/* Formulário de endereço simples (texto + confirmação manual do ponto). */
-function FormEndereco({ titulo, dica, botao, onConfirmar, onCancelar }: {
-  titulo: string; dica?: string; botao: string; onConfirmar: (rotulo: string) => void; onCancelar: (() => void) | null;
+/* Formulário de endereço com autocomplete (sem chave) + número, que grava a geolocalização. */
+function FormEndereco({ titulo, dica, botao, locais, onConfirmar, onCancelar }: {
+  titulo: string; dica?: string; botao: string; locais: SugestaoEndereco[];
+  onConfirmar: (rotulo: string, coord?: { lat: number; lng: number }) => void;
+  onCancelar: (() => void) | null;
 }) {
   const [texto, setTexto] = useState('');
-  const [confirmado, setConfirmado] = useState(false);
+  const [numero, setNumero] = useState('');
+  const [coord, setCoord] = useState<{ lat: number; lng: number } | null>(null);
+
+  function montarRotulo(): string {
+    const base = texto.trim();
+    const n = numero.trim();
+    if (!n) return base;
+    // não duplica se o número já aparece no texto escolhido
+    return new RegExp(`\\b${n}\\b`).test(base) ? base : `${base}, nº ${n}`;
+  }
+
   return (
     <div className="card mt-4 p-5">
       <h2 className="font-display font-bold">{titulo}</h2>
       {dica && <p className="mt-1 text-sm text-navy-500">{dica}</p>}
-      <input className="field-input mt-3" placeholder="Rua, número, bairro — Araçatuba" value={texto} onChange={(e) => { setTexto(e.target.value); setConfirmado(false); }} />
-      <label className="mt-3 flex items-center gap-2 text-sm text-navy-700">
-        <input type="checkbox" className="h-4 w-4 rounded border-navy-300 text-mint-600" checked={confirmado} onChange={(e) => setConfirmado(e.target.checked)} />
-        Confirmo que esse endereço está certo
-      </label>
-      <p className="mt-1 text-xs text-navy-400">A busca com sugestões no mapa entra numa próxima parte; por enquanto, confirme o endereço.</p>
+
+      <div className="mt-3">
+        <label className="field-label">Endereço (rua e bairro)</label>
+        <AutocompleteEndereco
+          value={texto}
+          locais={locais}
+          placeholder="Comece a digitar a rua — Araçatuba"
+          onChange={(t, c) => { setTexto(t); setCoord(c ?? null); }}
+        />
+        <p className="mt-1 text-xs text-navy-400">Escolha uma sugestão para fixar o ponto no mapa.</p>
+      </div>
+
+      <div className="mt-3">
+        <label className="field-label" htmlFor="numero-parada">Número</label>
+        <input id="numero-parada" className="field-input" inputMode="numeric" placeholder="Ex.: 450 (ou s/n)" value={numero} onChange={(e) => setNumero(e.target.value)} />
+      </div>
+
+      <p className={cn('mt-3 rounded-xl p-2.5 text-sm', coord ? 'bg-mint-50 text-mint-800' : 'bg-amber-50 text-amber-800')}>
+        {coord ? 'Ponto localizado no mapa ✓' : 'Selecione uma sugestão para localizar no mapa.'}
+      </p>
+
       <div className="mt-4 flex gap-3">
-        <button className="btn btn-lg btn-primary flex-1" disabled={!texto.trim() || !confirmado} onClick={() => onConfirmar(texto.trim())}>{botao}</button>
+        <button
+          className="btn btn-lg btn-primary flex-1"
+          disabled={!texto.trim() || !numero.trim() || !coord}
+          onClick={() => onConfirmar(montarRotulo(), coord ?? undefined)}
+        >
+          {botao}
+        </button>
         {onCancelar && <button className="btn btn-lg btn-ghost" onClick={onCancelar}>Cancelar</button>}
       </div>
+
+      {texto.trim() && numero.trim() && !coord && (
+        <button
+          className="mt-3 w-full text-center text-xs font-medium text-navy-400 hover:text-navy-700"
+          onClick={() => onConfirmar(montarRotulo(), undefined)}
+        >
+          Não encontrei no mapa — confirmar só pelo endereço digitado
+        </button>
+      )}
     </div>
   );
 }
 
-function FormCasa({ rota, setRota, proxOrdem, capacidade, aBordo, onFechar }: {
-  rota: Rota; setRota: (r: Rota) => void; proxOrdem: number; capacidade: number; aBordo: { id: string }[]; onFechar: () => void;
+function FormCasa({ rota, setRota, locais, proxOrdem, capacidade, aBordo, onFechar }: {
+  rota: Rota; setRota: (r: Rota) => void; locais: SugestaoEndereco[]; proxOrdem: number; capacidade: number; aBordo: { id: string }[]; onFechar: () => void;
 }) {
   const [etapa, setEtapa] = useState<'endereco' | 'aluno'>('endereco');
   const [paradaId, setParadaId] = useState<string | null>(null);
   const [nome, setNome] = useState('');
 
-  function confirmarEndereco(rotulo: string) {
+  function confirmarEndereco(rotulo: string, coord?: { lat: number; lng: number }) {
     const pid = novoId();
-    setRota({ ...rota, paradas: [...rota.paradas, { id: pid, ordem: proxOrdem, tipo: 'casa', rotulo, confirmado: true }] });
+    setRota({ ...rota, paradas: [...rota.paradas, { id: pid, ordem: proxOrdem, tipo: 'casa', rotulo, confirmado: true, lat: coord?.lat, lng: coord?.lng }] });
     setParadaId(pid);
     setEtapa('aluno');
   }
@@ -424,7 +487,7 @@ function FormCasa({ rota, setRota, proxOrdem, capacidade, aBordo, onFechar }: {
   }
 
   if (etapa === 'endereco') {
-    return <FormEndereco titulo="Onde você busca o aluno?" botao="Confirmar endereço" onConfirmar={confirmarEndereco} onCancelar={onFechar} />;
+    return <FormEndereco titulo="Onde você busca o aluno?" botao="Confirmar endereço" locais={locais} onConfirmar={confirmarEndereco} onCancelar={onFechar} />;
   }
   return (
     <div className="card mt-4 p-5">
@@ -443,7 +506,8 @@ function FormCasa({ rota, setRota, proxOrdem, capacidade, aBordo, onFechar }: {
 }
 
 function FormEscola({ rota, setRota, destinos, proxOrdem, aBordo, onFechar }: {
-  rota: Rota; setRota: (r: Rota) => void; destinos: { id: string; nome: string; bairro: string }[];
+  rota: Rota; setRota: (r: Rota) => void;
+  destinos: { id: string; nome: string; bairro: string; lat?: number | null; lng?: number | null }[];
   proxOrdem: number; aBordo: { id: string; identificacao: string }[]; onFechar: () => void;
 }) {
   const [destinoId, setDestinoId] = useState('');
@@ -453,7 +517,14 @@ function FormEscola({ rota, setRota, destinos, proxOrdem, aBordo, onFechar }: {
   function confirmar() {
     if (!destinoId) return;
     const pid = novoId();
-    const parada: ParadaRota = { id: pid, ordem: proxOrdem, tipo: 'escola', rotulo: destino?.nome ?? 'Escola', confirmado: true, destinoId, destinoNome: destino?.nome ?? null };
+    // A escola já tem geolocalização no catálogo: aproveita para o mapa.
+    const lat = destino?.lat ?? undefined;
+    const lng = destino?.lng ?? undefined;
+    const parada: ParadaRota = {
+      id: pid, ordem: proxOrdem, tipo: 'escola', rotulo: destino?.nome ?? 'Escola', confirmado: true,
+      destinoId, destinoNome: destino?.nome ?? null,
+      lat: lat == null ? undefined : lat, lng: lng == null ? undefined : lng,
+    };
     const passageiros = rota.passageiros.map((p) => (selec.includes(p.id) ? { ...p, desembarqueParadaId: pid, destinoId } : p));
     setRota({ ...rota, paradas: [...rota.paradas, parada], passageiros });
     onFechar();
