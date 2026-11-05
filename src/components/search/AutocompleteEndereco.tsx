@@ -3,21 +3,45 @@ import { MapPin, Loader2 } from 'lucide-react';
 
 export interface SugestaoEndereco { rotulo: string; lat: number; lng: number }
 
+function normalizar(t: string): string {
+  return t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+}
+
+/** Filtra a lista local (bairros/escolas de Araçatuba) pelo texto digitado. */
+function filtrarLocais(locais: SugestaoEndereco[], q: string): SugestaoEndereco[] {
+  const alvo = normalizar(q);
+  if (!alvo) return [];
+  const casa = locais.filter((l) => normalizar(l.rotulo).includes(alvo));
+  // dedup por rótulo, mantendo ordem
+  const vistos = new Set<string>();
+  const out: SugestaoEndereco[] = [];
+  for (const s of casa) {
+    if (vistos.has(s.rotulo)) continue;
+    vistos.add(s.rotulo);
+    out.push(s);
+    if (out.length >= 6) break;
+  }
+  return out;
+}
+
 /**
- * Campo de endereço com autocomplete de ruas de Araçatuba (Geoapify, via proxy
- * /api/mapas). Protegido: mínimo de 3 letras e atraso ao digitar (debounce).
+ * Campo de endereço com autocomplete de Araçatuba.
  *
- * Degrada com elegância: se o serviço de mapas não responder (ex.: sem a chave
- * no ambiente local), continua funcionando como um campo de texto normal, sem
- * sugestões e sem erro para o usuário.
+ * Funciona SEMPRE: primeiro mostra, na hora, sugestões LOCAIS (bairros e
+ * escolas/faculdades que já temos no catálogo, com coordenadas). Em paralelo,
+ * se o serviço de mapas estiver configurado (Geoapify via /api/mapas,
+ * GEOAPIFY_API_KEY na Vercel), enriquece com endereços de rua. Se o serviço
+ * não responder, continua com as sugestões locais — sem erro para o usuário.
  */
 export function AutocompleteEndereco({
-  id, value, onChange, placeholder,
+  id, value, onChange, placeholder, locais = [],
 }: {
   id?: string;
   value: string;
   onChange: (texto: string, coord?: { lat: number; lng: number }) => void;
   placeholder?: string;
+  /** Lugares conhecidos de Araçatuba (bairros/escolas) para o fallback local. */
+  locais?: SugestaoEndereco[];
 }) {
   const [sugestoes, setSugestoes] = useState<SugestaoEndereco[]>([]);
   const [aberto, setAberto] = useState(false);
@@ -26,7 +50,14 @@ export function AutocompleteEndereco({
 
   useEffect(() => {
     const q = value.trim();
-    if (q.length < 3 || ignorar.current === value) { setSugestoes([]); setCarregando(false); return; }
+    if (q.length < 2 || ignorar.current === value) { setSugestoes([]); setCarregando(false); setAberto(false); return; }
+
+    // 1) Sugestões locais imediatas (bairros/escolas de Araçatuba).
+    const base = filtrarLocais(locais, q);
+    if (base.length) { setSugestoes(base); setAberto(true); }
+
+    // 2) Enriquecimento remoto (só a partir de 3 letras), se disponível.
+    if (q.length < 3) { setCarregando(false); return; }
     let vivo = true;
     setCarregando(true);
     const t = setTimeout(async () => {
@@ -36,20 +67,32 @@ export function AutocompleteEndereco({
           body: JSON.stringify({ operacao: 'autocompletar', texto: q }),
         });
         if (!vivo) return;
-        if (!r.ok) { setSugestoes([]); setAberto(false); return; }
+        if (!r.ok) return; // mantém as sugestões locais já exibidas
         const d = (await r.json()) as { resultados?: SugestaoEndereco[] };
         if (!vivo) return;
-        const lista = Array.isArray(d.resultados) ? d.resultados.slice(0, 5) : [];
-        setSugestoes(lista);
-        setAberto(lista.length > 0);
+        const remoto = Array.isArray(d.resultados) ? d.resultados : [];
+        if (remoto.length) {
+          // remoto primeiro, local depois; dedup por rótulo; máx. 6
+          const vistos = new Set<string>();
+          const merge: SugestaoEndereco[] = [];
+          for (const s of [...remoto, ...base]) {
+            if (vistos.has(s.rotulo)) continue;
+            vistos.add(s.rotulo);
+            merge.push(s);
+            if (merge.length >= 6) break;
+          }
+          setSugestoes(merge);
+          setAberto(true);
+        }
       } catch {
-        if (vivo) { setSugestoes([]); setAberto(false); }
+        /* silêncio: segue com as sugestões locais */
       } finally {
         if (vivo) setCarregando(false);
       }
     }, 350);
     return () => { vivo = false; clearTimeout(t); };
-  }, [value]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value, locais]);
 
   function escolher(s: SugestaoEndereco) {
     ignorar.current = s.rotulo;
@@ -81,7 +124,7 @@ export function AutocompleteEndereco({
       {aberto && sugestoes.length > 0 && (
         <ul className="absolute z-20 mt-1 w-full overflow-hidden rounded-xl border border-navy-100 bg-white shadow-float" role="listbox">
           {sugestoes.map((s, i) => (
-            <li key={i} role="option" aria-selected={false}>
+            <li key={`${s.rotulo}-${i}`} role="option" aria-selected={false}>
               <button
                 type="button"
                 className="flex w-full items-start gap-2 px-3 py-2.5 text-left text-sm hover:bg-mint-50"

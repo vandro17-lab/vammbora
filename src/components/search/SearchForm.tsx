@@ -1,5 +1,5 @@
 import { nomeDestinoParaExibicao } from '@/lib/utils';
-import { useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Check, MapPin, Search } from 'lucide-react';
 import type { Contratacao, ModalidadeTrajeto, Turno } from '@/types';
@@ -7,7 +7,7 @@ import { CIDADE_PADRAO } from '@/data/cidades';
 import { useVitrine } from '@/data/VitrineProvider';
 import { TURNO_LABEL, cn } from '@/lib/utils';
 import { criteriosParaParams } from '@/lib/searchParams';
-import { AutocompleteEndereco } from '@/components/search/AutocompleteEndereco';
+import { AutocompleteEndereco, type SugestaoEndereco } from '@/components/search/AutocompleteEndereco';
 
 const TITULOS = ['De onde vamos sair?', 'Qual é o destino?', 'Como é sua rotina?'];
 const DESCRICOES = ['Comece pelo bairro de embarque.', 'Escolha a escola ou a faculdade.', 'Falta pouco para encontrar suas opções.'];
@@ -15,6 +15,29 @@ const DESCRICOES = ['Comece pelo bairro de embarque.', 'Escolha a escola ou a fa
 export function SearchForm({ compact = false }: { compact?: boolean }) {
   const navigate = useNavigate();
   const { destinos, carregando, erro } = useVitrine();
+
+  // Lugares conhecidos de Araçatuba para o autocomplete funcionar sem depender
+  // do serviço externo de mapas: cada escola/faculdade e um ponto por bairro.
+  const locaisBusca = useMemo<SugestaoEndereco[]>(() => {
+    const porBairro = new Map<string, { lat: number; lng: number; n: number }>();
+    const escolas: SugestaoEndereco[] = [];
+    for (const d of destinos) {
+      const lat = d.lat;
+      const lng = d.lng;
+      if (lat == null || lng == null || !Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+      if (lat === 0 && lng === 0) continue;
+      escolas.push({ rotulo: `${nomeDestinoParaExibicao(d.nome)} — ${d.bairro}`, lat, lng });
+      if (d.bairro) {
+        const c = porBairro.get(d.bairro) ?? { lat: 0, lng: 0, n: 0 };
+        porBairro.set(d.bairro, { lat: c.lat + lat, lng: c.lng + lng, n: c.n + 1 });
+      }
+    }
+    const bairros: SugestaoEndereco[] = [...porBairro.entries()]
+      .map(([b, v]) => ({ rotulo: `${b} (bairro)`, lat: v.lat / v.n, lng: v.lng / v.n }))
+      .sort((a, b) => a.rotulo.localeCompare(b.rotulo, 'pt-BR'));
+    return [...bairros, ...escolas];
+  }, [destinos]);
+
   const [passo, setPasso] = useState(0);
   const [endereco, setEndereco] = useState('');
   const [origemCoord, setOrigemCoord] = useState<{ lat: number; lng: number } | null>(null);
@@ -48,7 +71,7 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
         <p className="mt-2 text-sm leading-relaxed text-navy-500">{DESCRICOES[passo]}</p>
         {passo === 0 && <div className="mt-6 space-y-5">
           <div className="flex items-center gap-3 rounded-xl bg-navy-50 p-4"><MapPin className="h-5 w-5 text-mint-700" /><div><span className="block text-xs text-navy-500">Sua cidade</span><span className="text-sm font-semibold">Araçatuba, SP</span></div></div>
-          <div><label className="field-label" htmlFor="endereco">Endereço ou bairro de embarque</label><AutocompleteEndereco id="endereco" value={endereco} placeholder="Ex.: Rua Floriano Peixoto, Centro…" onChange={(texto, coord) => { setEndereco(texto); setOrigemCoord(coord ?? null); }} /><p className="mt-2 text-xs text-navy-500">Digite para ver sugestões de Araçatuba. O ponto exato você combina com o motorista.</p></div>
+          <div><label className="field-label" htmlFor="endereco">Endereço ou bairro de embarque</label><AutocompleteEndereco id="endereco" value={endereco} locais={locaisBusca} placeholder="Ex.: Centro, Vila Mendonça, escola…" onChange={(texto, coord) => { setEndereco(texto); setOrigemCoord(coord ?? null); }} /><p className="mt-2 text-xs text-navy-500">Digite para ver sugestões de Araçatuba. O ponto exato você combina com o motorista.</p></div>
         </div>}
         {passo === 1 && <div className="mt-6">
           <label className="field-label" htmlFor="destino">Escola, faculdade ou destino</label>
