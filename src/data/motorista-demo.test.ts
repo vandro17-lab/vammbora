@@ -1,52 +1,52 @@
 import { describe, it, expect } from 'vitest';
 import {
   ALUNOS_DEMO, INDICADORES_DEMO, VAN_DEMO, OPORTUNIDADES_DEMO,
-  rotaDemoManha, rotaComOportunidade, VEICULO_DEMO,
+  rotaDemoManha, pedidoDaOportunidade,
 } from './motorista-demo';
-import { montarEntradaMotor, avaliarRotaCandidata } from '@/lib/rota-para-motor';
-import { planejarRota } from '@/engine/planejamento';
+import { criarMatrizDemo, rotaOperacionalDeCadastro, partidaRetroativa, encontrarEncaixes, simularRota } from '@/lib/encaixe';
 
-describe('dados demonstrativos do Vambora Pro', () => {
+const FOLGA = 8;
+function baseOperacional() {
+  const matriz = criarMatrizDemo();
+  const base0 = rotaOperacionalDeCadastro(rotaDemoManha(), { capacidade: VAN_DEMO.lugares, partidaMin: 0 })!;
+  const latest = partidaRetroativa(base0, matriz)!;
+  return { matriz, base: { ...base0, partidaMin: latest - FOLGA } };
+}
+
+describe('dados demonstrativos do Vambora Pro (motor viário #7)', () => {
   it('os indicadores batem com as listas (sem números soltos)', () => {
     expect(INDICADORES_DEMO.alunos).toBe(ALUNOS_DEMO.length);
     expect(INDICADORES_DEMO.capacidade).toBe(VAN_DEMO.lugares);
     expect(INDICADORES_DEMO.vagas).toBe(VAN_DEMO.lugares - ALUNOS_DEMO.length);
   });
 
-  it('a rota demo base é um plano válido no motor real', () => {
-    const plano = planejarRota(montarEntradaMotor(rotaDemoManha(), VEICULO_DEMO));
+  it('a rota demo base é válida no motor real e chega até o horário final', () => {
+    const { matriz, base } = baseOperacional();
+    const plano = simularRota(base, matriz);
     expect(plano.valido).toBe(true);
-    expect(plano.saida).toBeTypeOf('number');
+    expect(plano.eventos.at(-1)!.chegadaMin).toBeLessThanOrEqual(420);
   });
 
-  it('o simulador de impacto devolve um nível coerente para cada oportunidade', () => {
-    const base = rotaDemoManha();
-    const baseEntrada = montarEntradaMotor(base, VEICULO_DEMO);
+  it('o simulador usa o MESMO motor da busca e devolve resultado coerente', () => {
+    const { matriz, base } = baseOperacional();
     for (const op of OPORTUNIDADES_DEMO) {
-      const candidata = montarEntradaMotor(rotaComOportunidade(base, op), VEICULO_DEMO);
-      const r = avaliarRotaCandidata(baseEntrada, candidata, base.limiteAntecipacaoMin ?? 0);
-      expect(['disponivel', 'sob_consulta', 'indisponivel']).toContain(r.nivel);
-      expect(r.motivos.length).toBeGreaterThan(0);
-    }
-  });
-
-  it('distingue honestamente quem está na rota de quem exige desvio (sem forçar resultado)', () => {
-    const base = rotaDemoManha();
-    const baseEntrada = montarEntradaMotor(base, VEICULO_DEMO);
-    const regioesNaRota = new Set(base.paradas.filter((p) => p.tipo === 'casa').map((p) => p.rotulo));
-    for (const op of OPORTUNIDADES_DEMO) {
-      const r = avaliarRotaCandidata(
-        baseEntrada,
-        montarEntradaMotor(rotaComOportunidade(base, op), VEICULO_DEMO),
-        base.limiteAntecipacaoMin ?? 0,
-      );
-      if (regioesNaRota.has(op.regiao)) {
-        // Embarca numa parada existente (sem desvio): o motor não descarta.
-        expect(r.nivel).not.toBe('indisponivel');
-      } else {
-        // Região fora da rota exige desvio: sem tolerância informada, o motor recusa.
-        expect(r.nivel).toBe('indisponivel');
+      const opcoes = encontrarEncaixes(base, pedidoDaOportunidade(op), matriz);
+      // Toda opção respeita o horário final e a variação de 10 min dos antigos.
+      for (const o of opcoes) {
+        expect(o.horarioEntregaMin).toBeLessThanOrEqual(op.limiteEscolaMin);
+        expect(o.alteracoes.every((a) => Math.abs(a.diferencaMin) <= 10)).toBe(true);
+        expect(o.horarioBuscaMin).toBeLessThan(o.horarioEntregaMin);
       }
     }
+  });
+
+  it('distingue honestamente quem cabe de quem fica longe da rota (sem forçar)', () => {
+    const { matriz, base } = baseOperacional();
+    const porRegiao = (r: string) => encontrarEncaixes(base, pedidoDaOportunidade(OPORTUNIDADES_DEMO.find((o) => o.regiao === r)!), matriz);
+    // Centro e Vila Mendonça fazem parte da rota -> cabem.
+    expect(porRegiao('Centro').length).toBeGreaterThan(0);
+    expect(porRegiao('Vila Mendonça').length).toBeGreaterThan(0);
+    // Água Branca fica fora do alcance sem atrasar os outros -> não cabe.
+    expect(porRegiao('Água Branca')).toEqual([]);
   });
 });

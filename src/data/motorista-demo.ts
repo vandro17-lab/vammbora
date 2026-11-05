@@ -4,6 +4,7 @@
  * se o painel diz "12 alunos", a lista tem 12. Nenhum dado real de criança.
  */
 import type { Rota } from '@/types/motorista';
+import type { PedidoEncaixe } from '@/lib/encaixe';
 
 export const MOTORISTA_DEMO = {
   nome: 'João Batista',
@@ -58,21 +59,36 @@ export const INDICADORES_DEMO = {
   aReceber: 640, // 2 em atraso
 };
 
+/** Coordenadas DEMONSTRATIVAS (Araçatuba-SP). Aproximadas, para o motor viário
+ *  calcular tempos coerentes. Não são endereços reais de crianças. */
+export const GARAGEM_COORD = { lat: -21.2050, lng: -50.4400 };
+export const REGIAO_COORD: Record<string, { lat: number; lng: number }> = {
+  'Centro': { lat: -21.2085, lng: -50.4330 },
+  'Vila Mendonça': { lat: -21.1950, lng: -50.4500 },
+  'Jardim Nova Iorque': { lat: -21.2250, lng: -50.4550 },
+  'Água Branca': { lat: -21.1780, lng: -50.4150 },
+};
+export const ESCOLA_COORD: Record<string, { lat: number; lng: number }> = {
+  'Colégio Paineiras': { lat: -21.2100, lng: -50.4250 },
+  'Instituto São João': { lat: -21.2000, lng: -50.4450 },
+};
+
 export interface OportunidadeDemo {
   id: string;
   regiao: string;
   escola: string;
   turno: string;
   quando: string;
-  // dados para o simulador de impacto (minutos desde a meia-noite)
-  embarqueDesejadoMin: number;
-  atrasoAdicionalMin: number;
+  /** Coordenada aproximada da casa da família (demonstração). */
+  casa: { lat: number; lng: number };
+  /** Horário máximo de chegada à escola (minutos da meia-noite). */
+  limiteEscolaMin: number;
 }
 
 export const OPORTUNIDADES_DEMO: OportunidadeDemo[] = [
-  { id: 'o1', regiao: 'Centro', escola: 'Colégio Paineiras', turno: 'Manhã', quando: 'a partir de fevereiro', embarqueDesejadoMin: 397, atrasoAdicionalMin: 2 },
-  { id: 'o2', regiao: 'Vila Mendonça', escola: 'Instituto São João', turno: 'Manhã', quando: 'imediato', embarqueDesejadoMin: 404, atrasoAdicionalMin: 4 },
-  { id: 'o3', regiao: 'Água Branca', escola: 'Colégio Paineiras', turno: 'Manhã', quando: 'março', embarqueDesejadoMin: 409, atrasoAdicionalMin: 7 },
+  { id: 'o1', regiao: 'Centro', escola: 'Colégio Paineiras', turno: 'Manhã', quando: 'a partir de fevereiro', casa: { lat: -21.2070, lng: -50.4310 }, limiteEscolaMin: 420 },
+  { id: 'o2', regiao: 'Vila Mendonça', escola: 'Colégio Paineiras', turno: 'Manhã', quando: 'imediato', casa: { lat: -21.1965, lng: -50.4480 }, limiteEscolaMin: 420 },
+  { id: 'o3', regiao: 'Água Branca', escola: 'Colégio Paineiras', turno: 'Manhã', quando: 'março', casa: { lat: -21.1780, lng: -50.4150 }, limiteEscolaMin: 420 },
 ];
 
 export const FINANCEIRO_DEMO = {
@@ -120,13 +136,19 @@ export const DOCUMENTOS_DEMO = [
   { nome: 'Vistoria do transporte escolar', status: 'em_analise', validade: '—' },
 ];
 
-// Rota demo no formato do construtor — usada no simulador de impacto (motor real).
+// Rota demo no formato do construtor, COM coordenadas — usada no simulador de
+// impacto, que roda o MESMO motor viário (#7) da busca das famílias.
 export function rotaDemoManha(): Rota {
-  const saida = { id: 's0', ordem: 0, tipo: 'saida' as const, rotulo: 'Garagem', confirmado: true, tempoAteProximaMin: 7 };
-  const casas = ALUNOS_DEMO.slice(0, 6).map((a, i) => ({
-    id: `c${i}`, ordem: i + 1, tipo: 'casa' as const, rotulo: `${a.regiao}`, confirmado: true, tempoAteProximaMin: 4,
-  }));
-  const escola = { id: 'esc', ordem: casas.length + 1, tipo: 'escola' as const, rotulo: 'Colégio Paineiras', confirmado: true, destinoId: 'esc-paineiras', destinoNome: 'Colégio Paineiras' };
+  const saida = { id: 's0', ordem: 0, tipo: 'saida' as const, rotulo: 'Garagem', confirmado: true, tempoAteProximaMin: 7, lat: GARAGEM_COORD.lat, lng: GARAGEM_COORD.lng };
+  const casas = ALUNOS_DEMO.slice(0, 6).map((a, i) => {
+    const base = REGIAO_COORD[a.regiao] ?? GARAGEM_COORD;
+    return {
+      id: `c${i}`, ordem: i + 1, tipo: 'casa' as const, rotulo: `${a.regiao}`, confirmado: true, tempoAteProximaMin: 4,
+      lat: base.lat + i * 0.0009, lng: base.lng - i * 0.0007, // jitter leve para distinguir as casas
+    };
+  });
+  const paineiras = ESCOLA_COORD['Colégio Paineiras'];
+  const escola = { id: 'esc', ordem: casas.length + 1, tipo: 'escola' as const, rotulo: 'Colégio Paineiras', confirmado: true, destinoId: 'esc-paineiras', destinoNome: 'Colégio Paineiras', lat: paineiras.lat, lng: paineiras.lng };
   const paradas = [saida, ...casas, escola];
   const passageiros = ALUNOS_DEMO.slice(0, 6).map((a, i) => ({
     id: a.id, identificacao: a.nome, embarqueParadaId: `c${i}`, desembarqueParadaId: 'esc', destinoId: 'esc-paineiras',
@@ -140,61 +162,17 @@ export function rotaDemoManha(): Rota {
   };
 }
 
-/**
- * Monta a rota CANDIDATA (rota base + um novo aluno da oportunidade) para o motor
- * avaliar HONESTAMENTE o impacto de aceitar. Dois casos reais, decididos pelos dados:
- *
- *  1) A região da oportunidade JÁ é uma parada da rota (ex.: Centro). O novo aluno
- *     embarca nessa parada existente: nada muda nos horários, só a ocupação +1.
- *     O motor costuma aprovar (respeitando capacidade por trecho).
- *  2) A região NÃO está na rota (ex.: Água Branca). Seria preciso uma parada nova
- *     com desvio, empurrando o horário das paradas seguintes. O motor, sem tolerância
- *     de atraso informada, recusa — e é correto que recuse.
- *
- * Em nenhum caso o motor é alterado nem os resultados são forçados.
- */
-export function rotaComOportunidade(base: Rota, op: OportunidadeDemo): Rota {
-  const escola = base.paradas.find((p) => p.tipo === 'escola')!;
-  const paradaExistente = base.paradas.find((p) => p.tipo === 'casa' && p.rotulo === op.regiao);
-
-  // Caso 1: embarca numa parada que já existe (sem desvio).
-  if (paradaExistente) {
-    const novoAluno = {
-      id: `pax-${op.id}`,
-      identificacao: 'Novo aluno',
-      embarqueParadaId: paradaExistente.id,
-      desembarqueParadaId: escola.id,
-      destinoId: escola.destinoId ?? null,
-    };
-    return { ...base, passageiros: [...base.passageiros, novoAluno] };
-  }
-
-  // Caso 2: região fora da rota -> exige parada nova com desvio (motor avalia).
-  const ultimaCasa = base.paradas.filter((p) => p.tipo === 'casa').slice(-1)[0];
-  const novaCasa = {
-    id: `op-${op.id}`,
-    ordem: escola.ordem, // entra onde está a escola; a escola é empurrada
-    tipo: 'casa' as const,
-    rotulo: op.regiao,
-    confirmado: true,
-    tempoAteProximaMin: 3, // nova casa -> escola
+/** Pedido de encaixe (família) a partir de uma oportunidade demonstrativa. */
+export function pedidoDaOportunidade(op: OportunidadeDemo): PedidoEncaixe {
+  const escola = ESCOLA_COORD[op.escola] ?? ESCOLA_COORD['Colégio Paineiras'];
+  return {
+    alunoId: `novo-${op.id}`,
+    casa: { id: `casa-${op.id}`, nome: op.regiao, lat: op.casa.lat, lng: op.casa.lng },
+    escola: { id: op.escola === 'Colégio Paineiras' ? 'esc' : `escola-${op.id}`, nome: op.escola, lat: escola.lat, lng: escola.lng },
+    horarioEscolaMin: op.limiteEscolaMin,
   };
-  const paradas = base.paradas
-    .map((p) => (p.id === escola.id ? { ...p, ordem: escola.ordem + 1 } : p))
-    .concat(novaCasa)
-    // o trecho da última casa agora vai até a nova casa (desvio)
-    .map((p) => (ultimaCasa && p.id === ultimaCasa.id ? { ...p, tempoAteProximaMin: op.atrasoAdicionalMin } : p))
-    .sort((a, b) => a.ordem - b.ordem);
-
-  const novoAluno = {
-    id: `pax-${op.id}`,
-    identificacao: 'Novo aluno',
-    embarqueParadaId: novaCasa.id,
-    desembarqueParadaId: escola.id,
-    destinoId: escola.destinoId ?? null,
-  };
-  return { ...base, paradas, passageiros: [...base.passageiros, novoAluno] };
 }
+
 
 export const VEICULO_DEMO = {
   id: 'van-demo', modelo: VAN_DEMO.modelo, ano: VAN_DEMO.ano, lugaresPassageiro: VAN_DEMO.lugares,

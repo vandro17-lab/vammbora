@@ -19,7 +19,7 @@ export interface Compromisso {
 }
 export interface Trecho { minutos: number; metros: number }
 export interface MatrizViaria {
-  origem: 'google-routes' | 'fixture-testada' | 'outro-provedor';
+  origem: 'google-routes' | 'geoapify' | 'fixture-testada' | 'demonstracao' | 'outro-provedor';
   obter(de: PontoGeo, para: PontoGeo, partidaMin: number): Trecho | null;
 }
 export interface RotaOperacional {
