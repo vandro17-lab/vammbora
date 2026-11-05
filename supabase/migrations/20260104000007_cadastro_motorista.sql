@@ -223,6 +223,10 @@ create policy passengers_owner on public.route_passengers for all
 -- ----------------------------------------------------------------------------
 -- Condutor OK: existe >=1 requisito 'condutor' ativo na cidade E todos têm
 -- documento aprovado e não vencido do owner. (Sem requisitos => NÃO ok.)
+
+-- Flag "anúncio ativo" precisa existir ANTES da função motorista_elegivel que a usa.
+alter table public.drivers add column if not exists anuncio_ativo boolean not null default false;
+
 create or replace function public.condutor_documentos_ok(p_owner uuid, p_city text)
 returns boolean language sql stable security definer set search_path = public as $$
   with req as (
@@ -265,17 +269,14 @@ $$;
 -- condutor OK e existe uma ROTA concluída/ativa com um veículo com documentos OK.
 create or replace function public.motorista_elegivel(d public.drivers)
 returns boolean language sql stable security definer set search_path = public as $$
-  select d.is_published and not d.is_suspended and coalesce(d.anuncio_ativo, false)
-     and public.condutor_documentos_ok(d.owner_id, d.city_id)
+  select (d).is_published and not (d).is_suspended and coalesce((d).anuncio_ativo, false)
+     and public.condutor_documentos_ok((d).owner_id, (d).city_id)
      and exists (
        select 1 from public.routes r
-       where r.owner_id = d.owner_id and r.status = 'concluida'
-         and public.veiculo_documentos_ok(r.vehicle_id, d.owner_id, d.city_id)
+       where r.owner_id = (d).owner_id and r.status = 'concluida'
+         and public.veiculo_documentos_ok(r.vehicle_id, (d).owner_id, (d).city_id)
      );
 $$;
-
--- Flag "anúncio ativo" no drivers (motorista liga; só aparece se elegível).
-alter table public.drivers add column if not exists anuncio_ativo boolean not null default false;
 
 -- Recria a view pública com o gating de elegibilidade.
 create or replace view public.public_listings as
