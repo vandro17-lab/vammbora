@@ -8,12 +8,16 @@ import {
   CheckCircle2,
   Clock,
 } from 'lucide-react';
+import { LINKS_ENTRADA_MOTORISTA } from '@/app/navegacao-motorista';
 
 /**
- * Entrada "Sou motorista" + prévia do painel.
- * A Etapa 1 entrega a porta de entrada e a estrutura do dashboard (preparação).
- * O onboarding completo, cadastro de veículo/rotas e o simulador do motor real
- * entram na Etapa 3 — e isso é dito com honestidade na própria tela.
+ * Entrada ÚNICA do Vambora Motoristas ("Sou motorista").
+ * Fluxo: Marketplace → aqui → autenticação existente (`/motorista/conta`) →
+ * app operacional real (`/painel`). O Vambora Pro (`/pro`) é apenas a
+ * demonstração, claramente rotulada — nunca a porta de entrada.
+ *
+ * NOTA (Fase 2): esta tela está preparada ESTRUTURALMENTE para receber o design
+ * das imagens na Fase 3. Aqui não há redesenho — só a unificação do fluxo.
  */
 export function DriverLandingPage() {
   return (
@@ -28,7 +32,7 @@ export function DriverLandingPage() {
           </Link>
           <div className="mt-6 max-w-2xl">
             <span className="chip w-fit bg-white/10 text-mint-200 ring-1 ring-white/15">
-              Para quem dirige
+              Vambora Motoristas
             </span>
             <h1 className="mt-4 font-display text-4xl font-extrabold leading-tight sm:text-5xl">
               Preencha os assentos vazios com os alunos certos.
@@ -38,15 +42,19 @@ export function DriverLandingPage() {
               bagunçar o trajeto de quem já viaja com você.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
-              <Link to="/pro" className="btn btn-lg btn-primary">
-                Conhecer o Vambora Pro
+              <Link to={LINKS_ENTRADA_MOTORISTA.entrar} className="btn btn-lg btn-primary">
+                Entrar ou criar conta
               </Link>
-              <button className="btn btn-lg btn-ghost text-white ring-1 ring-white/20" disabled>
-                Começar cadastro (em breve)
-              </button>
+              <Link
+                to={LINKS_ENTRADA_MOTORISTA.demonstracao}
+                className="btn btn-lg btn-ghost text-white ring-1 ring-white/20"
+              >
+                Ver demonstração
+              </Link>
             </div>
             <p className="mt-3 text-sm text-navy-200">
-              O Vambora Pro é uma demonstração do app do motorista, com dados de exemplo.
+              Entrar leva ao seu aplicativo (cadastro da van, rotas e simulador). A demonstração
+              (Vambora Pro) usa dados de exemplo, só para conhecer a experiência.
             </p>
           </div>
         </div>
