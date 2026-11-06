@@ -2,7 +2,7 @@ import type { Config } from 'tailwindcss';
 
 /**
  * Design System Vambora — tokens centrais (premium).
- * Paleta: azul-marinho profundo (brand), verde-menta (accent),
+ * Paleta: preto (brand), amarelo escolar (accent),
  * branco, cinzas neutros e acentos discretos. Sem aparência de template.
  */
 export default {
@@ -22,29 +22,29 @@ export default {
     extend: {
       colors: {
         navy: {
-          50: '#eef3fb',
-          100: '#d6e2f4',
-          200: '#adc3e7',
-          300: '#7c9cd6',
-          400: '#4f72bf',
-          500: '#2f52a0',
-          600: '#213d7d',
-          700: '#182e60',
-          800: '#102044',
-          900: '#0b1f3a',
-          950: '#07132a',
+          50: '#fafafa',
+          100: '#f5f5f5',
+          200: '#e5e5e5',
+          300: '#d4d4d4',
+          400: '#a3a3a3',
+          500: '#737373',
+          600: '#525252',
+          700: '#404040',
+          800: '#262626',
+          900: '#171717',
+          950: '#0a0a0a',
         },
         mint: {
-          50: '#edfbf5',
-          100: '#d2f5e6',
-          200: '#a8eccf',
-          300: '#71dcb3',
-          400: '#3cc394',
-          500: '#1ba67a',
-          600: '#128563',
-          700: '#116a51',
-          800: '#115442',
-          900: '#0f4538',
+          50: '#fffef0',
+          100: '#fef9c3',
+          200: '#fef08a',
+          300: '#fde047',
+          400: '#facc15',
+          500: '#eab308',
+          600: '#ca8a04',
+          700: '#a16207',
+          800: '#854d0e',
+          900: '#713f12',
         },
         amber: {
           50: '#fff8ed',
@@ -92,7 +92,7 @@ export default {
         'card-hover':
           '0 2px 6px rgba(11,31,58,0.06), 0 26px 50px -18px rgba(11,31,58,0.34)',
         float: '0 30px 70px -24px rgba(11,31,58,0.4)',
-        glow: '0 0 0 1px rgba(60,195,148,0.35), 0 12px 40px -8px rgba(27,166,122,0.45)',
+        glow: '0 0 0 1px rgba(250,204,21,0.35), 0 12px 40px -8px rgba(234,179,8,0.3)',
         'inner-top': 'inset 0 1px 0 0 rgba(255,255,255,0.08)',
       },
       keyframes: {

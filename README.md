@@ -1,96 +1,118 @@
-# Vambora 🚐
+# 🚐 VanBora
 
-**Marketplace de transporte escolar e universitário** para Araçatuba/SP — projeto acadêmico **Van Bora** (Fatec Araçatuba, Ideathon Fatec 2026).
+**Uma forma de aproximar famílias e motoristas de transporte escolar, considerando as rotas que realmente podem atender cada aluno.**
 
-O Vambora conecta famílias e estudantes a vans que realmente conseguem buscar o aluno na porta, chegar a tempo e ter vaga no horário certo — com base em **compatibilidade de rota**, não em distância em linha reta. A negociação acontece direto com o motorista pelo WhatsApp.
+Projeto acadêmico de estudantes do primeiro semestre de Análise e Desenvolvimento de Sistemas da Fatec Araçatuba, apresentado no Ideathon 2026.
 
-> ⚠️ **Protótipo acadêmico.** Os motoristas exibidos são **dados de demonstração**, sempre identificados. Não representa, ainda, um serviço contratável.
+## Sobre o projeto
 
----
+Encontrar uma van escolar nem sempre é simples. Muitas famílias procuram transporte por indicação, grupos de WhatsApp ou redes sociais. Depois de encontrar um contato, ainda precisam perguntar se o motorista atende à escola, passa perto de casa, tem vaga e consegue chegar no horário.
 
-## ✨ O que já funciona (Etapa 1)
+Do lado dos motoristas, também existe uma dificuldade: encontrar novos alunos que se encaixem nos trajetos que eles já fazem.
 
-- **Landing page premium** com identidade Vambora (hero, benefícios, como funciona, motoristas em destaque, confiança, FAQ, chamada para motoristas).
-- **Busca guiada** (cidade, endereço/bairro, escola/faculdade, turno, mensal/avulso, trajeto) — pública, sem login.
-- **Estado de busca premium**: animação original de uma van percorrendo a rota, com mensagens honestas e respeito a `prefers-reduced-motion`.
-- **Resultados** com filtro de compatibilidade (adaptador **simulado**, claramente marcado), cards com avaliação, vagas, horário de passagem, recursos e preço.
-- **Perfil do motorista** com recursos do veículo, janela de embarque, status de verificação honesto e **CTA de WhatsApp com mensagem pronta**.
-- **Lista de interesse** quando não há van compatível (com consentimento). Distingue gravação real
-  × simulação e **não** promete aviso automático (não implementado).
-- **Prévia do painel do motorista** (estrutura preparada para a Etapa 3).
-- **PWA instalável** (manifesto, ícones 192/512 + maskable, service worker versionado).
-- **Testes automatizados** da lógica central (20 testes).
-- **Banco de dados Supabase** (Etapa 2): migrações versionadas, RLS, storage, RPCs seguras e seed —
-  **aplicados**; a vitrine e o admin leem/gravam no banco quando configurado. Veja
-  [`docs/GUIA-SUPABASE.md`](docs/GUIA-SUPABASE.md).
-- **Administração** (`/admin`): login por papel (Supabase Auth), publicar/ocultar motoristas e
-  editar vagas. Sem botão público.
+Foi pensando nessas duas situações que surgiu o **VanBora**. A ideia não é apenas reunir contatos de motoristas, mas ajudar a encontrar opções que façam sentido para o percurso e para os horários de cada família.
 
-> **Estados separados (honestidade):** _implementado_ (UI + lógica, testado com build/vitest/
-> Playwright) · _depende de config_ (variáveis do Supabase no Vercel) · _demonstração_ (dados de
-> exemplo quando o Supabase está desligado) · _simulado_ (motor de encaixe — ver
-> [`docs/ESPEC-MOTOR-DE-ENCAIXE.md`](docs/ESPEC-MOTOR-DE-ENCAIXE.md)). Detalhes em
-> [`docs/PENDENCIAS.md`](docs/PENDENCIAS.md).
+## Nossa proposta
 
-## 🧰 Stack
+A família informa o endereço, a escola ou faculdade, o turno e se precisa de ida, volta ou dos dois trajetos.
 
-| Camada | Tecnologia | Por quê |
-|---|---|---|
-| UI | **React 18 + TypeScript + Vite** | Rápido, moderno, tipado |
-| Estilo | **Tailwind CSS** (design system próprio) | Consistência e velocidade |
-| Animações | **Framer Motion** | Transições premium, acessíveis |
-| Ícones | **Lucide** | Conjunto coeso e leve |
-| Rotas | **React Router** | Navegação entre telas |
-| PWA | **vite-plugin-pwa** (Workbox) | Instalação e cache seguro |
-| Testes | **Vitest** | Testes da lógica de negócio |
+O objetivo é comparar essas informações com as rotas cadastradas pelos motoristas, considerando o caminho percorrido, os horários e a capacidade do veículo. Quando houver dados suficientes, a busca poderá apresentar uma estimativa de quando a van passaria no endereço e chegaria ao destino.
 
-Licenças: todas MIT/ISC (compatíveis com uso acadêmico). Detalhes em [`docs/DECISOES.md`](docs/DECISOES.md).
+Para o motorista, o sistema oferece um espaço para organizar seus trajetos e verificar possibilidades de atender novos alunos sem prejudicar os compromissos da rota.
 
-## 🚀 Como rodar
+## Funcionalidades
+
+**Para famílias e estudantes**
+
+- Pesquisa por endereço, escola ou faculdade e turno.
+- Seleção de ida, volta ou ida e volta.
+- Consulta de opções de transporte e informações públicas do motorista.
+- Análise de compatibilidade com o trajeto e estimativas de horário, quando os dados permitirem.
+- Possibilidade de entrar em contato com o motorista.
+
+**Para motoristas**
+
+- Cadastro de veículo e informações do serviço.
+- Criação e organização de rotas, escolas e paradas.
+- Gerenciamento de passageiros e capacidade.
+- Visualização dos trajetos no mapa.
+- Ferramentas para avaliar a inclusão de novos alunos.
+
+As funcionalidades estão em diferentes estágios de desenvolvimento e validação.
+
+## Como pensamos o encaixe de rotas
+
+Uma van pode passar perto de uma casa e, mesmo assim, não conseguir atender àquela família. Ela pode estar indo no sentido contrário, não ter vaga naquele trecho ou não conseguir chegar à escola a tempo.
+
+Por isso, trabalhamos com regras e algoritmos que consideram os pontos da rota, os deslocamentos, os horários e a ocupação do veículo. A proposta é verificar se um novo embarque pode ser incluído sem comprometer os demais passageiros.
+
+O sistema já possui lógica de cálculo de encaixes. A ligação dessa lógica com as rotas reais cadastradas pelos motoristas está em processo de integração e testes. Os resultados demonstrativos usados nas primeiras versões não devem ser confundidos com disponibilidade real.
+
+## Tecnologias utilizadas
+
+| Tecnologia | Para que usamos |
+| --- | --- |
+| React e TypeScript | Interfaces e lógica da aplicação |
+| Vite | Ambiente de desenvolvimento |
+| Tailwind CSS | Estilo das telas |
+| Supabase | Banco de dados e autenticação |
+| GitHub | Organização e versionamento do código |
+| Vercel | Publicação da aplicação |
+| Vitest | Testes automatizados |
+
+Outras bibliotecas e serviços usados no projeto estão descritos na documentação técnica.
+
+## Como executar
+
+É necessário ter **Node.js 20 ou superior**. Depois de clonar o repositório, execute na pasta do projeto:
 
 ```bash
-npm install        # instala dependências
-npm run dev        # ambiente de desenvolvimento (http://localhost:5173)
-npm run build      # build de produção (inclui checagem de tipos)
-npm run preview    # testa o build de produção
-npm run test       # roda os testes
-npm run icons      # regenera os ícones do PWA
+npm install
+npm run dev
 ```
 
-Pré-requisito: **Node.js 20+**.
+Para gerar a versão de produção:
 
-## 📁 Estrutura
-
-```
-src/
-├── components/   # UI (marca, layout, home, busca, resultados, ui)
-├── data/         # dados de demonstração (cidades, destinos, motoristas)
-├── lib/          # lógica (matching simulado, whatsapp, utils, searchParams)
-├── pages/        # telas (home, resultados, perfil, motorista, 404)
-├── pwa/          # instalação e atualização do PWA
-└── types/        # tipos de domínio
-docs/             # documentação do projeto e pesquisas
+```bash
+npm run build
 ```
 
-## 📚 Documentação
+Para executar os testes:
 
-- [`docs/PLANO-MESTRE.md`](docs/PLANO-MESTRE.md) — plano e referência à visão original
-- [`docs/ARQUITETURA.md`](docs/ARQUITETURA.md) — arquitetura e decisões técnicas
-- [`docs/MODELO-DE-DADOS.md`](docs/MODELO-DE-DADOS.md) — entidades e evolução até Supabase
-- [`docs/GUIA-SUPABASE.md`](docs/GUIA-SUPABASE.md) — configurar o banco Supabase (passo a passo)
-- [`supabase/`](supabase/) — migrações SQL, RLS, storage e seed
-- [`docs/DECISOES.md`](docs/DECISOES.md) — registro de decisões (ADR)
-- [`docs/GUIA-PARA-INICIANTES.md`](docs/GUIA-PARA-INICIANTES.md) — passo a passo para quem está começando
-- [`docs/PENDENCIAS.md`](docs/PENDENCIAS.md) — o que falta e riscos
-- [`docs/USO-DE-IA.md`](docs/USO-DE-IA.md) — declaração de uso de IA (exigência do Ideathon)
-- [`docs/pesquisas/`](docs/pesquisas/) — pesquisas do grupo
+```bash
+npm run test
+```
 
-## 🔐 Privacidade e honestidade
+Algumas funcionalidades dependem da configuração do Supabase. Veja [o guia de configuração](docs/GUIA-SUPABASE.md).
 
-- Nunca publicamos endereço completo de nenhum aluno.
-- Selo de "documentação verificada" só aparece com verificação **real** registrada.
-- Dados de exemplo são sempre identificados como **demonstração**.
+## Estado atual e próximos passos
+
+O **VanBora é um protótipo acadêmico**, ainda não um serviço comercial de transporte disponível para contratação.
+
+Construímos telas para famílias e motoristas, recursos de cadastro e gerenciamento de rotas e algoritmos relacionados à compatibilidade de trajetos. Durante o desenvolvimento, utilizamos simulações para observar o funcionamento da proposta.
+
+Agora estamos trabalhando para usar as informações efetivamente cadastradas pelos motoristas na busca pública e testar, com rotas reais, os encaixes, os horários previstos e a disponibilidade de vagas.
+
+Também precisamos continuar verificando os resultados em diferentes situações, especialmente para os trajetos de ida e volta.
+
+## Nossa equipe e como desenvolvemos
+
+Somos estudantes do primeiro semestre de Análise e Desenvolvimento de Sistemas da **Fatec Araçatuba**. Nosso trabalho envolveu identificar o problema, pesquisar as necessidades de famílias e motoristas, discutir a solução, definir funcionalidades e regras e testar o protótipo.
+
+Utilizamos ferramentas de inteligência artificial como apoio na implementação do código, na construção das interfaces, na organização das informações e na revisão e nos testes. As decisões sobre o problema e sobre o funcionamento proposto foram trabalhadas pela equipe.
+
+O uso de IA está documentado em [Uso de IA](docs/USO-DE-IA.md). As etapas anteriores ao Ideathon e as atividades realizadas durante o evento devem ser identificadas corretamente nos registros do projeto.
+
+## Documentação
+
+- [Arquitetura do sistema](docs/ARQUITETURA.md)
+- [Modelo de dados](docs/MODELO-DE-DADOS.md)
+- [Configuração do Supabase](docs/GUIA-SUPABASE.md)
+- [Decisões do projeto](docs/DECISOES.md)
+- [Pendências e limitações](docs/PENDENCIAS.md)
+- [Uso de inteligência artificial](docs/USO-DE-IA.md)
+- [Pesquisas do grupo](docs/pesquisas/)
 
 ---
 
-Feito com ❤️ pela equipe Van Bora — Fatec Araçatuba.
+**VanBora — Fatec Araçatuba | Ideathon 2026**
