@@ -1,7 +1,7 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   FileText, CalendarDays, Wrench, Fuel, BarChart3, Gift, HelpCircle, Settings,
-  ChevronRight, CheckCircle2, Clock, AlertTriangle, Gauge, Coins, Route as RouteIcon, Tag, LogOut, User,
+  ChevronRight, CheckCircle2, Clock, AlertTriangle, Gauge, Coins, Route as RouteIcon, Tag, LogOut, User, Bus,
 } from 'lucide-react';
 import { Avatar } from '@/components/brand/Avatar';
 import { VMShell } from '@/components/vm/VMShell';
@@ -38,6 +38,18 @@ export function MaisPage() {
           </div>
           <ChevronRight className="h-5 w-5 text-navy-300" />
         </Card>
+
+        {/* Minha Van em destaque (antes acessível só pela aba; agora vive no hub) */}
+        <button onClick={() => navigate('/app/van')} className="w-full text-left">
+          <Card className="vm-press flex items-center gap-3 p-4">
+            <span className="vm-chip-ico vm-ico-green"><Bus className="h-5 w-5" /></span>
+            <div className="flex-1">
+              <p className="font-display font-bold text-navy-900">Minha Van</p>
+              <p className="text-xs text-navy-500">Veículo, consumo, custos e documentos</p>
+            </div>
+            <ChevronRight className="h-5 w-5 text-navy-300" />
+          </Card>
+        </button>
 
         <div className="grid grid-cols-2 gap-3">
           {MODULOS.map(({ k, Icone, label, cor }) => (

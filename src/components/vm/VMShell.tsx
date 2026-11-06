@@ -1,14 +1,19 @@
 import type { ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Home, Route as RouteIcon, Sparkles, LineChart, Bus } from 'lucide-react';
+import { Home, Route as RouteIcon, Sparkles, LineChart, LayoutGrid } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const TABS = [
+/**
+ * Abas da navegação inferior. O 5º item é "Mais" (hub), que reúne Minha Van,
+ * Documentação, Combustível, Clube etc. — coerente com a referência (/pro) e
+ * evitando deixar o hub órfão. Minha Van (/app/van) é alcançada a partir do hub.
+ */
+export const TABS = [
   { to: '/app', end: true, label: 'Início', Icon: Home },
   { to: '/app/rotas', end: false, label: 'Rotas', Icon: RouteIcon },
   { to: '/app/oportunidades', end: false, label: 'Oportunidades', Icon: Sparkles },
   { to: '/app/inteligencia', end: false, label: 'Inteligência', Icon: LineChart },
-  { to: '/app/van', end: false, label: 'Van', Icon: Bus },
+  { to: '/app/mais', end: false, label: 'Mais', Icon: LayoutGrid },
 ] as const;
 
 /** Casca do app Vambora Motoristas: fundo + conteúdo + navegação inferior. */
