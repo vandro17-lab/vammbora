@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Bus, Plus, Loader2, Snowflake, Accessibility, ShieldCheck, Check } from 'lucide-react';
 import { MotoristaShell, ExigirMotorista } from './MotoristaShell';
-import { listarVeiculos, salvarVeiculo, novoId } from '@/data/motorista-store';
+import { listarVeiculos, salvarVeiculo } from '@/data/motorista-store';
 import type { Veiculo } from '@/types/motorista';
 import { cn } from '@/lib/utils';
 
@@ -35,7 +35,7 @@ function Veiculos() {
     setSalvando(true);
     setAviso(null);
     try {
-      await salvarVeiculo({ ...editando, id: editando.id || novoId() });
+      await salvarVeiculo(editando);
       await recarregar();
       setEditando(null);
       setAviso('Van salva!');
