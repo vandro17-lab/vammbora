@@ -4,6 +4,7 @@ import type { Rota } from '@/types/motorista';
 import { supabase } from '@/lib/supabase';
 type Sugestao = { rotulo: string; lat: number; lng: number };
 type Resposta = { resultados?: Sugestao[]; trechos?: { minutos: number; metros: number }[]; erro?: string };
+// O proxy /api/mapas exige token da sessão Supabase (evita consumir a quota Geoapify sem autenticação).
 async function consultar(body: unknown): Promise<Resposta> {
   const { data: sessao } = await supabase?.auth.getSession() ?? { data: { session: null } };
   if (!sessao.session?.access_token) throw new Error('Entre na conta de motorista com Supabase ativo para usar o mapa real.');
