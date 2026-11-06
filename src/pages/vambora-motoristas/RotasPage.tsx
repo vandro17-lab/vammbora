@@ -145,13 +145,18 @@ export function RotaDetalhePage() {
   const [todas, setTodas] = useState(false);
   const [mapaGrande, setMapaGrande] = useState(false);
   const [publicando, setPublicando] = useState(false);
+  const [erroPub, setErroPub] = useState<string | null>(null);
 
   async function alternarPublicacao() {
     if (!rota) return;
     setPublicando(true);
+    setErroPub(null);
     try {
       await publicarRota(rota.id, !rota.isPublished);
       recarregar();
+    } catch {
+      // Ex.: coluna is_published ainda não criada no banco (migração pendente).
+      setErroPub('Não foi possível publicar agora. Se o problema persistir, a publicação ainda está sendo liberada.');
     } finally {
       setPublicando(false);
     }
@@ -215,6 +220,7 @@ export function RotaDetalhePage() {
               {publicando ? '…' : rota.isPublished ? 'Publicada ✓' : 'Publicar'}
             </button>
           </div>
+          {erroPub && <p className="mt-2 rounded-xl bg-amber-50 p-2.5 text-xs text-amber-800">{erroPub}</p>}
         </Card>
 
         {/* Mapa da sua rota (card titulado) */}
