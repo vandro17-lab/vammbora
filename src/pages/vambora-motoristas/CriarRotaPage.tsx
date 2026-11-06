@@ -79,11 +79,11 @@ export function CriarRotaPage() {
     setEtapa('paradas');
   }
 
-  async function concluir() {
+  async function concluir(rotaAtualizada: Rota) {
     setSalvando(true); setAviso(null);
     try {
-      const nome = rota.nome || `Rota ${rota.sentido === 'ida' ? 'de ida' : 'de volta'}`;
-      await salvarRota({ ...rota, nome, status: 'concluida' });
+      const nome = rotaAtualizada.nome || `Rota ${rotaAtualizada.sentido === 'ida' ? 'de ida' : 'de volta'}`;
+      await salvarRota({ ...rotaAtualizada, nome, status: 'concluida' });
       navigate('/app/rotas');
     } catch (e) {
       setAviso('Não foi possível salvar: ' + (e as Error).message);
@@ -292,7 +292,7 @@ function PillSel({ ativo, onClick, children }: { ativo: boolean; onClick: () => 
 /* ------------------------- Passo 3: confirmação ------------------------- */
 function ConfirmacaoRota({ rota, setRota, veiculo, capacidade, aBordo, onConcluir, salvando }: {
   rota: Rota; setRota: (r: Rota) => void; veiculo: Veiculo | null; capacidade: number;
-  aBordo: number; onConcluir: () => void; salvando: boolean;
+  aBordo: number; onConcluir: (rotaAtualizada: Rota) => void; salvando: boolean;
 }) {
   const alunos = rota.passageiros.length;
   const ocupacaoPct = capacidade > 0 ? Math.round((aBordo / capacidade) * 100) : 0;
