@@ -29,25 +29,21 @@ export function VMShell({ children, nav = true }: { children: ReactNode; nav?: b
 export function VMBottomNav() {
   return (
     <nav className="vm-nav">
-      <div className="vm-nav-inner px-3">
-        <div className="mb-3 flex items-stretch justify-between rounded-2xl border border-navy-100/70 bg-white/95 p-1.5 shadow-float backdrop-blur-xl">
-          {TABS.map(({ to, end, label, Icon }) => (
-            <NavLink key={to} to={to} end={end}
-              className={({ isActive }) => cn(
-                'flex flex-1 flex-col items-center gap-0.5 rounded-xl py-2 text-[10px] font-semibold transition-colors',
-                isActive ? 'text-white' : 'text-navy-400',
-              )}>
-              {({ isActive }) => (
-                <>
-                  <span className={cn('grid h-8 w-full place-items-center rounded-xl', isActive && 'bg-mint-500 shadow-glow')}>
-                    <Icon className="h-5 w-5" />
-                  </span>
-                  <span>{label}</span>
-                </>
-              )}
-            </NavLink>
-          ))}
-        </div>
+      <div className="vm-nav-inner flex items-stretch justify-around gap-1 rounded-t-2xl border-t border-navy-100 bg-white/95 px-2 pb-[max(env(safe-area-inset-bottom),0.4rem)] pt-1.5 shadow-[0_-10px_30px_-18px_rgba(11,31,58,0.35)] backdrop-blur-xl">
+        {TABS.map(({ to, end, label, Icon }) => (
+          <NavLink key={to} to={to} end={end}
+            className={({ isActive }) => cn(
+              'flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-2xl px-0.5 py-1.5 text-[9px] font-semibold tracking-tight transition-colors',
+              isActive ? 'bg-mint-500 text-white shadow-glow' : 'text-navy-400',
+            )}>
+            {({ isActive }) => (
+              <>
+                <Icon className="h-5 w-5" strokeWidth={isActive ? 2.4 : 2} />
+                <span className="leading-none">{label}</span>
+              </>
+            )}
+          </NavLink>
+        ))}
       </div>
     </nav>
   );

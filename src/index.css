@@ -234,7 +234,7 @@ section[id] { scroll-margin-top: 90px; }
 .vm-btn { background: var(--vm-green); color:#fff; border-radius: 9999px; }
 .vm-btn:hover { background: var(--vm-green-strong); }
 /* Barra de navegação inferior */
-.vm-nav { position: fixed; inset-inline: 0; bottom: 0; z-index: 40; padding-bottom: env(safe-area-inset-bottom); }
+.vm-nav { position: fixed; inset-inline: 0; bottom: 0; z-index: 40; }
 .vm-nav-inner { max-width: 30rem; margin: 0 auto; }
 /* Tiles de estatística (chips coloridos) */
 .vm-chip-ico { display:grid; place-items:center; width: 2.25rem; height: 2.25rem; border-radius: 0.9rem; }
