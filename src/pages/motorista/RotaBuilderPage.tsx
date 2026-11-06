@@ -94,12 +94,12 @@ function Builder() {
     });
   }, []);
 
-  async function salvar(status: Rota['status']) {
+  async function salvar(status: Rota['status'], rotaAtualizada: Rota = rota) {
     setSalvando(true);
     setAviso(null);
     try {
-      const nome = rota.nome || `Rota ${rota.sentido === 'ida' ? 'de ida' : 'de volta'}`;
-      const salva = await salvarRota({ ...rota, nome, status });
+      const nome = rotaAtualizada.nome || `Rota ${rotaAtualizada.sentido === 'ida' ? 'de ida' : 'de volta'}`;
+      const salva = await salvarRota({ ...rotaAtualizada, nome, status });
       setRota(salva);
       if (status === 'concluida') {
         navigate('/painel/rotas');
