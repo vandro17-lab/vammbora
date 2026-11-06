@@ -46,6 +46,7 @@ Telas React → serviços em `src/data/*` e `src/lib/*` → Supabase (tabelas + 
 - Real × demonstrativo: `07-RECURSOS-DEMONSTRATIVOS.md`
 - Riscos/recuperação/reconciliação: `08-RISCOS-E-RECUPERACAO.md`
 - Progresso/checkpoints: `09-PROGRESSO-E-CHECKPOINTS.md`
+- **Dados por tela (10 telas) e classificação RF/CALC/RNC/DEP/DEMO:** `10-AUDITORIA-DADOS-10-TELAS.md` (ler antes de construir qualquer tela)
 
 ## As 3 lacunas que mudam o plano (resumo — detalhe em 02)
 1. **Van editada ≠ marketplace.** O editor de van grava na tabela `vehicles`; o marketplace lê recursos/capacidade da tabela `drivers` (via `public_listings`). **Não há sincronização** e **não há nenhuma escrita do motorista na tabela `drivers`** (só o admin escreve). Hoje o motorista real não consegue publicar/editar o que o público vê.

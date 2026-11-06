@@ -1,172 +1,66 @@
 import { Link } from 'react-router-dom';
-import {
-  ArrowLeft,
-  Bus,
-  Route,
-  Inbox,
-  Sparkles,
-  CheckCircle2,
-  Clock,
-} from 'lucide-react';
+import { Route as RouteIcon, Users, Calculator, Check, ArrowRight } from 'lucide-react';
+import { VanEscolar } from '@/components/vm/VanEscolar';
 import { LINKS_ENTRADA_MOTORISTA } from '@/app/navegacao-motorista';
 
 /**
- * Entrada ÚNICA do Vambora Motoristas ("Sou motorista").
- * Fluxo: Marketplace → aqui → autenticação existente (`/motorista/conta`) →
- * app operacional real (`/painel`). O Vambora Pro (`/pro`) é apenas a
- * demonstração, claramente rotulada — nunca a porta de entrada.
- *
- * NOTA (Fase 2): esta tela está preparada ESTRUTURALMENTE para receber o design
- * das imagens na Fase 3. Aqui não há redesenho — só a unificação do fluxo.
+ * TELA 1 — Boas-vindas do Vambora Motoristas.
+ * Entrada única "Sou motorista": Marketplace → aqui → autenticação existente
+ * (`/motorista/conta`) → app real (`/app`). Preserva o login Google/e-mail.
  */
 export function DriverLandingPage() {
+  const beneficios = [
+    { Icone: RouteIcon, texto: 'Organize suas rotas' },
+    { Icone: Users, texto: 'Encontre mais alunos' },
+    { Icone: Calculator, texto: 'Calcule seus custos' },
+  ];
   return (
-    <div>
-      <section className="bg-brand-gradient">
-        <div className="container-page py-14 text-white">
-          <Link
-            to="/"
-            className="inline-flex items-center gap-1.5 text-sm font-medium text-navy-200 hover:text-white"
-          >
-            <ArrowLeft className="h-4 w-4" /> Voltar
-          </Link>
-          <div className="mt-6 max-w-2xl">
-            <span className="chip w-fit bg-white/10 text-mint-200 ring-1 ring-white/15">
-              Vambora Motoristas
-            </span>
-            <h1 className="mt-4 font-display text-4xl font-extrabold leading-tight sm:text-5xl">
-              Preencha os assentos vazios com os alunos certos.
-            </h1>
-            <p className="mt-4 text-lg text-navy-100">
-              O Vambora mostra sua van para famílias cuja rota realmente combina com a sua — sem
-              bagunçar o trajeto de quem já viaja com você.
-            </p>
-            <div className="mt-6 flex flex-wrap gap-3">
-              <Link to={LINKS_ENTRADA_MOTORISTA.entrar} className="btn btn-lg btn-primary">
-                Entrar ou criar conta
-              </Link>
-              <Link
-                to={LINKS_ENTRADA_MOTORISTA.demonstracao}
-                className="btn btn-lg btn-ghost text-white ring-1 ring-white/20"
-              >
-                Ver demonstração
-              </Link>
-            </div>
-            <p className="mt-3 text-sm text-navy-200">
-              Entrar leva ao seu aplicativo (cadastro da van, rotas e simulador). A demonstração
-              (Vambora Pro) usa dados de exemplo, só para conhecer a experiência.
-            </p>
-          </div>
+    <div className="vm-grad flex min-h-dvh flex-col text-white">
+      <div className="vm-screen flex flex-1 flex-col px-6 pb-8 pt-[calc(env(safe-area-inset-top)+2.5rem)]">
+        {/* Logo */}
+        <div className="flex items-center gap-2.5">
+          <span className="grid h-10 w-10 place-items-center rounded-2xl bg-white/15 ring-1 ring-white/25">
+            <Check className="h-5 w-5 text-white" strokeWidth={3} />
+          </span>
+          <span className="font-display text-2xl font-extrabold tracking-tight">Vambora <span className="text-mint-200">Motoristas</span></span>
         </div>
-      </section>
 
-      {/* Como funciona para o motorista */}
-      <section className="container-page py-14">
-        <h2 className="font-display text-3xl font-bold">Como vai funcionar para você</h2>
-        <div className="mt-8 grid gap-6 md:grid-cols-3">
-          {[
-            { Icone: Bus, t: 'Cadastre sua van', d: 'Capacidade, recursos, fotos e documentos — com autosave e passos simples.' },
-            { Icone: Route, t: 'Monte suas rotas', d: 'Escolas, horários e paradas. Sem precisar percorrer a rota com GPS.' },
-            { Icone: Sparkles, t: 'Receba alunos compatíveis', d: 'Veja oportunidades por região e turno, sem expor dados das famílias.' },
-          ].map((p) => (
-            <div key={p.t} className="card p-6">
-              <span className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-navy-900 text-white">
-                <p.Icone className="h-6 w-6" />
+        <p className="mt-4 max-w-xs text-lg font-medium text-mint-50/90">
+          O assistente inteligente do motorista de transporte escolar.
+        </p>
+
+        {/* Van escolar */}
+        <div className="relative my-8 flex items-center justify-center">
+          <div className="pointer-events-none absolute h-44 w-44 rounded-full bg-white/10 blur-2xl" />
+          <VanEscolar className="relative w-full max-w-[22rem] drop-shadow-xl" />
+        </div>
+
+        {/* Benefícios */}
+        <ul className="space-y-3">
+          {beneficios.map((b) => (
+            <li key={b.texto} className="flex items-center gap-3">
+              <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/15 ring-1 ring-white/20">
+                <b.Icone className="h-5 w-5" />
               </span>
-              <h3 className="mt-4 font-display text-lg font-bold">{p.t}</h3>
-              <p className="mt-2 text-sm text-navy-600">{p.d}</p>
-            </div>
+              <span className="text-base font-medium">{b.texto}</span>
+            </li>
           ))}
-        </div>
-      </section>
+        </ul>
 
-      {/* Prévia do painel */}
-      <section className="bg-white py-14">
-        <div className="container-page">
-          <div className="flex flex-wrap items-center gap-3">
-            <h2 className="font-display text-3xl font-bold">Prévia do seu painel</h2>
-            <span className="chip bg-mint-50 text-mint-800">Em breve</span>
-          </div>
-          <p className="mt-2 max-w-xl text-navy-600">
-            Suas vans, rotas e solicitações. Tudo organizado em um só lugar.
+        <div className="mt-auto pt-8">
+          <Link to={LINKS_ENTRADA_MOTORISTA.entrar}
+            className="flex h-14 w-full items-center justify-center gap-2 rounded-full bg-white text-base font-bold text-mint-700 shadow-float transition active:scale-[0.98]">
+            Começar agora <ArrowRight className="h-5 w-5" />
+          </Link>
+          <p className="mt-3 text-center text-sm text-mint-50/90">
+            Já tem uma conta?{' '}
+            <Link to={LINKS_ENTRADA_MOTORISTA.entrar} className="font-bold underline underline-offset-2">Entrar</Link>
           </p>
-
-          <div className="mt-8 grid gap-6 lg:grid-cols-3">
-            <PainelCard titulo="Minhas vans" Icone={Bus}>
-              <LinhaMock texto="Van 01 — 15 lugares" chip="Ativa" ok />
-              <LinhaMock texto="Van 02 — 18 lugares" chip="Em cadastro" />
-            </PainelCard>
-            <PainelCard titulo="Minhas rotas" Icone={Route}>
-              <LinhaMock texto="Centro → Colégio Paineiras" chip="Manhã" ok />
-              <LinhaMock texto="Vila Mendonça → Inst. São João" chip="Tarde" ok />
-            </PainelCard>
-            <PainelCard titulo="Solicitações" Icone={Inbox}>
-              <LinhaMock texto="Nova família — Jd. Nova Iorque" chip="Pendente" />
-              <LinhaMock texto="Avulso — 12/11" chip="Pendente" />
-            </PainelCard>
-          </div>
-
-          {/* Simulador */}
-          <div className="card mt-6 p-6">
-            <div className="flex flex-wrap items-center gap-3">
-              <h3 className="font-display text-lg font-bold">Simulador “e se eu aceitar este aluno?”</h3>
-              <span className="chip bg-navy-50 text-navy-600">Planejamento de rota</span>
-            </div>
-            <p className="mt-2 text-sm text-navy-600">
-              Veja como uma nova parada pode mudar os horários da sua rota antes de aceitar um aluno.
-            </p>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <div className="rounded-xl bg-navy-50 p-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-navy-400">Antes</p>
-                <p className="mt-2 inline-flex items-center gap-2 text-navy-700">
-                  <Clock className="h-4 w-4" /> Chega 7 min antes da aula
-                </p>
-              </div>
-              <div className="rounded-xl bg-mint-50 p-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-mint-600">Depois</p>
-                <p className="mt-2 inline-flex items-center gap-2 text-navy-700">
-                  <Clock className="h-4 w-4" /> Chega 3 min antes — ainda dentro da margem
-                </p>
-              </div>
-            </div>
-
-          </div>
+          <Link to={LINKS_ENTRADA_MOTORISTA.demonstracao} className="mt-4 block text-center text-xs font-medium text-mint-100/70">
+            Ver demonstração (dados de exemplo)
+          </Link>
         </div>
-      </section>
-    </div>
-  );
-}
-
-function PainelCard({
-  titulo,
-  Icone,
-  children,
-}: {
-  titulo: string;
-  Icone: typeof Bus;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="card p-6">
-      <div className="flex items-center gap-2.5">
-        <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-navy-50 text-navy-700">
-          <Icone className="h-5 w-5" />
-        </span>
-        <h3 className="font-display font-bold">{titulo}</h3>
       </div>
-      <div className="mt-4 space-y-2">{children}</div>
-    </div>
-  );
-}
-
-function LinhaMock({ texto, chip, ok }: { texto: string; chip: string; ok?: boolean }) {
-  return (
-    <div className="flex items-center justify-between rounded-lg bg-navy-50 px-3 py-2.5 text-sm">
-      <span className="flex items-center gap-2 text-navy-700">
-        {ok && <CheckCircle2 className="h-4 w-4 text-mint-500" />}
-        {texto}
-      </span>
-      <span className="chip bg-white text-navy-500 ring-1 ring-navy-100">{chip}</span>
     </div>
   );
 }
