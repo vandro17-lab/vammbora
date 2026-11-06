@@ -1,5 +1,12 @@
 import { StartupExperience } from '@/components/brand/StartupExperience';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Outlet } from 'react-router-dom';
+import { ExigirMotorista } from '@/pages/motorista/MotoristaShell';
+import { DashboardPage } from '@/pages/vambora-motoristas/DashboardPage';
+import { RotasPage, RotaDetalhePage } from '@/pages/vambora-motoristas/RotasPage';
+import { OportunidadesPage, SimularEncaixePage as VMSimularPage } from '@/pages/vambora-motoristas/OportunidadesPage';
+import { InteligenciaPage } from '@/pages/vambora-motoristas/InteligenciaPage';
+import { MinhaVanPage, CadastroVanPage } from '@/pages/vambora-motoristas/MinhaVanPage';
+import { MaisPage, ModuloPage } from '@/pages/vambora-motoristas/MaisPage';
 import { Layout } from '@/components/layout/Layout';
 import { ScrollManager } from '@/components/ScrollManager';
 import { PageTransition } from '@/components/motion/PageTransition';
@@ -51,7 +58,20 @@ export default function App() {
             <Route path="/painel/rotas" element={<RotasListPage />} />
             <Route path="/painel/rota/:id" element={<RotaBuilderPage />} />
             <Route path="/painel/simulador" element={<SimuladorEncaixePage />} />
-            {/* Vambora Pro — PRÉVIA demonstrativa (não substitui o app real /painel) */}
+            {/* Vambora Motoristas — app visual (dados reais + cenário demo) */}
+            <Route path="/app" element={<ExigirMotorista><Outlet /></ExigirMotorista>}>
+              <Route index element={<DashboardPage />} />
+              <Route path="rotas" element={<RotasPage />} />
+              <Route path="rotas/:id" element={<RotaDetalhePage />} />
+              <Route path="oportunidades" element={<OportunidadesPage />} />
+              <Route path="oportunidades/:id" element={<VMSimularPage />} />
+              <Route path="inteligencia" element={<InteligenciaPage />} />
+              <Route path="van" element={<MinhaVanPage />} />
+              <Route path="van/cadastro" element={<CadastroVanPage />} />
+              <Route path="mais" element={<MaisPage />} />
+              <Route path="mais/:modulo" element={<ModuloPage />} />
+            </Route>
+            {/* Vambora Pro — PRÉVIA demonstrativa anterior (preservada como referência) */}
             <Route path="/pro" element={<VamboraProPage />} />
             <Route path="/pro/encaixe" element={<LaboratorioEncaixePage />} />
             {/* Aliases canônicos "Vambora Motoristas" (aditivos; preservam links antigos) */}

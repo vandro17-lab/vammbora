@@ -23,7 +23,7 @@ export function ContaMotoristaPage() {
     setErro(null);
     setAviso(null);
     if (!USE_SUPABASE) {
-      navigate('/painel');
+      navigate('/app');
       return;
     }
     setEnviando(true);
@@ -41,7 +41,7 @@ export function ContaMotoristaPage() {
     setAviso(null);
     // Modo demonstração: entra direto no painel (dados ficam no navegador).
     if (!USE_SUPABASE) {
-      navigate('/painel');
+      navigate('/app');
       return;
     }
     setEnviando(true);
@@ -63,7 +63,7 @@ export function ContaMotoristaPage() {
       setModo('entrar');
       return;
     }
-    navigate('/painel');
+    navigate('/app');
   }
 
   return (

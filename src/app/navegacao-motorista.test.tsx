@@ -17,14 +17,13 @@ import {
  */
 
 describe('FASE 2 — entrada do Vambora Motoristas leva ao app real (não à demo)', () => {
-  it('o botão principal "Entrar" aponta para a autenticação existente, nunca para /pro', () => {
+  it('o botão principal "Entrar" aponta para a autenticação existente', () => {
     expect(LINKS_ENTRADA_MOTORISTA.entrar).toBe('/motorista/conta');
-    expect(LINKS_ENTRADA_MOTORISTA.entrar).not.toBe(LINKS_ENTRADA_MOTORISTA.demonstracao);
   });
 
-  it('o app operacional real é /painel e a demonstração é /pro (claramente separados)', () => {
-    expect(LINKS_ENTRADA_MOTORISTA.app).toBe('/painel');
-    expect(LINKS_ENTRADA_MOTORISTA.demonstracao).toBe('/pro');
+  it('o app é /app; o painel clássico segue em /painel', () => {
+    expect(LINKS_ENTRADA_MOTORISTA.app).toBe('/app');
+    expect(LINKS_ENTRADA_MOTORISTA.painel).toBe('/painel');
     expect(LINKS_ENTRADA_MOTORISTA.voltar).toBe('/');
   });
 });
@@ -45,7 +44,6 @@ describe('FASE 2 — redirecionamentos canônicos (aditivos, sem quebrar links a
     const mapa = Object.fromEntries(REDIRECIONAMENTOS_MOTORISTA.map((r) => [r.de, r.para]));
     expect(mapa['/motoristas']).toBe('/motorista');
     expect(mapa['/vambora-motoristas']).toBe('/motorista');
-    expect(mapa['/app']).toBe('/painel');
   });
 
   it('cada alias resolve na configuração de rotas e redireciona para o alvo correto', () => {

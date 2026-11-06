@@ -19,10 +19,12 @@ export const LINKS_ENTRADA_MOTORISTA = {
   voltar: '/',
   /** Autenticação existente (login Google/e-mail); após logar vai para `/painel`. */
   entrar: '/motorista/conta',
-  /** App operacional real do motorista. */
-  app: '/painel',
-  /** Vambora Pro — demonstração (dados de exemplo), claramente rotulada. */
-  demonstracao: '/pro',
+  /** App Vambora Motoristas (experiência visual + dados reais/demo). */
+  app: '/app',
+  /** Painel operacional clássico (cadastro/construtor reais). */
+  painel: '/painel',
+  /** Demonstração com dados de exemplo (abre o app em modo demo). */
+  demonstracao: '/app',
 } as const;
 
 /**
@@ -32,7 +34,6 @@ export const LINKS_ENTRADA_MOTORISTA = {
 export const REDIRECIONAMENTOS_MOTORISTA: ReadonlyArray<{ de: string; para: string }> = [
   { de: '/motoristas', para: '/motorista' },
   { de: '/vambora-motoristas', para: '/motorista' },
-  { de: '/app', para: '/painel' },
 ];
 
 /** Rotas de redirecionamento, para espalhar dentro de <Routes> no App. */

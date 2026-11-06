@@ -204,3 +204,28 @@
 .field-input::placeholder { color: #66778c; }
 section[id] { scroll-margin-top: 90px; }
 @media (max-width: 639px) { .container-page { padding-left: 20px; padding-right: 20px; } }
+
+/* ===================== Vambora Motoristas (app) ===================== */
+.vm-app { background: #f3f6f9; min-height: 100dvh; }
+.vm-screen { max-width: 30rem; margin: 0 auto; }
+/* Cabeçalho em gradiente verde/teal (referência das telas) */
+.vm-grad { background: linear-gradient(140deg, #0c5a48 0%, #11916a 52%, #15b877 100%); }
+.vm-grad-soft { background: linear-gradient(140deg, #e9f8f1 0%, #ddf3e9 100%); }
+.vm-card { border-radius: 1.25rem; background: #fff; box-shadow: 0 6px 22px rgb(11 31 58 / 6%); }
+.vm-accent { color: #12a06a; }
+.vm-bg-accent { background: #12a06a; }
+.vm-btn { background: #15a06a; color:#fff; border-radius: 9999px; }
+.vm-btn:hover { background: #0f8a5a; }
+/* Barra de navegação inferior */
+.vm-nav { position: fixed; inset-inline: 0; bottom: 0; z-index: 40; padding-bottom: env(safe-area-inset-bottom); }
+.vm-nav-inner { max-width: 30rem; margin: 0 auto; }
+/* Tiles de estatística (chips coloridos) */
+.vm-chip-ico { display:grid; place-items:center; width: 2.25rem; height: 2.25rem; border-radius: 0.9rem; }
+.vm-ico-blue { background:#e0ecff; color:#2563eb; }
+.vm-ico-green { background:#d7f5e6; color:#12a06a; }
+.vm-ico-purple { background:#ede4ff; color:#7c3aed; }
+.vm-ico-amber { background:#ffeccc; color:#c2740c; }
+.vm-ico-rose { background:#ffe2e2; color:#e11d48; }
+.vm-ico-teal { background:#d2f3f0; color:#0d9488; }
+.vm-ico-navy { background:#e2e8f5; color:#213d7d; }
+.vm-ico-slate { background:#e6ebf1; color:#475569; }
