@@ -341,6 +341,22 @@ export function LinhaPercurso({ rota, setRota }: { rota: Rota; setRota: (r: Rota
                   {descem.length > 0 && `Desce: ${descem.map((x) => x.identificacao).join(', ')}`}
                   {embarcam.length === 0 && descem.length === 0 && (p.confirmado ? 'Confirmada' : 'Sem confirmação')}
                 </p>
+                <label className="mt-2 flex items-center gap-2 text-xs text-navy-600">
+                  <span className="shrink-0">Chegada habitual</span>
+                  <input type="time" aria-label={`Horário habitual de chegada: ${p.rotulo}`}
+                    className="field-input !w-32 !py-1.5 text-sm"
+                    value={p.horarioChegadaMin == null ? '' : `${String(Math.floor(p.horarioChegadaMin / 60)).padStart(2, '0')}:${String(p.horarioChegadaMin % 60).padStart(2, '0')}`}
+                    onChange={(e) => {
+                      const valor = e.target.value;
+                      const minutos = /^([01]\\d|2[0-3]):[0-5]\\d$/.test(valor) ? horaParaMinutos(valor) : null;
+                      setRota({ ...rota,
+                        paradas: rota.paradas.map((s) => s.id === p.id ? { ...s, horarioChegadaMin: minutos } : s),
+                        passageiros: rota.passageiros.map((aluno) =>
+                          p.tipo === 'casa' && (rota.sentido === 'ida' ? aluno.embarqueParadaId === p.id : aluno.desembarqueParadaId === p.id)
+                            ? { ...aluno, horarioHabitualMin: minutos } : aluno),
+                      });
+                    }} />
+                </label>
               </div>
               {p.tipo !== 'saida' && (
                 <div className="flex shrink-0 items-center gap-1">
