@@ -21,13 +21,26 @@ describe('Registro de slots de arte (app_assets)', () => {
     }
   });
 
-  it('inclui os espaços combinados: van, clube e 8 ícones da Mais', () => {
+  it('inclui os espaços combinados: van, clube e os 8 ícones da Mais', () => {
     expect(slotPorId('header.van')?.kind).toBe('ilustracao');
     expect(slotPorId('clube.art')?.kind).toBe('ilustracao');
-    const icones = SLOTS.filter((s) => s.kind === 'icone');
-    expect(icones).toHaveLength(8);
-    for (const id of ['icon.minhaVan', 'icon.calendario', 'icon.manutencao', 'icon.combustivel', 'icon.relatorios', 'icon.documentacao', 'icon.ajuda', 'icon.config']) {
-      expect(slotPorId(id), id).toBeTruthy();
+    const iconesMais = [
+      'icon.minhaVan', 'icon.calendario', 'icon.manutencao', 'icon.combustivel',
+      'icon.relatorios', 'icon.documentacao', 'icon.ajuda', 'icon.config',
+    ];
+    for (const id of iconesMais) {
+      expect(slotPorId(id)?.kind, id).toBe('icone');
+    }
+    // A grade da Mais mantém exatamente 8 ícones.
+    expect(SLOTS.filter((s) => s.grupo === 'Tela Mais — ícones')).toHaveLength(8);
+  });
+
+  it('inclui os novos espaços (ilustrações de telas e cartões do Clube)', () => {
+    for (const id of ['dash.van', 'van.ilustracao', 'van.vazio', 'oportunidades.vazio', 'clube.hero']) {
+      expect(slotPorId(id)?.kind, id).toBe('ilustracao');
+    }
+    for (const id of ['clube.card.postos', 'clube.card.oficinas', 'clube.card.pneus', 'clube.card.seguro']) {
+      expect(slotPorId(id)?.kind, id).toBe('icone');
     }
   });
 

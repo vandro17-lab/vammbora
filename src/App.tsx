@@ -9,6 +9,7 @@ import { MinhaVanPage, CadastroVanPage } from '@/pages/vambora-motoristas/MinhaV
 import { MaisPage, ModuloPage } from '@/pages/vambora-motoristas/MaisPage';
 import { AparenciaPage } from '@/pages/vambora-motoristas/admin/AparenciaPage';
 import { AppAssetsProvider } from '@/lib/vm/useAppAssets';
+import { EdicaoAparenciaProvider } from '@/lib/vm/useEdicaoAparencia';
 import { Layout } from '@/components/layout/Layout';
 import { ScrollManager } from '@/components/ScrollManager';
 import { PageTransition } from '@/components/motion/PageTransition';
@@ -38,6 +39,7 @@ export default function App() {
       <ScrollManager />
       <AuthProvider>
         <AppAssetsProvider>
+        <EdicaoAparenciaProvider>
         <VitrineProvider>
           <StartupExperience>
           <Routes>
@@ -83,6 +85,7 @@ export default function App() {
           </Routes>
           </StartupExperience>
         </VitrineProvider>
+        </EdicaoAparenciaProvider>
         </AppAssetsProvider>
       </AuthProvider>
     </BrowserRouter>

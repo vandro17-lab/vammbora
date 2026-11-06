@@ -54,13 +54,15 @@ export function LinhaValor({ icon: Icon, cor = 'green', label, valor }: {
 }
 
 /** Estado vazio (sem dados reais ainda): ícone, título, texto e ação opcional. */
-export function EstadoVazio({ icon: Icon, titulo, texto, acao }: {
+export function EstadoVazio({ icon: Icon, titulo, texto, acao, ilustracao }: {
   icon: LucideIcon; titulo: string; texto: string; acao?: ReactNode;
+  /** Arte opcional que substitui o ícone (ex.: slot editável de estado vazio). */
+  ilustracao?: ReactNode;
 }) {
   return (
     <div className="vm-card flex flex-col items-center gap-2 px-6 py-10 text-center">
-      <span className="grid h-16 w-16 place-items-center rounded-2xl bg-mint-50 text-mint-600">
-        <Icon className="h-8 w-8" />
+      <span className="grid h-16 w-16 place-items-center overflow-hidden rounded-2xl bg-mint-50 text-mint-600">
+        {ilustracao ?? <Icon className="h-8 w-8" />}
       </span>
       <p className="mt-1 font-display text-lg font-bold text-navy-900">{titulo}</p>
       <p className="max-w-xs text-sm text-navy-500">{texto}</p>
