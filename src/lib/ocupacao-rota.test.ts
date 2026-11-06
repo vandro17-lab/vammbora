@@ -4,6 +4,7 @@ import {
   ocupacaoPorTrecho,
   picoOcupacao,
   aBordoEm,
+  estadoDaVanPorTrecho,
   validarRota,
   podeFinalizar,
 } from './ocupacao-rota';
@@ -84,9 +85,9 @@ describe('ocupacaoPorTrecho', () => {
 });
 
 describe('aBordoEm', () => {
-  it('mostra quem está a bordo numa escola (ambos no ponto da escola)', () => {
-    const a = aBordoEm(rotaBase(), 3);
-    expect(a.map((p) => p.id).sort()).toEqual(['p1', 'p2']);
+  it('desembarque na escola libera assentos no trecho seguinte', () => {
+    expect(aBordoEm(rotaBase(), 2).map((p) => p.id).sort()).toEqual(['p1', 'p2']);
+    expect(aBordoEm(rotaBase(), 3)).toEqual([]);
   });
 });
 
@@ -115,5 +116,32 @@ describe('validarRota / podeFinalizar', () => {
     const r = rotaBase();
     expect(r.passageiros[0].identificacao).toBe(r.passageiros[1].identificacao);
     expect(r.passageiros[0].id).not.toBe(r.passageiros[1].id);
+  });
+});
+
+describe('estadoDaVanPorTrecho', () => {
+  it('mantém nomes e vagas sincronizados com a ocupação após cada parada', () => {
+    const r = rotaBase();
+    const estados = estadoDaVanPorTrecho(r, veiculo);
+    expect(estados.map((e) => e.ocupados)).toEqual([0, 1, 2, 0]);
+    expect(estados.map((e) => e.livres)).toEqual([15, 14, 13, 15]);
+    expect(estados[2].passageiros.map((p) => p.id)).toEqual(['p1', 'p2']);
+    expect(estados[3].passageiros).toEqual([]);
+  });
+
+  it('reaproveita vagas após escola para embarque posterior', () => {
+    const r = rotaBase();
+    r.paradas.push({ id: 'c', ordem: 4, tipo: 'casa', rotulo: 'Casa C', confirmado: true });
+    r.paradas.push({ id: 'e2', ordem: 5, tipo: 'escola', rotulo: 'Escola 2', confirmado: true, destinoId: 'esc2' });
+    r.passageiros.push({ id: 'p3', identificacao: 'Maria', embarqueParadaId: 'c', desembarqueParadaId: 'e2', destinoId: 'esc2' });
+    const estados = estadoDaVanPorTrecho(r, veiculo);
+    expect(estados.map((e) => e.ocupados)).toEqual([0, 1, 2, 0, 1, 0]);
+    expect(estados[4].passageiros.map((p) => p.identificacao)).toEqual(['Maria']);
+    expect(estados[4].livres).toBe(14);
+  });
+
+  it('considera monitor e assentos reservados sem oferecer lugares inexistentes', () => {
+    const r = { ...rotaBase(), monitor: true, monitorOcupaLugar: true, lugaresReservados: 2 };
+    expect(estadoDaVanPorTrecho(r, veiculo).map((e) => e.livres)).toEqual([12, 11, 10, 12]);
   });
 });
