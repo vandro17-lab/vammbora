@@ -504,7 +504,7 @@ function FormEndereco({ titulo, dica, botao, locais, onConfirmar, onCancelar }: 
       <div className="mt-4 flex gap-3">
         <button
           className="btn btn-lg btn-primary flex-1"
-          disabled={!texto.trim() || !numero.trim() || !coord}
+          disabled={!texto.trim() || !coord}
           onClick={() => onConfirmar(montarRotulo(), coord ?? undefined)}
         >
           {botao}
@@ -512,7 +512,7 @@ function FormEndereco({ titulo, dica, botao, locais, onConfirmar, onCancelar }: 
         {onCancelar && <button className="btn btn-lg btn-ghost" onClick={onCancelar}>Cancelar</button>}
       </div>
 
-      {texto.trim() && numero.trim() && !coord && (
+      {texto.trim() && !coord && (
         <button
           className="mt-3 w-full text-center text-xs font-medium text-navy-400 hover:text-navy-700"
           onClick={() => onConfirmar(montarRotulo(), undefined)}
