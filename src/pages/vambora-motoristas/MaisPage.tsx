@@ -1,9 +1,10 @@
+import { useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 // Ícones premium (duotone) para o hub — Phosphor:
 import {
   SquaresFour, Van, CalendarBlank, Wrench, GasPump, ChartBar, FileText as FileDoc,
   Headset, GearSix, Crown, Gift, CaretRight, SealCheck, Percent,
-  PencilSimpleLine, ListBullets,
+  PencilSimpleLine, ListBullets, Bell, UserCircle,
 } from '@phosphor-icons/react';
 // Ícones das telas de detalhe (ModuloPage) — lucide (mantidos):
 import {
@@ -158,7 +159,8 @@ export function ModuloPage() {
         {modulo === 'combustivel' && <Combustivel />}
         {modulo === 'calendario' && <Calendario />}
         {modulo === 'clube' && <Clube />}
-        {(modulo === 'relatorios' || modulo === 'ajuda' || modulo === 'config') && <EmBreve titulo={titulo} />}
+        {(modulo === 'relatorios' || modulo === 'ajuda') && <EmBreve titulo={titulo} />}
+        {modulo === 'config' && <Config />}
       </div>
     </VMShell>
   );
@@ -274,6 +276,62 @@ function Clube() {
         </Card>
       ))}
       <p className="text-center text-[11px] text-navy-400">Ofertas ilustrativas — parcerias comerciais a confirmar. Estrutura pronta para ofertas reais.</p>
+    </>
+  );
+}
+
+/* ---- Configurações: inclui o ATALHO OCULTO para o modo "Editar aparência" ----
+   Toque 7 vezes seguidas na linha da versão (rodapé) para abrir o modo de edição,
+   sem precisar de um botão de admin à vista. Publicar/salvar continua protegido
+   pelo banco (só admin autenticado grava de verdade). */
+function Config() {
+  const navigate = useNavigate();
+  const { ativarOculto } = useEdicaoAparencia();
+  const toquesRef = useRef(0);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  function tocarVersao() {
+    toquesRef.current += 1;
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => { toquesRef.current = 0; }, 1200);
+    if (toquesRef.current >= 7) {
+      toquesRef.current = 0;
+      ativarOculto();
+      navigate('/app/mais'); // começa a editar pela tela Mais; a barra do modo aparece
+    }
+  }
+
+  return (
+    <>
+      <Card className="divide-y divide-navy-50 p-0">
+        {[
+          [Bell, 'Notificações', 'Avisos de documentos e oportunidades'],
+          [UserCircle, 'Conta', 'E-mail, telefone e cidade'],
+          [GearSix, 'Preferências', 'Idioma, aparência e privacidade'],
+        ].map(([Ico, t, d]) => {
+          const I = Ico as PhosphorIcon;
+          return (
+            <div key={t as string} className="flex items-center gap-3 p-4">
+              <span className="vm-chip-ico vm-ico-navy"><I size={18} weight="duotone" /></span>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-navy-900">{t as string}</p>
+                <p className="text-[11px] text-navy-500">{d as string}</p>
+              </div>
+              <span className="chip bg-navy-50 text-navy-400">em breve</span>
+            </div>
+          );
+        })}
+      </Card>
+
+      {/* Rodapé com a versão — também é o atalho oculto (toque 7×). */}
+      <button
+        type="button"
+        onClick={tocarVersao}
+        className="mx-auto mt-5 block w-full select-none py-3 text-center text-[11px] text-navy-400"
+        aria-label="Versão do aplicativo"
+      >
+        Vambora Motoristas · versão 0.1.0
+      </button>
     </>
   );
 }

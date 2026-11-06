@@ -13,6 +13,8 @@ interface EdicaoAparenciaCtx {
   /** Slot cujo editor está aberto (bottom sheet), ou null. */
   slotAtivo: SlotDef | null;
   ativar: () => void;
+  /** Ativa o modo por um atalho oculto (sem exigir a affordance de admin à vista). */
+  ativarOculto: () => void;
   desativar: () => void;
   alternar: () => void;
   abrirEditor: (slot: SlotDef) => void;
@@ -25,7 +27,7 @@ interface EdicaoAparenciaCtx {
 
 const Ctx = createContext<EdicaoAparenciaCtx>({
   disponivel: false, ativo: false, slotAtivo: null,
-  ativar: () => {}, desativar: () => {}, alternar: () => {},
+  ativar: () => {}, ativarOculto: () => {}, desativar: () => {}, alternar: () => {},
   abrirEditor: () => {}, fecharEditor: () => {},
   previaDe: () => undefined, definirPrevia: () => {},
 });
@@ -65,6 +67,10 @@ export function EdicaoAparenciaProvider({ children }: { children: ReactNode }) {
   const previaDe = useCallback((slotId: string) => previas[slotId], [previas]);
 
   const ativar = useCallback(() => { if (disponivel) setAtivo(true); }, [disponivel]);
+  // Atalho oculto (ex.: toque secreto em Configurações): abre o modo sem exigir a
+  // affordance de admin. Não concede escrita — publicar/remover seguem barrados
+  // pelas políticas do banco para quem não for admin autenticado.
+  const ativarOculto = useCallback(() => setAtivo(true), []);
   const fecharEditor = useCallback(() => setSlotAtivo(null), []);
   const abrirEditor = useCallback((slot: SlotDef) => setSlotAtivo(slot), []);
   const desativar = useCallback(() => {
@@ -75,9 +81,9 @@ export function EdicaoAparenciaProvider({ children }: { children: ReactNode }) {
   const alternar = useCallback(() => (ativo ? desativar() : ativar()), [ativo, desativar, ativar]);
 
   const valor = useMemo<EdicaoAparenciaCtx>(() => ({
-    disponivel, ativo, slotAtivo, ativar, desativar, alternar,
+    disponivel, ativo, slotAtivo, ativar, ativarOculto, desativar, alternar,
     abrirEditor, fecharEditor, previaDe, definirPrevia,
-  }), [disponivel, ativo, slotAtivo, ativar, desativar, alternar, abrirEditor, fecharEditor, previaDe, definirPrevia]);
+  }), [disponivel, ativo, slotAtivo, ativar, ativarOculto, desativar, alternar, abrirEditor, fecharEditor, previaDe, definirPrevia]);
 
   return (
     <Ctx.Provider value={valor}>
@@ -115,7 +121,7 @@ function OverlaysEdicao() {
               onClick={desativar}
               className="ml-1 inline-flex items-center gap-1 rounded-full bg-mint-500 px-3 py-1.5 text-[12px] font-bold text-white active:scale-95"
             >
-              <Check size={14} weight="bold" /> Concluir
+              <Check size={14} weight="bold" /> Encerrar
             </button>
           </div>
         </div>
