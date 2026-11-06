@@ -21,16 +21,19 @@
 - Toda migração **aditiva** (add column/table nullable); nunca destrutiva sem backup e aprovação.
 - Rollback de código: `git revert <commit>`; rollback de branch nunca por force em branch de outro agente.
 
+## Estado da `main` e PRs (atualizado 2026-11-06)
+- **PR #14 JÁ FOI INCORPORADO à `main`**: a `main` está em **`3965b73`** (Merge PR #14). A consolidação do Algoritmo Supremo (Fases 1/2/4) + geolocalização estão na `main`. Não há mais o que "mergear do PR #14".
+- Fase 1 (testes de proteção) → PR **#15**. Fase 2 (unificação) → PR **#16**. Ambas baseadas em `3965b73`.
+- **Base consolidada** Fase 1 + Fase 2 → branch `consolidacao/fases-1-2-vambora-motoristas` (PR de consolidação). É a base recomendada para a Fase 3.
+
 ## Reconciliação obrigatória antes de implementar (fazer no início de CADA fase futura)
 1. `git fetch origin` e comparar:
-   - `main` mudou? (novos merges além de `011fb14`)
+   - `main` mudou além de `3965b73`? (novos merges)
    - `src/engine/*` mudou? (motores são intocáveis sem fase própria)
-   - **PR #14** (`ccr-f18e6a2b-a7ex08`) foi mergeado ou atualizado?
-2. **Ordem de reconciliação recomendada** para telas de rota/passageiro/encaixe:
-   a. Mergear/estabilizar **PR #14** (consolidação + geolocalização) na base de trabalho.
-   b. Aplicar **migração 0010** (após aprovação) — aditiva.
-   c. Aplicar **correção da RPC `salvar_rota_completa`** (após aprovação).
-   d. Só então Fases 7/8 que gravam rotas.
+2. **Ordem de reconciliação recomendada** para telas de rota/passageiro/encaixe (banco ainda pendente):
+   a. Aplicar **migração 0010** (após aprovação) — aditiva.
+   b. Aplicar **correção da RPC `salvar_rota_completa`** (após aprovação).
+   c. Só então Fases 7/8 que gravam rotas.
 3. Registrar em `09` o commit/base reconciliado.
 
 ## Estado do banco hoje (para detectar mudança futura)
@@ -41,6 +44,7 @@ route_passengers=0, vehicles=0, destinations=46, cities=1**. RLS ativa; `route_p
 sem colunas de compromisso. Se algo disto mudar, reauditar antes de prosseguir.
 
 ## Git / segurança desta linha
-- Branch de documentação: `docs/plano-vambora-motoristas` (base `origin/main` `011fb14`).
-- Só documentação; **sem** merge, deploy, migração ou mudança de código funcional.
-- Não sobrescrever `ccr-f18e6a2b-a7ex08` (PR #14) nem branches de outros agentes.
+- Branches: `docs/plano-vambora-motoristas` (plano, base `011fb14`); `fase1/protecao-testes-vambora-motoristas` (PR #15); `fase2/unificacao-vambora-motoristas` (PR #16); `consolidacao/fases-1-2-vambora-motoristas` (base recomendada, Fase 1 + Fase 2). Todas baseadas na `main` atual `3965b73`.
+- **Sem** merge na `main`, deploy, migração ou alteração de banco/RLS/RPC/motores sem autorização.
+- Não sobrescrever branches de outros agentes.
+- Overlap de docs entre Fase 1 e Fase 2: os documentos da Fase 2 são superset (registram as duas fases); na consolidação, `00` e `09` foram resolvidos para essa versão — nada da Fase 1 foi perdido.
