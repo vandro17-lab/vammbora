@@ -96,11 +96,11 @@ export function MaisPage() {
         <div className="grid grid-cols-2 gap-3">
           {ATALHOS.map(({ to, label, descr, Icone, cor }) => (
             <button key={to} onClick={() => navigate(to)} className="h-full w-full text-left">
-              <Card className="vm-press relative flex h-full items-start gap-3 p-3.5">
-                <CaretRight size={15} weight="bold" className="absolute right-3 top-3.5 text-navy-300" />
+              <Card className="vm-press relative flex h-full items-start gap-2.5 p-3.5">
+                <CaretRight size={14} weight="bold" className="absolute right-2.5 top-3.5 text-navy-300" />
                 <span className={cn('vm-chip-ico shrink-0', cor)}><Icone size={20} weight="duotone" /></span>
-                <div className="min-w-0 flex-1 pr-5">
-                  <p className="font-display text-[14px] font-bold leading-tight text-navy-900">{label}</p>
+                <div className="min-w-0 flex-1 pr-3.5">
+                  <p className="font-display text-[13px] font-bold leading-tight tracking-tight text-navy-900">{label}</p>
                   <p className="mt-1 text-[11px] leading-snug text-navy-500">{descr}</p>
                 </div>
               </Card>

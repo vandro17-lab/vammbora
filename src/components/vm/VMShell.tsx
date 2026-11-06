@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { NavLink } from 'react-router-dom';
-import { Home, Route as RouteIcon, Sparkles, LineChart, LayoutGrid } from 'lucide-react';
+import { Home, Route as RouteIcon, Handshake, LineChart, LayoutGrid } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 /**
@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils';
 export const TABS = [
   { to: '/app', end: true, label: 'Início', Icon: Home },
   { to: '/app/rotas', end: false, label: 'Rotas', Icon: RouteIcon },
-  { to: '/app/oportunidades', end: false, label: 'Oportunidades', Icon: Sparkles },
+  { to: '/app/oportunidades', end: false, label: 'Oportunidades', Icon: Handshake },
   { to: '/app/inteligencia', end: false, label: 'Inteligência', Icon: LineChart },
   { to: '/app/mais', end: false, label: 'Mais', Icon: LayoutGrid },
 ] as const;

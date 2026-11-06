@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-  Brain, CalendarBlank, Leaf, GasPump, Coins, ChartBar, Target, TrendUp, CaretRight, CaretDown,
+  ChartLineUp, CalendarBlank, Leaf, GasPump, Coins, ChartBar, Target, TrendUp, CaretRight, CaretDown,
 } from '@phosphor-icons/react';
 import { VMShell } from '@/components/vm/VMShell';
 import { VMSectionHeader } from '@/components/vm/VMHeader';
@@ -22,7 +22,7 @@ export function InteligenciaPage() {
   return (
     <VMShell>
       <VMSectionHeader
-        icon={Brain}
+        icon={ChartLineUp}
         titulo="Inteligência"
         subtitulo="Análises e projeções para otimizar sua operação escolar."
       />
