@@ -36,8 +36,8 @@ export function RotasPage() {
             {dados.rotas.map((r) => {
               const km = distanciaRotaKm(r);
               return (
-                <Link key={r.id} to={`/app/rotas/${r.id}`}>
-                  <Card className="flex items-center gap-3 p-4">
+                <Link key={r.id} to={`/app/rotas/${r.id}`} className="block">
+                  <Card className="vm-press flex items-center gap-3 p-4">
                     <span className="vm-chip-ico vm-ico-green"><RouteIcon className="h-5 w-5" /></span>
                     <div className="min-w-0 flex-1">
                       <p className="font-bold text-navy-900">{r.nome}</p>

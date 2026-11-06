@@ -80,7 +80,7 @@ export function DashboardPage() {
 
         {/* Oportunidade na rota */}
         <Link to="/app/oportunidades" className="block">
-          <Card className="flex items-center gap-3 p-4">
+          <Card className="vm-press flex items-center gap-3 p-4">
             <span className="vm-chip-ico vm-ico-green"><Sparkles className="h-5 w-5" /></span>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-bold text-navy-900">Oportunidade na sua rota</p>

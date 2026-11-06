@@ -42,8 +42,8 @@ export function OportunidadesPage() {
         {aba === 'compat' ? (
           <div className="mt-3 space-y-3">
             {compativeis.map(({ op, r }) => (
-              <Link key={op.id} to={`/app/oportunidades/${op.id}`}>
-                <Card className="flex items-center gap-3 p-3.5">
+              <Link key={op.id} to={`/app/oportunidades/${op.id}`} className="block">
+                <Card className="vm-press flex items-center gap-3 p-3.5">
                   <Avatar nome={op.regiao} className="h-11 w-11 text-sm" />
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-bold text-navy-900">{op.regiao} → {op.escola}</p>

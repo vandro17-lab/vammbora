@@ -206,23 +206,40 @@ section[id] { scroll-margin-top: 90px; }
 @media (max-width: 639px) { .container-page { padding-left: 20px; padding-right: 20px; } }
 
 /* ===================== Vambora Motoristas (app) ===================== */
-.vm-app { background: #f3f6f9; min-height: 100dvh; }
+/* Identidade verde/teal unificada (um só "verde" em todo o app). */
+:root {
+  --vm-green: #12916a;        /* verde principal (meio do gradiente) */
+  --vm-green-strong: #0f7d5a; /* hover / contraste em branco */
+  --vm-teal: #0d9488;         /* teal de apoio */
+  --vm-surface: #f2f6f8;      /* fundo do app */
+  --vm-hairline: rgb(214 226 244 / 55%); /* contorno sutil dos cartões */
+}
+.vm-app { background: var(--vm-surface); min-height: 100dvh; }
 .vm-screen { max-width: 30rem; margin: 0 auto; }
-/* Cabeçalho em gradiente verde/teal (referência das telas) */
-.vm-grad { background: linear-gradient(140deg, #0c5a48 0%, #11916a 52%, #15b877 100%); }
+/* Cabeçalho em gradiente verde/teal (identidade das telas) */
+.vm-grad { background: linear-gradient(145deg, #0b5747 0%, #0f8a66 50%, #16b377 100%); }
 .vm-grad-soft { background: linear-gradient(140deg, #e9f8f1 0%, #ddf3e9 100%); }
-.vm-card { border-radius: 1.25rem; background: #fff; box-shadow: 0 6px 22px rgb(11 31 58 / 6%); }
-.vm-accent { color: #12a06a; }
-.vm-bg-accent { background: #12a06a; }
-.vm-btn { background: #15a06a; color:#fff; border-radius: 9999px; }
-.vm-btn:hover { background: #0f8a5a; }
+/* Cartão: raio 2xl + hairline + sombra em camadas (coerente com .card). */
+.vm-card {
+  border-radius: 1.25rem;
+  background: #fff;
+  border: 1px solid var(--vm-hairline);
+  box-shadow: 0 1px 2px rgb(11 31 58 / 4%), 0 10px 28px -16px rgb(11 31 58 / 20%);
+}
+/* Feedback de toque para cartões clicáveis. */
+.vm-press { transition: transform .18s cubic-bezier(0.22,1,0.36,1), box-shadow .18s ease; }
+.vm-press:active { transform: scale(0.985); }
+.vm-accent { color: var(--vm-green-strong); }
+.vm-bg-accent { background: var(--vm-green); }
+.vm-btn { background: var(--vm-green); color:#fff; border-radius: 9999px; }
+.vm-btn:hover { background: var(--vm-green-strong); }
 /* Barra de navegação inferior */
 .vm-nav { position: fixed; inset-inline: 0; bottom: 0; z-index: 40; padding-bottom: env(safe-area-inset-bottom); }
 .vm-nav-inner { max-width: 30rem; margin: 0 auto; }
 /* Tiles de estatística (chips coloridos) */
 .vm-chip-ico { display:grid; place-items:center; width: 2.25rem; height: 2.25rem; border-radius: 0.9rem; }
 .vm-ico-blue { background:#e0ecff; color:#2563eb; }
-.vm-ico-green { background:#d7f5e6; color:#12a06a; }
+.vm-ico-green { background:#d4f3e4; color:#0f7d5a; }
 .vm-ico-purple { background:#ede4ff; color:#7c3aed; }
 .vm-ico-amber { background:#ffeccc; color:#c2740c; }
 .vm-ico-rose { background:#ffe2e2; color:#e11d48; }
