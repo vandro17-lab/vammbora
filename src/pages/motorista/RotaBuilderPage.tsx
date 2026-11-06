@@ -19,7 +19,7 @@ import { TURNO_LABEL, cn, minutosParaTextoHora, horaParaMinutos, nomeDestinoPara
 const DIAS = [['seg', 'Seg'], ['ter', 'Ter'], ['qua', 'Qua'], ['qui', 'Qui'], ['sex', 'Sex']] as const;
 const TURNOS: Turno[] = ['manha', 'tarde', 'noite', 'integral'];
 
-function rotaNova(): Rota {
+export function rotaNova(): Rota {
   return {
     id: '', nome: '', sentido: 'ida', turno: 'manha', dias: ['seg', 'ter', 'qua', 'qui', 'sex'],
     veiculoId: null, monitor: false, monitorOcupaLugar: false, lugaresReservados: 0,
@@ -268,7 +268,7 @@ function Preparacao({ rota, setRota, veiculos, veiculo, capacidade, onComecar }:
 }
 
 /* ----------------------------- Van visual ----------------------------- */
-function VanViz({ capacidade, aBordo, rota, veiculo }: { capacidade: number; aBordo: number; rota: Rota; veiculo: Veiculo | null }) {
+export function VanViz({ capacidade, aBordo, rota, veiculo }: { capacidade: number; aBordo: number; rota: Rota; veiculo: Veiculo | null }) {
   const livres = Math.max(0, capacidade - aBordo);
   return (
     <div className="card overflow-hidden p-5">
@@ -300,7 +300,7 @@ function VanViz({ capacidade, aBordo, rota, veiculo }: { capacidade: number; aBo
 }
 
 /* ----------------------------- Linha do percurso ----------------------------- */
-function LinhaPercurso({ rota, setRota }: { rota: Rota; setRota: (r: Rota) => void }) {
+export function LinhaPercurso({ rota, setRota }: { rota: Rota; setRota: (r: Rota) => void }) {
   if (rota.paradas.length === 0) return null;
   const paradas = [...rota.paradas].sort((a, b) => a.ordem - b.ordem);
 
@@ -358,7 +358,7 @@ function LinhaPercurso({ rota, setRota }: { rota: Rota; setRota: (r: Rota) => vo
 }
 
 /* ----------------------------- Ação: adicionar parada ----------------------------- */
-function AcaoParada({ rota, setRota, destinos, locais, aBordo, capacidade }: {
+export function AcaoParada({ rota, setRota, destinos, locais, aBordo, capacidade }: {
   rota: Rota; setRota: (r: Rota) => void;
   destinos: { id: string; nome: string; bairro: string; lat?: number | null; lng?: number | null }[];
   locais: SugestaoEndereco[];
@@ -622,7 +622,7 @@ function FormEscola({ rota, setRota, destinos, proxOrdem, aBordo, onFechar }: {
 }
 
 /* ----------------------------- Horários ----------------------------- */
-function Horarios({ rota, setRota, onConfirmar, salvando }: { rota: Rota; setRota: (r: Rota) => void; onConfirmar: () => void; salvando: boolean }) {
+export function Horarios({ rota, setRota, onConfirmar, salvando }: { rota: Rota; setRota: (r: Rota) => void; onConfirmar: () => void; salvando: boolean }) {
   const [hora, setHora] = useState(rota.ultimoDesembarqueMin != null ? minutosParaTextoHora(rota.ultimoDesembarqueMin).replace('h', ':') : '');
   const [antecip, setAntecip] = useState(rota.limiteAntecipacaoMin != null ? String(rota.limiteAntecipacaoMin) : '');
 
