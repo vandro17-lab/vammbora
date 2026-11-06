@@ -3,11 +3,20 @@
 Atualizar ao fim de cada fase. Fonte de verdade da continuidade (não depender do chat).
 
 ## Estado atual
-- **Fase atual:** Fase 1 — Proteção e testes de referência → **CONCLUÍDA**.
-- **Próxima fase:** Fase 2 — Unificação do app (**aguardando aprovação**).
+- **Fase atual:** Fase 2 — Unificação da experiência Vambora Motoristas → **CONCLUÍDA**.
+- **Próxima fase:** Fase 3 — Design system (**aguardando aprovação E imagens**).
 - **Branch da documentação (plano):** `docs/plano-vambora-motoristas` (commit `7800374`, base `011fb14`).
-- **Branch de trabalho da Fase 1:** `fase1/protecao-testes-vambora-motoristas` (base `origin/main` = `3965b73`).
-- **Impedimentos:** **imagens de referência não recebidas** (bloqueiam Fase 3 e o detalhamento visual; ver `04`).
+- **Branch da Fase 1:** `fase1/protecao-testes-vambora-motoristas` (base `3965b73`) — PR **#15** (draft, revisão, sem merge).
+- **Branch da Fase 2:** `fase2/unificacao-vambora-motoristas` (base `origin/main` = `3965b73`, SEM depender da Fase 1).
+- **Impedimentos:** **imagens de referência não recebidas** (bloqueiam a Fase 3; ver `04`).
+
+## Resultados reais da Fase 2
+- **Fluxo unificado:** Marketplace → "Sou motorista" (`/motorista`) → entrada → `/motorista/conta` (auth existente) → **app real `/painel`**. Antes a entrada levava à demo `/pro`.
+- **Arquivos:** `src/app/navegacao-motorista.tsx` (novo — fonte única: links da entrada + aliases), `src/App.tsx` (aliases aditivos), `src/pages/DriverLandingPage.tsx` (CTAs: "Entrar ou criar conta" principal; "Ver demonstração" secundário e rotulado).
+- **Aliases canônicos (aditivos):** `/motoristas` e `/vambora-motoristas` → `/motorista`; `/app` → `/painel`. Links antigos preservados; `/pro` segue como prévia demonstrativa (não substitui `/painel`).
+- **Testes:** `src/app/navegacao-motorista.test.tsx` (6, via `matchRoutes` sem DOM). Suíte: **215 passam**; `tsc --noEmit` 0; `build` ok.
+- **Preservado e intocado:** login Google, construtor de rotas, simulador, cadastro de veículos, marketplace, banco, RLS, RPCs, motores. Sem migração 0010 e sem correção da RPC nesta fase.
+- **Não verificado:** render-level e2e de navegação (projeto não tem jsdom/Testing Library) e fluxos reais de auth/Supabase — ver `06`.
 
 ## ⚠️ Reconciliação registrada (2026-11-05, início da Fase 1)
 - A `main` **avançou de `011fb14` para `3965b73`**: o **PR #14 foi MERGEADO** (consolidação Algoritmo Supremo Fases 1/2/4 + geolocalização agora estão na `main`).
@@ -25,9 +34,9 @@ Atualizar ao fim de cada fase. Fonte de verdade da continuidade (não depender d
 | Fase | Tema | Status |
 |------|------|--------|
 | 0 | Auditoria e documentação | ✅ concluída |
-| 1 | Proteção e testes de referência | ✅ concluída |
-| 2 | Unificação do app (rotas/entrada) | ⏳ aguardando aprovação |
-| 3 | Design system (depende de imagens) | ⛔ bloqueada (imagens) |
+| 1 | Proteção e testes de referência | ✅ concluída (PR #15) |
+| 2 | Unificação do app (rotas/entrada) | ✅ concluída |
+| 3 | Design system (depende de imagens) | ⛔ bloqueada (imagens) — próxima |
 | 4 | Entrada e autenticação | ⬜ |
 | 5 | Cadastro + Minha Van ↔ marketplace (GAP-1) | ⬜ |
 | 6 | Dashboard | ⬜ |
@@ -47,10 +56,11 @@ Atualizar ao fim de cada fase. Fonte de verdade da continuidade (não depender d
 - **Decisão de produto GAP-1** (fonte de verdade van ↔ drivers ↔ view) → Fase 5.
 
 ## Próximo passo exato
-1. Revisar os testes da Fase 1 na branch `fase1/protecao-testes-vambora-motoristas`.
-2. Enviar as **imagens de referência** (bloqueiam a Fase 3).
-3. Aprovar o início da **Fase 2** (unificação do app, sem redesenho) — ou pedir a reconciliação do banco (migração 0010 + correção da RPC) antes das fases de rota.
+1. Revisar a Fase 2 na branch `fase2/unificacao-vambora-motoristas` (e a Fase 1 no PR #15).
+2. Enviar as **imagens de referência** (pré-requisito da Fase 3).
+3. Aprovar o início da **Fase 3** (design system) — ou pedir a reconciliação do banco (migração 0010 + correção da RPC) antes das fases de rota (7/8).
 
 ## Log de checkpoints
 - 2026-11-05 — Fase 0 concluída. Documentação criada em `docs/vambora-motoristas/` na branch `docs/plano-vambora-motoristas` (base `011fb14`). Sem alteração de código funcional, banco ou motores.
-- 2026-11-06 — Fase 1 concluída na branch `fase1/protecao-testes-vambora-motoristas` (base `main` `3965b73`, já com PR #14 mergeado). Adicionados 10 testes de regressão + 8 it.todo de lacunas. Suíte: 219 passam + 8 todo; tsc 0; build ok. Nada funcional/banco/motor alterado. Migração 0010 e correção da RPC seguem pendentes.
+- 2026-11-06 — Fase 1 concluída na branch `fase1/protecao-testes-vambora-motoristas` (base `main` `3965b73`, já com PR #14 mergeado). Adicionados 10 testes de regressão + 8 it.todo de lacunas. Suíte: 219 passam + 8 todo; tsc 0; build ok. PR #15 (draft, revisão). Nada funcional/banco/motor alterado.
+- 2026-11-06 — Fase 2 concluída na branch `fase2/unificacao-vambora-motoristas` (base `main` `3965b73`, sem depender da Fase 1). Entrada unificada leva ao app real `/painel` (não à demo `/pro`); fonte única de navegação + aliases aditivos; 6 testes de navegação. Suíte: 215 passam; tsc 0; build ok. Sem alterar banco/RLS/RPC/motores; migração 0010 e correção da RPC seguem pendentes.
