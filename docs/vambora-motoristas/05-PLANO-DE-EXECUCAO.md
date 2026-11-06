@@ -6,9 +6,15 @@ Legenda de contrato por fase: **Objetivo · Estado atual · Dependências ·
 Arquivos · Dados · Preservar · Modificar · Riscos · Testes · Critério ·
 Checkpoint · Recuperação · Pendências.**
 
-> Pré-condição global de toda fase futura: **reconciliar** com a `main`, os
-> motores e o PR #14 (ver `08`). Nenhuma fase altera banco/motores/produção sem
-> aprovação explícita.
+> Pré-condição global de toda fase futura: **reconciliar** com a `main` e os
+> motores (ver `08`). Nenhuma fase altera banco/motores/produção sem aprovação.
+>
+> **Contratos de dados por tela:** TODA fase que construir componentes visuais
+> (3, 5, 6, 7, 8, 9, 10, 11) deve seguir o mapa de `10-AUDITORIA-DADOS-10-TELAS.md`
+> — cada indicador ligado à sua fonte real (RF/CALC/RNC), o que é DEP (espera dado)
+> e o que é DEMO (fixture substituível). Regra: **não inventar número que o mapa
+> marque como CALC/RF**, e **não reescrever motor** que já exista. O `/pro` é a
+> base visual; os números reais vêm das fontes do doc `10`.
 
 ---
 
@@ -56,6 +62,7 @@ Checkpoint · Recuperação · Pendências.**
 
 ## Fase 3 — Design system (depende das imagens)
 - **Objetivo:** tokens e componentes conforme as imagens aprovadas.
+- **Contratos:** os componentes de indicador (stat tile, barra de ocupação, gráfico) devem ser **data-agnósticos** e receber os valores já calculados pelos serviços reais do doc `10` (ex.: barra de ocupação alimentada por `ocupacaoPorTrecho`). Nada de número embutido no componente.
 - **Estado atual:** Tailwind custom (`navy/mint/amber`) + componentes utilitários; `VamboraProPage` é a base visual.
 - **Dependências:** **imagens de referência** (`04`); Fase 2.
 - **Arquivos:** `tailwind.config`, `src/index.css`, `src/components/ui/*` (novos), `04-REFERENCIA-VISUAL.md`.
