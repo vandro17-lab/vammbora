@@ -34,19 +34,19 @@ export function InteligenciaPage() {
           <Card className="p-4">
             <span className="vm-chip-ico vm-ico-green"><Leaf className="h-5 w-5" /></span>
             <p className="mt-2 text-xs text-navy-500">Receita estimada</p>
-            <p className="font-display text-2xl font-extrabold text-navy-900">{formatBRL(ind.receitaMesBRL)}</p>
+            <p className="font-display text-2xl font-extrabold tabular-nums text-navy-900">{formatBRL(ind.receitaMesBRL)}</p>
           </Card>
           <Card className="p-4">
             <span className="vm-chip-ico vm-ico-amber"><Clock className="h-5 w-5" /></span>
             <p className="mt-2 text-xs text-navy-500">Custo combustível</p>
-            <p className="font-display text-2xl font-extrabold text-amber-600">{formatBRL(ind.custoCombustivelMesBRL)}</p>
+            <p className="font-display text-2xl font-extrabold tabular-nums text-amber-600">{formatBRL(ind.custoCombustivelMesBRL)}</p>
           </Card>
         </div>
 
         <Card className="p-4">
           <p className="inline-flex items-center gap-1.5 text-sm font-semibold text-navy-600"><Leaf className="h-4 w-4 vm-accent" /> Resultado estimado</p>
           <div className="flex items-end justify-between">
-            <p className="font-display text-3xl font-extrabold text-navy-900">{formatBRL(ind.resultadoMesBRL)}</p>
+            <p className="font-display text-3xl font-extrabold tabular-nums text-navy-900">{formatBRL(ind.resultadoMesBRL)}</p>
             <span className="chip bg-mint-100 text-mint-800">{ind.resultadoPctReceita}% da receita</span>
           </div>
         </Card>

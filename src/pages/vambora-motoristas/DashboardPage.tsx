@@ -85,7 +85,7 @@ export function DashboardPage() {
           <div className="flex items-start justify-between">
             <div>
               <p className="inline-flex items-center gap-1.5 text-sm font-semibold text-navy-600"><Users className="h-4 w-4 vm-accent" /> Ocupação da van</p>
-              <p className="mt-1 font-display text-4xl font-extrabold text-navy-900">{ind.ocupacaoPct}%</p>
+              <p className="mt-1 font-display text-4xl font-extrabold tabular-nums text-navy-900">{ind.ocupacaoPct}%</p>
               <p className="text-xs text-navy-500">{ind.capacidade - ind.vagas} de {ind.capacidade} lugares</p>
             </div>
             <VanEscolar className="w-28 shrink-0" />
@@ -100,13 +100,13 @@ export function DashboardPage() {
               <Card className="p-4">
                 <span className="vm-chip-ico vm-ico-rose"><Fuel className="h-5 w-5" /></span>
                 <p className="mt-2 text-xs text-navy-500">Diesel por dia</p>
-                <p className="font-display text-2xl font-extrabold text-navy-900">{ind.dieselDiaL.toFixed(1).replace('.', ',')} L</p>
+                <p className="font-display text-2xl font-extrabold tabular-nums text-navy-900">{ind.dieselDiaL.toFixed(1).replace('.', ',')} L</p>
                 <p className="text-[11px] text-navy-400">(= {kmDia} km)</p>
               </Card>
               <Card className="p-4">
                 <span className="vm-chip-ico vm-ico-amber"><Coins className="h-5 w-5" /></span>
                 <p className="mt-2 text-xs text-navy-500">Custo por dia</p>
-                <p className="font-display text-2xl font-extrabold text-navy-900">{formatBRL(ind.custoDiaBRL)}</p>
+                <p className="font-display text-2xl font-extrabold tabular-nums text-navy-900">{formatBRL(ind.custoDiaBRL)}</p>
                 <p className="text-[11px] text-navy-400">(estimado)</p>
               </Card>
             </div>

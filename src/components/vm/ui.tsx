@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
-import type { LucideIcon } from 'lucide-react';
+import { ChevronLeft, type LucideIcon } from 'lucide-react';
 
 /** Chip "demonstração" discreto (quando a tela usa o cenário de exemplo). */
 export function DemoChip({ className }: { className?: string }) {
@@ -19,7 +19,7 @@ export function StatTile({ icon: Icon, valor, rotulo, cor = 'green' }: {
   return (
     <div className="vm-card flex flex-col items-center gap-1 px-2 py-3 text-center">
       <span className={cn('vm-chip-ico', `vm-ico-${cor}`)}><Icon className="h-5 w-5" /></span>
-      <span className="font-display text-xl font-extrabold leading-none text-navy-900">{valor}</span>
+      <span className="font-display text-xl font-extrabold leading-none tabular-nums text-navy-900">{valor}</span>
       <span className="text-[11px] font-medium text-navy-500">{rotulo}</span>
     </div>
   );
@@ -48,7 +48,7 @@ export function LinhaValor({ icon: Icon, cor = 'green', label, valor }: {
     <div className="flex items-center gap-3 py-2.5">
       <span className={cn('vm-chip-ico', `vm-ico-${cor}`)}><Icon className="h-5 w-5" /></span>
       <span className="flex-1 text-sm text-navy-600">{label}</span>
-      <span className="font-display font-bold text-navy-900">{valor}</span>
+      <span className="font-display font-bold tabular-nums text-navy-900">{valor}</span>
     </div>
   );
 }
@@ -76,8 +76,8 @@ export function SubHeader({ titulo, onVoltar, acao }: { titulo: string; onVoltar
       <div className="vm-screen flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           {onVoltar && (
-            <button onClick={onVoltar} className="grid h-8 w-8 place-items-center rounded-full bg-white/15" aria-label="Voltar">
-              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.2"><path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            <button onClick={onVoltar} className="grid h-8 w-8 place-items-center rounded-full bg-white/15 transition active:scale-95" aria-label="Voltar">
+              <ChevronLeft className="h-5 w-5" strokeWidth={2.4} />
             </button>
           )}
           <h1 className="font-display text-lg font-bold">{titulo}</h1>
