@@ -35,18 +35,37 @@ export function ocupacaoPorTrecho(rota: Rota): { paradaId: string; ordem: number
   });
 }
 
+/** Estado determinístico da van após cada parada, inclusive nomes e vagas.
+ * A ordem dos assentos exibidos é uma representação, não uma atribuição física.
+ * Recalcular a partir das paradas/passageiros persistidos evita estados divergentes.
+ */
+export function estadoDaVanPorTrecho(rota: Rota, veiculo: Veiculo | null) {
+  const capacidade = capacidadeAlunos(rota, veiculo);
+  return [...rota.paradas].sort((a, b) => a.ordem - b.ordem).map((parada) => {
+    const passageiros = aBordoEm(rota, parada.ordem);
+    return {
+      paradaId: parada.id,
+      ordem: parada.ordem,
+      passageiros,
+      ocupados: passageiros.length,
+      livres: Math.max(0, capacidade - passageiros.length),
+      excedeuCapacidade: passageiros.length > capacidade,
+    };
+  });
+}
+
 /** Maior ocupação em qualquer trecho (pico). */
 export function picoOcupacao(rota: Rota): number {
   return ocupacaoPorTrecho(rota).reduce((m, t) => Math.max(m, t.ocupacao), 0);
 }
 
-/** Passageiros a bordo em uma parada específica (ainda não desembarcaram até ali). */
+/** Passageiros a bordo no trecho APÓS a parada indicada. Desembarques nessa parada já saíram. */
 export function aBordoEm(rota: Rota, paradaOrdem: number): PassageiroRota[] {
   return rota.passageiros.filter((pax) => {
     const emb = ordemDe(rota, pax.embarqueParadaId);
     if (emb === null || emb > paradaOrdem) return false;
     const des = ordemDe(rota, pax.desembarqueParadaId);
-    return des === null || des >= paradaOrdem;
+    return des === null || des > paradaOrdem;
   });
 }
 
