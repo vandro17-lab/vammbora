@@ -4,6 +4,7 @@ import { Avatar } from '@/components/brand/Avatar';
 import { VMShell } from '@/components/vm/VMShell';
 import { StatTile, Card, Barra, DemoChip } from '@/components/vm/ui';
 import { VanEscolar } from '@/components/vm/VanEscolar';
+import { SlotIlustracao } from '@/components/vm/SlotImagem';
 import { useDadosMotorista } from '@/lib/vm/useDadosMotorista';
 import { useAuth } from '@/lib/auth';
 import { MOTORISTA_DEMO } from '@/data/motorista-demo';
@@ -64,7 +65,9 @@ export function DashboardPage() {
         {/* Primeiros passos (dados reais, ainda incompletos) */}
         {!dados.demo && (!dados.veiculo || ind.rotas === 0) && (
           <Card className="p-5 text-center">
-            <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-mint-50 text-mint-600"><Sparkles className="h-7 w-7" /></span>
+            <span className="mx-auto grid h-14 w-14 place-items-center overflow-hidden rounded-2xl bg-mint-50 text-mint-600">
+              <SlotIlustracao slot="dash.primeirosPassos" alt="" fallback={<Sparkles className="h-7 w-7" />} />
+            </span>
             <p className="mt-3 font-display text-lg font-bold text-navy-900">Vamos preparar o seu app</p>
             <p className="mx-auto mt-1 max-w-xs text-sm text-navy-500">
               {!dados.veiculo
@@ -88,7 +91,9 @@ export function DashboardPage() {
               <p className="mt-1 font-display text-4xl font-extrabold tabular-nums text-navy-900">{ind.ocupacaoPct}%</p>
               <p className="text-xs text-navy-500">{ind.capacidade - ind.vagas} de {ind.capacidade} lugares</p>
             </div>
-            <VanEscolar className="w-28 shrink-0" />
+            <div className="w-28 shrink-0">
+              <SlotIlustracao slot="dash.van" alt="Van escolar" fallback={<VanEscolar className="w-full" />} />
+            </div>
           </div>
           <Barra pct={ind.ocupacaoPct} className="mt-3" />
         </Card>

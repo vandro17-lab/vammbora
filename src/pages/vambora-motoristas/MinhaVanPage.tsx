@@ -4,6 +4,7 @@ import { Gauge, Fuel, Coins, Route as RouteIcon, FileText, Wrench, Pencil, Chevr
 import { VMShell } from '@/components/vm/VMShell';
 import { Card, SubHeader, LinhaValor, DemoChip, EstadoVazio } from '@/components/vm/ui';
 import { VanEscolar } from '@/components/vm/VanEscolar';
+import { SlotIlustracao } from '@/components/vm/SlotImagem';
 import { useDadosMotorista, lerPrefs, salvarPrefs } from '@/lib/vm/useDadosMotorista';
 import { salvarVeiculo } from '@/data/motorista-store';
 import { formatBRL, cn } from '@/lib/utils';
@@ -24,6 +25,7 @@ export function MinhaVanPage() {
         <div className="px-4 pt-4">
           <EstadoVazio
             icon={Bus}
+            ilustracao={<SlotIlustracao slot="van.vazio" alt="" fallback={<Bus className="h-8 w-8" />} />}
             titulo="Cadastre sua van"
             texto="Informe modelo, lugares, consumo e preço do diesel para calcularmos custos, rotas e oportunidades."
             acao={
@@ -44,7 +46,9 @@ export function MinhaVanPage() {
         {dados.demo && <div className="flex justify-end"><DemoChip /></div>}
         <Card className="p-4">
           <div className="flex items-center gap-3">
-            <VanEscolar className="w-28 shrink-0" />
+            <div className="w-28 shrink-0">
+              <SlotIlustracao slot="van.ilustracao" alt="Van escolar" fallback={<VanEscolar className="w-full" />} />
+            </div>
             <div className="flex-1">
               <p className="font-display text-lg font-extrabold text-navy-900">{v?.modelo ?? 'Mercedes-Benz Sprinter'}</p>
               <p className="text-sm text-navy-500">{v?.ano ?? 2018} · {v?.lugaresPassageiro ?? 15} lugares</p>
