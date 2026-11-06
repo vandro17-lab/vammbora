@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import {
   Check, Bus, Snowflake, ShieldCheck, Accessibility, CheckCircle2, ArrowRight, Loader2, Plus,
   Navigation, AlertCircle, Flag,
@@ -10,7 +10,7 @@ import { VanEscolar } from '@/components/vm/VanEscolar';
 import { SlotIlustracao } from '@/components/vm/SlotImagem';
 import { MapaInterativoRota } from '@/components/motorista/MapaInterativoRota';
 import { VanViz, LinhaPercurso, AcaoParada, Horarios, rotaNova } from '@/pages/motorista/RotaBuilderPage';
-import { listarVeiculos, salvarRota } from '@/data/motorista-store';
+import { listarVeiculos, salvarRota, obterRota } from '@/data/motorista-store';
 import { USE_SUPABASE } from '@/lib/supabase';
 import { VEICULO_CENARIO } from '@/lib/vm/cenario';
 import { useVitrine } from '@/data/VitrineProvider';
@@ -29,6 +29,8 @@ type Etapa = 'van' | 'paradas' | 'confirmacao';
    via componentes exportados do construtor — sem criar um segundo motor. */
 export function CriarRotaPage() {
   const navigate = useNavigate();
+  const { id } = useParams();
+  const editando = !!id && id !== 'nova';
   const { destinos } = useVitrine();
   const [veiculos, setVeiculos] = useState<Veiculo[] | null>(null);
   const [selId, setSelId] = useState<string | null>(null);
@@ -36,6 +38,8 @@ export function CriarRotaPage() {
   const [etapa, setEtapa] = useState<Etapa>('van');
   const [salvando, setSalvando] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
+  // Parada em foco: coordena a representação da van e o destaque no mapa (3.2/3.4).
+  const [paradaSel, setParadaSel] = useState<string | null>(null);
 
   useEffect(() => {
     let vivo = true;
@@ -44,12 +48,20 @@ export function CriarRotaPage() {
       // A van demonstrativa (id não-UUID) só entra no MODO DEMONSTRAÇÃO (sem banco).
       // Com banco conectado, usa só veículos reais — senão o save falha no UUID.
       const lista = reais.length > 0 ? reais : (!USE_SUPABASE ? [VEICULO_CENARIO] : []);
+      // Edição: reabre uma rota salva no MESMO fluxo guiado (3.9 — salvar, reabrir, editar).
+      const existente = editando ? await obterRota(id!).catch(() => null) : null;
       if (!vivo) return;
       setVeiculos(lista);
-      setSelId(lista[0]?.id ?? null);
+      if (existente) {
+        setRota(existente);
+        setSelId(existente.veiculoId ?? lista[0]?.id ?? null);
+        setEtapa('paradas'); // já tem van; abre direto nas paradas
+      } else {
+        setSelId(lista[0]?.id ?? null);
+      }
     })();
     return () => { vivo = false; };
-  }, []);
+  }, [id, editando]);
 
   const veiculo = useMemo(() => veiculos?.find((v) => v.id === rota.veiculoId) ?? null, [veiculos, rota.veiculoId]);
   const capacidade = capacidadeAlunos(rota, veiculo);
@@ -83,8 +95,8 @@ export function CriarRotaPage() {
     setSalvando(true); setAviso(null);
     try {
       const nome = rotaAtualizada.nome || `Rota ${rotaAtualizada.sentido === 'ida' ? 'de ida' : 'de volta'}`;
-      await salvarRota({ ...rotaAtualizada, nome, status: 'concluida' });
-      navigate('/app/rotas');
+      const salva = await salvarRota({ ...rotaAtualizada, nome, status: 'concluida' });
+      navigate(`/app/rotas/${salva.id}`);
     } catch (e) {
       setAviso('Não foi possível salvar: ' + (e as Error).message);
       setSalvando(false);
@@ -93,7 +105,7 @@ export function CriarRotaPage() {
 
   function voltar() {
     if (etapa === 'van') navigate('/app/rotas');
-    else if (etapa === 'paradas') setEtapa('van');
+    else if (etapa === 'paradas') { if (editando) navigate('/app/rotas'); else setEtapa('van'); }
     else setEtapa('paradas');
   }
 
@@ -102,7 +114,7 @@ export function CriarRotaPage() {
 
   return (
     <VMShell nav={false}>
-      <SubHeader titulo="Criar rota" onVoltar={voltar} />
+      <SubHeader titulo={editando ? 'Editar rota' : 'Criar rota'} onVoltar={voltar} />
       <div className="px-4 pb-10 pt-4">
         <Stepper atual={idxEtapa} />
 
@@ -120,15 +132,16 @@ export function CriarRotaPage() {
         ) : etapa === 'paradas' ? (
           <div className="space-y-3.5">
             <ConfigRota rota={rota} setRota={setRota} />
-            <VanViz capacidade={capacidade} aBordo={aBordoFinal.length} rota={rota} veiculo={veiculo} />
-            {rota.paradas.length > 0 && <LinhaPercurso rota={rota} setRota={setRota} />}
+            <VanViz capacidade={capacidade} rota={rota} veiculo={veiculo}
+              paradaSelecionadaId={paradaSel} onSelecionarParada={setParadaSel} />
+            {rota.paradas.length > 0 && <LinhaPercurso rota={rota} setRota={setRota} paradaSelecionadaId={paradaSel} onSelecionarParada={setParadaSel} />}
             {rota.paradas.length > 0 && (
               <Card className="p-3.5">
                 <p className="mb-2.5 inline-flex items-center gap-2 font-display font-bold text-navy-900">
                   <Navigation className="h-4 w-4 text-mint-600" /> Mapa da rota
                 </p>
                 <div className="h-60 overflow-hidden rounded-2xl ring-1 ring-navy-100">
-                  <MapaInterativoRota paradas={rota.paradas} onTempos={aplicarTempos} bare />
+                  <MapaInterativoRota paradas={rota.paradas} onTempos={aplicarTempos} bare destacarParadaId={paradaSel} />
                 </div>
               </Card>
             )}

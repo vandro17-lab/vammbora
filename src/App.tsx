@@ -71,6 +71,7 @@ export default function App() {
               <Route index element={<DashboardPage />} />
               <Route path="rotas" element={<RotasPage />} />
               <Route path="rotas/nova" element={<CriarRotaPage />} />
+              <Route path="rotas/:id/editar" element={<CriarRotaPage />} />
               <Route path="rotas/:id" element={<RotaDetalhePage />} />
               <Route path="oportunidades" element={<OportunidadesPage />} />
               <Route path="oportunidades/:id" element={<VMSimularPage />} />

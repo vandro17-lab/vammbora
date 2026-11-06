@@ -163,7 +163,7 @@ export function RotaDetalhePage() {
   return (
     <VMShell nav={false}>
       <SubHeader titulo="Detalhes da Rota" onVoltar={() => navigate('/app/rotas')}
-        acao={<button onClick={() => navigate(`/painel/rota/${rota.id}`)} className="grid h-8 w-8 place-items-center rounded-full bg-white/20" aria-label="Editar rota"><Path size={17} weight="bold" /></button>} />
+        acao={<button onClick={() => navigate(`/app/rotas/${rota.id}/editar`)} className="grid h-8 w-8 place-items-center rounded-full bg-white/20" aria-label="Editar rota"><Path size={17} weight="bold" /></button>} />
 
       <div className="space-y-3.5 px-4 pb-10 pt-4">
         {dados.demo && <div className="flex justify-end"><DemoChip /></div>}
