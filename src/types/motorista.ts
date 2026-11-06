@@ -25,6 +25,8 @@ export interface ParadaRota {
   lat?: number;
   lng?: number;
   confirmado: boolean;
+  /** Horário habitual de chegada informado pelo motorista, em minutos do dia. */
+  horarioChegadaMin?: number | null;
   /** Quando tipo === 'escola'. */
   destinoId?: string | null;
   destinoNome?: string | null;
