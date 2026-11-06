@@ -11,7 +11,7 @@ import { SlotIlustracao } from '@/components/vm/SlotImagem';
 import { MapaInterativoRota } from '@/components/motorista/MapaInterativoRota';
 import { VanViz, LinhaPercurso, AcaoParada, Horarios, rotaNova } from '@/pages/motorista/RotaBuilderPage';
 import { listarVeiculos, salvarRota } from '@/data/motorista-store';
-import { useDadosMotorista } from '@/lib/vm/useDadosMotorista';
+import { USE_SUPABASE } from '@/lib/supabase';
 import { VEICULO_CENARIO } from '@/lib/vm/cenario';
 import { useVitrine } from '@/data/VitrineProvider';
 import { capacidadeAlunos, aBordoEm, validarRota, podeFinalizar } from '@/lib/ocupacao-rota';
@@ -29,7 +29,6 @@ type Etapa = 'van' | 'paradas' | 'confirmacao';
    via componentes exportados do construtor — sem criar um segundo motor. */
 export function CriarRotaPage() {
   const navigate = useNavigate();
-  const { dados } = useDadosMotorista();
   const { destinos } = useVitrine();
   const [veiculos, setVeiculos] = useState<Veiculo[] | null>(null);
   const [selId, setSelId] = useState<string | null>(null);
@@ -42,13 +41,15 @@ export function CriarRotaPage() {
     let vivo = true;
     (async () => {
       const reais = await listarVeiculos().catch(() => [] as Veiculo[]);
-      const lista = reais.length > 0 ? reais : (dados.demo ? [VEICULO_CENARIO] : []);
+      // A van demonstrativa (id não-UUID) só entra no MODO DEMONSTRAÇÃO (sem banco).
+      // Com banco conectado, usa só veículos reais — senão o save falha no UUID.
+      const lista = reais.length > 0 ? reais : (!USE_SUPABASE ? [VEICULO_CENARIO] : []);
       if (!vivo) return;
       setVeiculos(lista);
       setSelId(lista[0]?.id ?? null);
     })();
     return () => { vivo = false; };
-  }, [dados.demo]);
+  }, []);
 
   const veiculo = useMemo(() => veiculos?.find((v) => v.id === rota.veiculoId) ?? null, [veiculos, rota.veiculoId]);
   const capacidade = capacidadeAlunos(rota, veiculo);
