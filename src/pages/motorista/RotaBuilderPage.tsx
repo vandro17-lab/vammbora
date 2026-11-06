@@ -548,7 +548,7 @@ function FormCasa({ rota, setRota, locais, proxOrdem, capacidade, aBordo, onFech
     const lotado = aBordo.length + 1 > capacidade;
     setRota({
       ...rota,
-      passageiros: [...rota.passageiros, { id: novoId(), identificacao: nome.trim(), embarqueParadaId: paradaId, desembarqueParadaId: null }],
+      passageiros: [...rota.passageiros, { id: novoId(), identificacao: nome.trim(), embarqueParadaId: paradaId, desembarqueParadaId: null, horarioHabitualMin: rota.paradas.find((p) => p.id === paradaId)?.horarioChegadaMin ?? null }],
     });
     setNome('');
     if (!outroAqui && !lotado) onFechar();
