@@ -161,7 +161,7 @@ function Builder() {
           )}
 
           {etapa === 'horarios' && (
-            <Horarios rota={rota} setRota={setRota} onConfirmar={() => salvar('concluida')} salvando={salvando} />
+            <Horarios rota={rota} setRota={setRota} onConfirmar={(atualizada) => salvar('concluida', atualizada)} salvando={salvando} />
           )}
 
           {/* Rodapé de ações */}
@@ -622,14 +622,15 @@ function FormEscola({ rota, setRota, destinos, proxOrdem, aBordo, onFechar }: {
 }
 
 /* ----------------------------- Horários ----------------------------- */
-export function Horarios({ rota, setRota, onConfirmar, salvando }: { rota: Rota; setRota: (r: Rota) => void; onConfirmar: () => void; salvando: boolean }) {
+export function Horarios({ rota, setRota, onConfirmar, salvando }: { rota: Rota; setRota: (r: Rota) => void; onConfirmar: (rotaAtualizada: Rota) => void; salvando: boolean }) {
   const [hora, setHora] = useState(rota.ultimoDesembarqueMin != null ? minutosParaTextoHora(rota.ultimoDesembarqueMin).replace('h', ':') : '');
   const [antecip, setAntecip] = useState(rota.limiteAntecipacaoMin != null ? String(rota.limiteAntecipacaoMin) : '');
 
   function confirmar() {
     const min = /^\d{1,2}:\d{2}$/.test(hora) ? horaParaMinutos(hora) : null;
-    setRota({ ...rota, ultimoDesembarqueMin: min, limiteAntecipacaoMin: antecip ? Number(antecip) : null });
-    onConfirmar();
+    const atualizada = { ...rota, ultimoDesembarqueMin: min, limiteAntecipacaoMin: antecip ? Number(antecip) : null };
+    setRota(atualizada);
+    onConfirmar(atualizada);
   }
   return (
     <div className="card mt-4 p-5">
