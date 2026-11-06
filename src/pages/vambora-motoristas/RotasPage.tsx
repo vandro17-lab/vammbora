@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Route as RouteIcon, Users, Navigation, Clock, Plus, ChevronRight, Pencil, MapPin, School } from 'lucide-react';
 import { VMShell } from '@/components/vm/VMShell';
-import { Card, SubHeader, DemoChip } from '@/components/vm/ui';
+import { Card, SubHeader, DemoChip, EstadoVazio } from '@/components/vm/ui';
 import { MapaInterativoRota } from '@/components/motorista/MapaInterativoRota';
 import { useDadosMotorista } from '@/lib/vm/useDadosMotorista';
 import { distanciaRotaKm } from '@/lib/vm/cenario';
@@ -33,6 +33,19 @@ export function RotasPage() {
 
         {aba === 'ativas' ? (
           <div className="mt-3 space-y-3">
+            {dados.rotas.length === 0 && !dados.demo ? (
+              <EstadoVazio
+                icon={RouteIcon}
+                titulo="Nenhuma rota ainda"
+                texto="Monte sua primeira rota no construtor para ver ocupação, horários e custos aqui."
+                acao={
+                  <Link to="/painel/rota/nova" className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-mint-500 font-semibold text-white shadow-float active:scale-[0.98]">
+                    <Plus className="h-5 w-5" /> Montar nova rota
+                  </Link>
+                }
+              />
+            ) : (
+              <>
             {dados.rotas.map((r) => {
               const km = distanciaRotaKm(r);
               return (
@@ -53,9 +66,11 @@ export function RotasPage() {
                 </Link>
               );
             })}
-            <Link to="/painel/rota/nova" className="flex h-12 w-full items-center justify-center gap-2 rounded-full border-2 border-dashed border-mint-300 font-semibold text-mint-700">
+            <Link to="/painel/rota/nova" className="flex h-12 w-full items-center justify-center gap-2 rounded-full border-2 border-dashed border-mint-300 font-semibold text-mint-700 active:scale-[0.98]">
               <Plus className="h-5 w-5" /> Montar nova rota
             </Link>
+              </>
+            )}
             <Card className="flex items-center gap-3 p-4">
               <span className="vm-chip-ico vm-ico-teal"><MapPin className="h-5 w-5" /></span>
               <div className="flex-1">

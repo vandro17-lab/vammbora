@@ -53,6 +53,22 @@ export function LinhaValor({ icon: Icon, cor = 'green', label, valor }: {
   );
 }
 
+/** Estado vazio (sem dados reais ainda): ícone, título, texto e ação opcional. */
+export function EstadoVazio({ icon: Icon, titulo, texto, acao }: {
+  icon: LucideIcon; titulo: string; texto: string; acao?: ReactNode;
+}) {
+  return (
+    <div className="vm-card flex flex-col items-center gap-2 px-6 py-10 text-center">
+      <span className="grid h-16 w-16 place-items-center rounded-2xl bg-mint-50 text-mint-600">
+        <Icon className="h-8 w-8" />
+      </span>
+      <p className="mt-1 font-display text-lg font-bold text-navy-900">{titulo}</p>
+      <p className="max-w-xs text-sm text-navy-500">{texto}</p>
+      {acao && <div className="mt-3 w-full">{acao}</div>}
+    </div>
+  );
+}
+
 /** Cabeçalho de sub-tela (voltar + título + ação). */
 export function SubHeader({ titulo, onVoltar, acao }: { titulo: string; onVoltar?: () => void; acao?: ReactNode }) {
   return (

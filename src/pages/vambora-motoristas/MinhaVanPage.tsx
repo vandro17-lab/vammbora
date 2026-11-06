@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Gauge, Fuel, Coins, Route as RouteIcon, FileText, Wrench, Pencil, ChevronRight, Check } from 'lucide-react';
+import { Gauge, Fuel, Coins, Route as RouteIcon, FileText, Wrench, Pencil, ChevronRight, Check, Bus, Plus } from 'lucide-react';
 import { VMShell } from '@/components/vm/VMShell';
-import { Card, SubHeader, LinhaValor, DemoChip } from '@/components/vm/ui';
+import { Card, SubHeader, LinhaValor, DemoChip, EstadoVazio } from '@/components/vm/ui';
 import { VanEscolar } from '@/components/vm/VanEscolar';
 import { useDadosMotorista, lerPrefs, salvarPrefs } from '@/lib/vm/useDadosMotorista';
 import { salvarVeiculo } from '@/data/motorista-store';
@@ -15,6 +15,27 @@ export function MinhaVanPage() {
   const { dados, indicadores: ind } = useDadosMotorista();
   const v = dados.veiculo;
   const prefs = lerPrefs();
+
+  // Dados reais, mas o motorista ainda não cadastrou a van.
+  if (!dados.demo && !v) {
+    return (
+      <VMShell>
+        <SubHeader titulo="Minha Van" />
+        <div className="px-4 pt-4">
+          <EstadoVazio
+            icon={Bus}
+            titulo="Cadastre sua van"
+            texto="Informe modelo, lugares, consumo e preço do diesel para calcularmos custos, rotas e oportunidades."
+            acao={
+              <button onClick={() => navigate('/app/van/cadastro')} className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-mint-500 font-semibold text-white shadow-float active:scale-[0.98]">
+                <Plus className="h-5 w-5" /> Cadastrar van
+              </button>
+            }
+          />
+        </div>
+      </VMShell>
+    );
+  }
 
   return (
     <VMShell>

@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Sparkles, MapPin, CheckCircle2, AlertTriangle, ChevronRight, Zap, Users } from 'lucide-react';
 import { Avatar } from '@/components/brand/Avatar';
 import { VMShell } from '@/components/vm/VMShell';
-import { Card, SubHeader, DemoChip } from '@/components/vm/ui';
+import { Card, SubHeader, DemoChip, EstadoVazio } from '@/components/vm/ui';
 import { useDadosMotorista } from '@/lib/vm/useDadosMotorista';
 import { OPORTUNIDADES_VM, simularEncaixe, DIAS_UTEIS_MES } from '@/lib/vm/encaixe';
 import { formatBRL, cn } from '@/lib/utils';
@@ -33,7 +33,7 @@ export function OportunidadesPage() {
     <VMShell>
       <SubHeader titulo="Oportunidades" />
       <div className="px-4 pt-4">
-        <div className="flex gap-2 text-sm font-semibold">
+        <div className="flex flex-wrap gap-2 text-sm font-semibold">
           <button onClick={() => setAba('compat')} className={cn('inline-flex items-center gap-1.5 rounded-full px-3 py-2', aba === 'compat' ? 'bg-mint-500 text-white' : 'bg-navy-100 text-navy-500')}><Zap className="h-4 w-4" /> Compatíveis ({compativeis.length})</button>
           <button onClick={() => setAba('regiao')} className={cn('inline-flex items-center gap-1.5 rounded-full px-3 py-2', aba === 'regiao' ? 'bg-mint-500 text-white' : 'bg-navy-100 text-navy-500')}><Sparkles className="h-4 w-4" /> Novas da região ({NOVAS_REGIAO.length})</button>
         </div>
@@ -41,6 +41,13 @@ export function OportunidadesPage() {
 
         {aba === 'compat' ? (
           <div className="mt-3 space-y-3">
+            {compativeis.length === 0 && (
+              <EstadoVazio
+                icon={Zap}
+                titulo="Nenhuma oportunidade compatível"
+                texto="Quando houver famílias que encaixam na sua rota sem atrasar os outros alunos, elas aparecem aqui. Veja também as novas da região."
+              />
+            )}
             {compativeis.map(({ op, r }) => (
               <Link key={op.id} to={`/app/oportunidades/${op.id}`} className="block">
                 <Card className="vm-press flex items-center gap-3 p-3.5">
@@ -54,7 +61,9 @@ export function OportunidadesPage() {
                 </Card>
               </Link>
             ))}
-            <p className="pt-1 text-center text-[11px] text-navy-400">Compatibilidade calculada pelo motor de encaixe, sobre a sua rota. Sem dados pessoais das famílias.</p>
+            {compativeis.length > 0 && (
+              <p className="pt-1 text-center text-[11px] text-navy-400">Compatibilidade calculada pelo motor de encaixe, sobre a sua rota. Sem dados pessoais das famílias.</p>
+            )}
           </div>
         ) : (
           <div className="mt-3 space-y-2.5">
