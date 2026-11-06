@@ -1,5 +1,12 @@
 import type { CriteriosBusca, ResultadoCompatibilidade, Motorista, ModalidadeTrajeto } from '@/types';
 import { minutosParaTextoHora } from '@/lib/utils';
+import { listarRotas, listarVeiculos } from '@/data/motorista-store';
+import {
+  buscarEmRotasReais,
+  rotaElegivelParaBusca,
+  type EntradaBuscaReal,
+  type ResultadoRotaReal,
+} from '@/lib/busca-rotas-reais';
 
 /**
  * Cliente da BUSCA REAL: chama a função server-side `/api/buscar-rotas` (que roda
@@ -54,6 +61,46 @@ export async function buscarRotasReais(
     }
   }
   return { estado: 'ok', resultados: todos };
+}
+
+/* ===================== Modo demonstração (localStorage) =====================
+ * Sem backend, as rotas reais vivem no navegador do próprio usuário. Aqui a
+ * família é anônima mas é o MESMO navegador, então podemos ler as rotas e rodar
+ * o MESMO núcleo (buscarEmRotasReais) — provando o fluxo ponta a ponta sem infra.
+ * O cartão é montado a partir da PRÓPRIA rota (nome + van), sem vitrine `drivers`. */
+export interface ResultadoRotaRealEnriquecido extends ResultadoRotaReal {
+  rotaNome: string;
+  vanLugares: number | null;
+}
+
+export async function buscarRotasReaisDemo(criterios: CriteriosBusca): Promise<ResultadoRotaRealEnriquecido[]> {
+  if (!Number.isFinite(criterios.origemLat) || !Number.isFinite(criterios.origemLng) || !criterios.destinoId) return [];
+  const [rotas, veiculos] = await Promise.all([listarRotas(), listarVeiculos()]);
+  const veicPorId = new Map(veiculos.map((v) => [v.id, v]));
+  const rotaPorId = new Map(rotas.map((r) => [r.id, r]));
+  const entradas: EntradaBuscaReal[] = rotas
+    .filter((r) => rotaElegivelParaBusca(r))
+    .map((r) => ({ rota: r, veiculo: r.veiculoId ? veicPorId.get(r.veiculoId) ?? null : null }));
+  if (entradas.length === 0) return [];
+
+  const sentidos: ('ida' | 'volta')[] = criterios.modalidade === 'ambos' ? ['ida', 'volta'] : [criterios.modalidade];
+  const out: ResultadoRotaRealEnriquecido[] = [];
+  for (const sentido of sentidos) {
+    const { resultados } = buscarEmRotasReais(entradas, {
+      origem: { lat: criterios.origemLat!, lng: criterios.origemLng! },
+      destinoId: criterios.destinoId,
+      sentido,
+      turno: criterios.turno,
+      contratacao: criterios.contratacao,
+    });
+    for (const r of resultados) {
+      if (r.status !== 'compativel' && r.status !== 'sob_confirmacao') continue; // nunca mostrar falso encaixe
+      const rota = rotaPorId.get(r.rotaId);
+      const van = rota?.veiculoId ? veicPorId.get(rota.veiculoId) : undefined;
+      out.push({ ...r, rotaNome: rota?.nome || 'Rota', vanLugares: van?.lugaresPassageiro ?? null });
+    }
+  }
+  return out;
 }
 
 function nivelDe(s: ResultadoPublicoAPI['status']): ResultadoCompatibilidade['nivel'] {

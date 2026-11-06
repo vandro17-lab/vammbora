@@ -4,7 +4,8 @@ import { AnimatePresence } from 'framer-motion';
 import { SlidersHorizontal, ArrowLeft, SearchX, WifiOff, RefreshCw } from 'lucide-react';
 import { paramsParaCriterios } from '@/lib/searchParams';
 import { buscarComMotor } from '@/lib/busca-encaixe';
-import { buscarRotasReais, mapearParaCartoes } from '@/lib/busca-rotas-reais-cliente';
+import { buscarRotasReais, mapearParaCartoes, buscarRotasReaisDemo, type ResultadoRotaRealEnriquecido } from '@/lib/busca-rotas-reais-cliente';
+import { CartaoRotaReal } from '@/components/results/CartaoRotaReal';
 import { useVitrine } from '@/data/VitrineProvider';
 import { CIDADE_PADRAO } from '@/data/cidades';
 import { ResultCard } from '@/components/results/ResultCard';
@@ -62,6 +63,19 @@ export function SearchResultsPage() {
 
   const usandoReal = !modoDemo && !!real?.operando;
   const base = usandoReal ? real!.cartoes : elegiveis;
+
+  // DEMO: as rotas reais do próprio usuário (localStorage) viram resultados reais,
+  // provando o fluxo ponta a ponta sem backend. Só com origem confirmada + destino.
+  const [demoReais, setDemoReais] = useState<ResultadoRotaRealEnriquecido[] | null>(null);
+  useEffect(() => {
+    if (!modoDemo) { setDemoReais(null); return; }
+    let vivo = true;
+    buscarRotasReaisDemo(criterios)
+      .then((rs) => { if (vivo) setDemoReais(rs); })
+      .catch(() => { if (vivo) setDemoReais([]); });
+    return () => { vivo = false; };
+  }, [criterios, modoDemo]);
+  const temReaisDemo = modoDemo && (demoReais?.length ?? 0) > 0;
 
   // A tela de busca roda por ~3,8s; só revelamos quando a animação terminou E os
   // dados já chegaram. Em caso de erro, saímos da animação assim que ela termina.
@@ -121,6 +135,8 @@ export function SearchResultsPage() {
           <div className="min-h-[40vh]" aria-hidden="true" />
         ) : status === 'erro' ? (
           <ErroConexao onTentar={recarregar} />
+        ) : temReaisDemo ? (
+          <SecaoRotasReais itens={demoReais!} />
         ) : base.length === 0 ? (
           <NenhumResultado>
             <WaitlistForm criterios={criterios} />
@@ -166,6 +182,27 @@ export function SearchResultsPage() {
         )}
       </div>
     </>
+  );
+}
+
+function SecaoRotasReais({ itens }: { itens: ResultadoRotaRealEnriquecido[] }) {
+  return (
+    <div className="mt-6">
+      <p className="text-sm text-navy-600">
+        {plural(itens.length, 'rota compatível', 'rotas compatíveis')} com o seu endereço — horários calculados pelo motor.
+      </p>
+      <div className="mt-4 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        {itens.map((r, i) => (
+          <Reveal as="div" key={r.rotaId + r.sentido} delay={Math.min(i * 0.08, 0.4)}>
+            <CartaoRotaReal r={r} />
+          </Reveal>
+        ))}
+      </div>
+      <p className="mt-6 text-center text-xs text-navy-400">
+        Horários são estimativas calculadas pelo motor de compatibilidade a partir da rota real — aproximados,
+        sujeitos à confirmação do motorista.
+      </p>
+    </div>
   );
 }
 
