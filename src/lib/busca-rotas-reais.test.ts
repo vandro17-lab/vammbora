@@ -66,14 +66,18 @@ const pedidoIda = (over: Partial<PedidoFamilia> = {}): PedidoFamilia => ({
 });
 
 describe('elegibilidade de rota', () => {
-  it('aceita rota concluída não-demo com casa e escola', () => {
-    expect(rotaElegivelParaBusca({ ...rotaIda() })).toBe(true);
+  it('aceita rota concluída, publicada, não-demo, com casa e escola', () => {
+    expect(rotaElegivelParaBusca({ ...rotaIda(), isPublished: true })).toBe(true);
+  });
+  it('rejeita concluída mas NÃO publicada', () => {
+    expect(rotaElegivelParaBusca({ ...rotaIda(), isPublished: false })).toBe(false);
+    expect(rotaElegivelParaBusca({ ...rotaIda() })).toBe(false); // ausente = não publicada
   });
   it('rejeita rascunho', () => {
-    expect(rotaElegivelParaBusca({ ...rotaIda(), status: 'rascunho' })).toBe(false);
+    expect(rotaElegivelParaBusca({ ...rotaIda(), isPublished: true, status: 'rascunho' })).toBe(false);
   });
   it('rejeita rota demo', () => {
-    expect(rotaElegivelParaBusca({ ...rotaIda(), isDemo: true })).toBe(false);
+    expect(rotaElegivelParaBusca({ ...rotaIda(), isPublished: true, isDemo: true })).toBe(false);
   });
 });
 

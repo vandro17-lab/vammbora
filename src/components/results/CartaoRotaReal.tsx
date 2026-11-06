@@ -1,13 +1,13 @@
 import { Clock, Home, School, Users, CheckCircle2, HelpCircle } from 'lucide-react';
 import { minutosParaTextoHora, cn } from '@/lib/utils';
-import type { ResultadoRotaRealEnriquecido } from '@/lib/busca-rotas-reais-cliente';
+import type { CartaoRotaRealDados } from '@/lib/busca-rotas-reais-cliente';
 
 /**
  * Cartão de resultado de uma ROTA REAL (sem depender da vitrine `drivers`).
  * Mostra o horário estimado conforme o sentido, calculado pelo motor — sempre
  * rotulado como ESTIMATIVA, nunca como confirmado.
  */
-export function CartaoRotaReal({ r }: { r: ResultadoRotaRealEnriquecido }) {
+export function CartaoRotaReal({ r }: { r: CartaoRotaRealDados }) {
   const hora = (m: number | null) => (m != null ? minutosParaTextoHora(m) : '—');
   const compat = r.status === 'compativel';
   const ida = r.sentido === 'ida';

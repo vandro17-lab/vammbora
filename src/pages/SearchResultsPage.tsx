@@ -4,7 +4,7 @@ import { AnimatePresence } from 'framer-motion';
 import { SlidersHorizontal, ArrowLeft, SearchX, WifiOff, RefreshCw } from 'lucide-react';
 import { paramsParaCriterios } from '@/lib/searchParams';
 import { buscarComMotor } from '@/lib/busca-encaixe';
-import { buscarRotasReais, mapearParaCartoes, buscarRotasReaisDemo, type ResultadoRotaRealEnriquecido } from '@/lib/busca-rotas-reais-cliente';
+import { buscarRotasReais, buscarRotasReaisDemo, type CartaoRotaRealDados } from '@/lib/busca-rotas-reais-cliente';
 import { CartaoRotaReal } from '@/components/results/CartaoRotaReal';
 import { useVitrine } from '@/data/VitrineProvider';
 import { CIDADE_PADRAO } from '@/data/cidades';
@@ -35,47 +35,27 @@ export function SearchResultsPage() {
   const [tempoAnimacao, setTempoAnimacao] = useState(true);
   const [soComVaga, setSoComVaga] = useState(false);
 
-  // BUSCA REAL (operacional): quando o Supabase está ativo, consulta rotas reais
-  // via função server-side. Se o endpoint não estiver configurado (503) ou falhar,
-  // mantém a busca atual (estimativa pela região) — sem quebrar o fluxo.
-  const motoristasPorSlug = useMemo(() => {
-    const m: Record<string, (typeof motoristas)[number]> = {};
-    for (const mot of motoristas) if (mot.slug) m[mot.slug] = mot;
-    return m;
-  }, [motoristas]);
-
-  const [real, setReal] = useState<{ operando: boolean; cartoes: typeof elegiveis } | null>(null);
+  // BUSCA REAL sobre rotas publicadas. DEMO: lê o localStorage do próprio
+  // navegador. PROD: função server-side (service role, sem PII). Ambos usam o
+  // MESMO núcleo. Sem origem/destino confirmados, não classifica compatibilidade.
+  const [reais, setReais] = useState<{ itens: CartaoRotaRealDados[]; operacional: boolean } | null>(null);
   useEffect(() => {
-    if (modoDemo) { setReal(null); return; }
     let vivo = true;
-    buscarRotasReais(criterios)
-      .then(({ estado, resultados }) => {
-        if (!vivo) return;
-        // Só "opera" com rotas reais quando o servidor respondeu (ok). Em
-        // 'nao_configurado'/'erro', deixa a busca atual assumir.
-        setReal(estado === 'ok'
-          ? { operando: true, cartoes: mapearParaCartoes(resultados, motoristasPorSlug) }
-          : { operando: false, cartoes: [] });
-      })
-      .catch(() => { if (vivo) setReal({ operando: false, cartoes: [] }); });
-    return () => { vivo = false; };
-  }, [criterios, modoDemo, motoristasPorSlug]);
-
-  const usandoReal = !modoDemo && !!real?.operando;
-  const base = usandoReal ? real!.cartoes : elegiveis;
-
-  // DEMO: as rotas reais do próprio usuário (localStorage) viram resultados reais,
-  // provando o fluxo ponta a ponta sem backend. Só com origem confirmada + destino.
-  const [demoReais, setDemoReais] = useState<ResultadoRotaRealEnriquecido[] | null>(null);
-  useEffect(() => {
-    if (!modoDemo) { setDemoReais(null); return; }
-    let vivo = true;
-    buscarRotasReaisDemo(criterios)
-      .then((rs) => { if (vivo) setDemoReais(rs); })
-      .catch(() => { if (vivo) setDemoReais([]); });
+    (async () => {
+      if (modoDemo) {
+        const itens = await buscarRotasReaisDemo(criterios).catch(() => [] as CartaoRotaRealDados[]);
+        // No demo, só "opera" quando há rotas reais do usuário; senão, vitrine de exemplo.
+        if (vivo) setReais({ itens, operacional: itens.length > 0 });
+      } else {
+        const r = await buscarRotasReais(criterios).catch(() => ({ estado: 'erro' as const, resultados: [] as CartaoRotaRealDados[] }));
+        // Em prod, o servidor é a fonte quando responde (ok); em 503/erro, mantém a busca atual.
+        if (vivo) setReais({ itens: r.resultados, operacional: r.estado === 'ok' });
+      }
+    })();
     return () => { vivo = false; };
   }, [criterios, modoDemo]);
-  const temReaisDemo = modoDemo && (demoReais?.length ?? 0) > 0;
+  const mostrarReais = !!reais?.operacional;
+  const base = elegiveis;
 
   // A tela de busca roda por ~3,8s; só revelamos quando a animação terminou E os
   // dados já chegaram. Em caso de erro, saímos da animação assim que ela termina.
@@ -135,8 +115,14 @@ export function SearchResultsPage() {
           <div className="min-h-[40vh]" aria-hidden="true" />
         ) : status === 'erro' ? (
           <ErroConexao onTentar={recarregar} />
-        ) : temReaisDemo ? (
-          <SecaoRotasReais itens={demoReais!} />
+        ) : mostrarReais ? (
+          reais!.itens.length > 0 ? (
+            <SecaoRotasReais itens={reais!.itens} />
+          ) : (
+            <NenhumResultado>
+              <WaitlistForm criterios={criterios} />
+            </NenhumResultado>
+          )
         ) : base.length === 0 ? (
           <NenhumResultado>
             <WaitlistForm criterios={criterios} />
@@ -185,7 +171,7 @@ export function SearchResultsPage() {
   );
 }
 
-function SecaoRotasReais({ itens }: { itens: ResultadoRotaRealEnriquecido[] }) {
+function SecaoRotasReais({ itens }: { itens: CartaoRotaRealDados[] }) {
   return (
     <div className="mt-6">
       <p className="text-sm text-navy-600">

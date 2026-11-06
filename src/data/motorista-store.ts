@@ -104,7 +104,7 @@ export async function listarRotas(): Promise<Rota[]> {
     const { data, error } = await supabase
       .from('routes')
       .select(
-        'id,name,direction,turno,days,vehicle_id,monitor,monitor_ocupa_lugar,reserved_seats,last_dropoff_min,early_leave_limit_min,status,updated_at,' +
+        'id,name,direction,turno,days,vehicle_id,monitor,monitor_ocupa_lugar,reserved_seats,last_dropoff_min,early_leave_limit_min,status,is_published,updated_at,' +
           'route_stops(id,ordem,type,label,lat,lng,confirmed,destination_id,leg_time_min,habitual_arrival_min),' +
           'route_passengers(id,identificacao,board_stop_id,alight_stop_id,destination_id,' +
           'horario_habitual_min,ajuste_antes_min,ajuste_depois_min,atendimento_min,atendimento_origem)',
@@ -153,6 +153,21 @@ export async function excluirRota(id: string): Promise<void> {
   lsSet(K_ROTAS, lista);
 }
 
+/**
+ * Publica/despublica uma rota na busca pública (ação explícita do motorista).
+ * Atualização direta (RLS: o dono pode alterar sua própria rota) — NÃO passa
+ * pelo RPC de salvamento, para não depender dele. No modo demo, grava local.
+ */
+export async function publicarRota(id: string, publicar: boolean): Promise<void> {
+  if (USE_SUPABASE && supabase) {
+    const { error } = await supabase.from('routes').update({ is_published: publicar }).eq('id', id);
+    if (error) throw new Error(error.message);
+    return;
+  }
+  const lista = lsGet<Rota[]>(K_ROTAS, []).map((r) => (r.id === id ? { ...r, isPublished: publicar } : r));
+  lsSet(K_ROTAS, lista);
+}
+
 /* ------------------------- mapeadores Supabase --------------------------- */
 interface LinhaStop {
   id: string; ordem: number; type: string; label: string | null;
@@ -169,6 +184,7 @@ interface LinhaRota {
   id: string; name: string | null; direction: string; turno: string | null; days: string[] | null;
   vehicle_id: string | null; monitor: boolean; monitor_ocupa_lugar: boolean; reserved_seats: number;
   last_dropoff_min: number | null; early_leave_limit_min: number | null; status: string; updated_at: string;
+  is_published?: boolean | null;
   route_stops: LinhaStop[]; route_passengers: LinhaPax[];
 }
 
@@ -187,6 +203,7 @@ export function mapRotaDoBanco(r: unknown): Rota {
     ultimoDesembarqueMin: x.last_dropoff_min,
     limiteAntecipacaoMin: x.early_leave_limit_min,
     status: (x.status as Rota['status']) ?? 'rascunho',
+    isPublished: !!x.is_published,
     atualizadoEm: x.updated_at,
     paradas: (x.route_stops ?? [])
       .map((s) => ({

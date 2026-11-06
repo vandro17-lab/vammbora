@@ -10,6 +10,7 @@ import { VMSectionHeader } from '@/components/vm/VMHeader';
 import { Card, SubHeader, DemoChip, EstadoVazio } from '@/components/vm/ui';
 import { MapaInterativoRota } from '@/components/motorista/MapaInterativoRota';
 import { useDadosMotorista } from '@/lib/vm/useDadosMotorista';
+import { publicarRota } from '@/data/motorista-store';
 import { distanciaRotaKm } from '@/lib/vm/cenario';
 import { minutosParaTextoHora, cn } from '@/lib/utils';
 import type { Rota } from '@/types/motorista';
@@ -139,10 +140,22 @@ function BotaoMontarRota({ to }: { to: string }) {
 export function RotaDetalhePage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { dados } = useDadosMotorista();
+  const { dados, recarregar } = useDadosMotorista();
   const rota = dados.rotas.find((r) => r.id === id) ?? dados.rotas[0];
   const [todas, setTodas] = useState(false);
   const [mapaGrande, setMapaGrande] = useState(false);
+  const [publicando, setPublicando] = useState(false);
+
+  async function alternarPublicacao() {
+    if (!rota) return;
+    setPublicando(true);
+    try {
+      await publicarRota(rota.id, !rota.isPublished);
+      recarregar();
+    } finally {
+      setPublicando(false);
+    }
+  }
 
   if (!rota) {
     return (
@@ -182,6 +195,25 @@ export function RotaDetalhePage() {
             <span className="inline-flex items-center gap-1.5"><Users className="h-4 w-4 text-navy-400" /> {rota.passageiros.length}</span>
             <span className="inline-flex items-center gap-1.5"><Navigation className="h-4 w-4 text-navy-400" /> {km.toFixed(1).replace('.', ',')} km</span>
             <span className="inline-flex items-center gap-1.5"><Clock className="h-4 w-4 text-navy-400" /> {tempoMin(km)} min</span>
+          </div>
+        </Card>
+
+        {/* Publicar na busca pública (ação explícita do motorista) */}
+        <Card className="p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="font-display font-bold text-navy-900">Busca pública</p>
+              <p className="mt-0.5 text-xs leading-snug text-navy-500">
+                {rota.isPublished
+                  ? 'As famílias podem encontrar esta rota e ver o horário estimado de passagem.'
+                  : 'Concluir não publica. Publique para as famílias encontrarem esta rota na busca.'}
+              </p>
+            </div>
+            <button onClick={alternarPublicacao} disabled={publicando} aria-pressed={!!rota.isPublished}
+              className={cn('shrink-0 rounded-full px-4 py-2 text-sm font-bold transition active:scale-95 disabled:opacity-60',
+                rota.isPublished ? 'bg-mint-500 text-white shadow-glow' : 'bg-navy-100 text-navy-700')}>
+              {publicando ? '…' : rota.isPublished ? 'Publicada ✓' : 'Publicar'}
+            </button>
           </div>
         </Card>
 

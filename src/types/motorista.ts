@@ -74,6 +74,9 @@ export interface Rota {
   ultimoDesembarqueMin: number | null;
   limiteAntecipacaoMin: number | null;
   status: StatusRota;
+  /** Publicada na busca pública pela família (ação explícita do motorista).
+   *  "concluída" NÃO implica "publicada". Ausente/false = não aparece na busca. */
+  isPublished?: boolean;
   paradas: ParadaRota[];
   passageiros: PassageiroRota[];
   atualizadoEm: string;

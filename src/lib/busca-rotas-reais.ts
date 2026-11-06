@@ -64,12 +64,14 @@ export interface ResultadoRotaReal {
   codigos: CodigoMotivo[];
 }
 
-/** Elegibilidade NO NÍVEL DA ROTA (o nível do motorista — anúncio ativo — é
- *  checado onde os anúncios são conhecidos). Rota real e concluída, não demo. */
-export function rotaElegivelParaBusca(rota: Pick<Rota, 'status' | 'paradas'> & { isDemo?: boolean }): boolean {
+/** Elegibilidade NO NÍVEL DA ROTA: real, concluída, PUBLICADA pelo motorista
+ *  (ação explícita — "concluída" não implica "publicada") e com casa + escola. */
+export function rotaElegivelParaBusca(
+  rota: Pick<Rota, 'status' | 'paradas' | 'isPublished'> & { isDemo?: boolean },
+): boolean {
   if (rota.isDemo) return false;
   if (rota.status !== 'concluida') return false;
-  // precisa de ao menos uma escola e uma casa no itinerário
+  if (!rota.isPublished) return false; // só aparece quando o motorista publica
   const temEscola = rota.paradas.some((p) => p.tipo === 'escola');
   const temCasa = rota.paradas.some((p) => p.tipo === 'casa');
   return temEscola && temCasa;

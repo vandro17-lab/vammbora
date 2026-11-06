@@ -33,9 +33,9 @@ const coordOk = (n: unknown): n is number => typeof n === 'number' && Number.isF
 interface LinhaStop { id: string; ordem: number; type: string; label: string | null; lat: number | null; lng: number | null; confirmed: boolean; destination_id: string | null; leg_time_min: number | null; habitual_arrival_min: number | null }
 interface LinhaPax { id: string; identificacao: string; board_stop_id: string | null; alight_stop_id: string | null; destination_id: string | null; horario_habitual_min: number | null }
 interface LinhaRota {
-  id: string; owner_id: string; vehicle_id: string | null; direction: string; turno: string | null;
+  id: string; name: string | null; owner_id: string; vehicle_id: string | null; direction: string; turno: string | null;
   monitor: boolean; monitor_ocupa_lugar: boolean; reserved_seats: number; last_dropoff_min: number | null;
-  status: string; is_demo: boolean; route_stops: LinhaStop[]; route_passengers: LinhaPax[];
+  status: string; is_demo: boolean; is_published: boolean; route_stops: LinhaStop[]; route_passengers: LinhaPax[];
 }
 
 function mapRota(r: LinhaRota): Rota {
@@ -51,10 +51,10 @@ function mapRota(r: LinhaRota): Rota {
     destinoId: p.destination_id, horarioHabitualMin: p.horario_habitual_min ?? null,
   }));
   return {
-    id: r.id, nome: '', sentido: (r.direction as Rota['sentido']) ?? 'ida', turno: (r.turno as Rota['turno']) ?? null,
+    id: r.id, nome: r.name ?? '', sentido: (r.direction as Rota['sentido']) ?? 'ida', turno: (r.turno as Rota['turno']) ?? null,
     dias: [], veiculoId: r.vehicle_id, monitor: r.monitor, monitorOcupaLugar: r.monitor_ocupa_lugar,
     lugaresReservados: r.reserved_seats, ultimoDesembarqueMin: r.last_dropoff_min, limiteAntecipacaoMin: null,
-    status: (r.status as Rota['status']) ?? 'rascunho', paradas, passageiros, atualizadoEm: '',
+    status: (r.status as Rota['status']) ?? 'rascunho', isPublished: r.is_published, paradas, passageiros, atualizadoEm: '',
   };
 }
 
@@ -97,34 +97,23 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
   try {
     const db = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
 
-    // Motoristas com anúncio ATIVO (elegibilidade de produto A).
-    const { data: drivers, error: errD } = await db
-      .from('drivers')
-      .select('owner_id, slug')
-      .eq('is_published', true)
-      .eq('anuncio_ativo', true)
-      .eq('is_suspended', false)
-      .eq('is_demo', false);
-    if (errD) return reply(res, 500, { erro: 'Falha ao consultar anúncios.' });
-    const slugPorOwner = new Map<string, string>();
-    for (const d of drivers ?? []) if (d.owner_id && d.slug) slugPorOwner.set(d.owner_id as string, d.slug as string);
-    if (slugPorOwner.size === 0) return reply(res, 200, { resultados: [], totalRotasAvaliadas: 0 });
-
-    // Rotas elegíveis do sentido pedido.
+    // Rotas ELEGÍVEIS: concluídas, PUBLICADAS pelo motorista, não-demo, do sentido pedido.
     const { data: rotas, error: errR } = await db
       .from('routes')
       .select(
-        'id,owner_id,vehicle_id,direction,turno,monitor,monitor_ocupa_lugar,reserved_seats,last_dropoff_min,status,is_demo,' +
+        'id,name,owner_id,vehicle_id,direction,turno,monitor,monitor_ocupa_lugar,reserved_seats,last_dropoff_min,status,is_demo,is_published,' +
           'route_stops(id,ordem,type,label,lat,lng,confirmed,destination_id,leg_time_min,habitual_arrival_min),' +
           'route_passengers(id,identificacao,board_stop_id,alight_stop_id,destination_id,horario_habitual_min)',
       )
       .eq('status', 'concluida')
       .eq('is_demo', false)
-      .eq('direction', pedido.sentido)
-      .in('owner_id', [...slugPorOwner.keys()]);
+      .eq('is_published', true)
+      .eq('direction', pedido.sentido);
     if (errR) return reply(res, 500, { erro: 'Falha ao consultar rotas.' });
 
     const linhas = (rotas ?? []) as unknown as LinhaRota[];
+    if (linhas.length === 0) return reply(res, 200, { resultados: [], totalRotasAvaliadas: 0 });
+
     const vehicleIds = [...new Set(linhas.map((r) => r.vehicle_id).filter((v): v is string => !!v))];
     const vmap = new Map<string, LinhaVeiculo>();
     if (vehicleIds.length) {
@@ -132,6 +121,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       for (const v of veics ?? []) vmap.set(v.id as string, v as LinhaVeiculo);
     }
 
+    const rotaPorId = new Map(linhas.map((r) => [r.id, r]));
     const entradas: EntradaBuscaReal[] = linhas.map((r) => ({
       rota: mapRota(r),
       veiculo: mapVeiculo(r.vehicle_id ? vmap.get(r.vehicle_id) : undefined),
@@ -139,19 +129,23 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
 
     const { resultados, totalRotasAvaliadas } = buscarEmRotasReais(entradas, pedido);
 
-    // Anexa o slug público do motorista (para a vitrine) — SEM nenhum dado de aluno.
-    const ownerPorRota = new Map(linhas.map((r) => [r.id, r.owner_id]));
-    const publico = resultados.map((res0) => ({
-      rotaId: res0.rotaId,
-      driverSlug: slugPorOwner.get(ownerPorRota.get(res0.rotaId) ?? '') ?? null,
-      sentido: res0.sentido,
-      status: res0.status,
-      passagemCasaMin: res0.passagemCasaMin,
-      horarioEscolaMin: res0.horarioEscolaMin,
-      minutosABordo: res0.minutosABordo,
-      fonteHorario: res0.fonteHorario,
-      motivo: res0.motivo,
-    }));
+    // Resposta SEM PII: dados da PRÓPRIA rota (nome + van), nenhum dado de aluno.
+    const publico = resultados.map((res0) => {
+      const linha = rotaPorId.get(res0.rotaId);
+      const van = linha?.vehicle_id ? vmap.get(linha.vehicle_id) : undefined;
+      return {
+        rotaId: res0.rotaId,
+        rotaNome: linha?.name ?? 'Rota',
+        vanLugares: van?.seats_passenger ?? null,
+        sentido: res0.sentido,
+        status: res0.status,
+        passagemCasaMin: res0.passagemCasaMin,
+        horarioEscolaMin: res0.horarioEscolaMin,
+        minutosABordo: res0.minutosABordo,
+        fonteHorario: res0.fonteHorario,
+        motivo: res0.motivo,
+      };
+    });
 
     return reply(res, 200, { resultados: publico, totalRotasAvaliadas });
   } catch (e) {

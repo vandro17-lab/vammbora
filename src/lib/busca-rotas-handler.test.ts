@@ -41,8 +41,8 @@ const C = { familia: { lat: -21.2010, lng: -50.4388 }, casaA: { lat: -21.1995, l
 
 function rotaRealCanon() {
   return {
-    id: 'rota-1', owner_id: 'owner-1', vehicle_id: 'veic-1', direction: 'ida', turno: 'manha',
-    monitor: false, monitor_ocupa_lugar: false, reserved_seats: 0, last_dropoff_min: 7 * 60, status: 'concluida', is_demo: false,
+    id: 'rota-1', name: 'Rota do Teste', owner_id: 'owner-1', vehicle_id: 'veic-1', direction: 'ida', turno: 'manha',
+    monitor: false, monitor_ocupa_lugar: false, reserved_seats: 0, last_dropoff_min: 7 * 60, status: 'concluida', is_demo: false, is_published: true,
     route_stops: [
       { id: 's', ordem: 0, type: 'saida', label: 'Garagem', lat: C.garagem.lat, lng: C.garagem.lng, confirmed: true, destination_id: null, leg_time_min: null, habitual_arrival_min: null },
       { id: 'a', ordem: 1, type: 'casa', label: 'Rua Secreta A, 123', lat: C.casaA.lat, lng: C.casaA.lng, confirmed: true, destination_id: null, leg_time_min: null, habitual_arrival_min: null },
@@ -71,9 +71,8 @@ describe('api/buscar-rotas (handler, mock Supabase)', () => {
     expect(res.statusCode).toBe(503);
   });
 
-  it('motorista com anúncio ativo + rota concluída => compatível, SEM PII', async () => {
+  it('rota publicada e concluída => compatível, com nome/van e SEM PII', async () => {
     estado.canned = {
-      drivers: [{ owner_id: 'owner-1', slug: 'van-do-ze' }],
       routes: [rotaRealCanon()],
       vehicles: [{ id: 'veic-1', seats_passenger: 6 }],
     };
@@ -83,15 +82,17 @@ describe('api/buscar-rotas (handler, mock Supabase)', () => {
     const out = JSON.parse(res.body);
     expect(out.totalRotasAvaliadas).toBe(1);
     expect(out.resultados).toHaveLength(1);
-    expect(out.resultados[0].driverSlug).toBe('van-do-ze');
+    expect(out.resultados[0].rotaNome).toBe('Rota do Teste');
+    expect(out.resultados[0].vanLugares).toBe(6);
     expect(out.resultados[0].status).toBe('compativel');
+    // SEM PII: nenhum nome de aluno nem endereço de casa na resposta.
     expect(res.body).not.toContain('Segredo');
     expect(res.body).not.toContain('Secreta');
     expect(res.body).not.toContain('identificacao');
   });
 
-  it('sem motorista com anúncio ativo => vazio (não vaza rota)', async () => {
-    estado.canned = { drivers: [], routes: [rotaRealCanon()], vehicles: [{ id: 'veic-1', seats_passenger: 6 }] };
+  it('sem rotas publicadas => vazio (não vaza rota)', async () => {
+    estado.canned = { routes: [], vehicles: [] };
     const res = fakeRes();
     await handler(fakeReq(pedido), res as never);
     expect(res.statusCode).toBe(200);
