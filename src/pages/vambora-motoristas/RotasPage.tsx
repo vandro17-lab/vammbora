@@ -32,6 +32,8 @@ export function RotasPage() {
         titulo="Minhas rotas"
         subtitulo="Gerencie, crie e simule suas rotas escolares."
         voltarPara={null}
+        tituloKey="rotas.header.titulo"
+        subtituloKey="rotas.header.subtitulo"
       />
 
       <div className="px-4 pt-4">

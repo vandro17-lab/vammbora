@@ -4,6 +4,8 @@ import { CaretLeft, Bell, Check } from '@phosphor-icons/react';
 import type { Icon as PhosphorIcon } from '@phosphor-icons/react';
 import { VanEscolar } from '@/components/vm/VanEscolar';
 import { SlotIlustracao } from '@/components/vm/SlotImagem';
+import { TextoEditavel } from '@/components/vm/TextoEditavel';
+import type { TextoDef } from '@/data/ui-config';
 
 /**
  * Cabeçalho premium de seção do app Vambora Motoristas (fiel à referência):
@@ -12,11 +14,17 @@ import { SlotIlustracao } from '@/components/vm/SlotImagem';
  * e o título com ícone + subtítulo. Reutilizável pelas telas de aba.
  */
 export function VMSectionHeader({
-  icon: Icon, titulo, subtitulo, acao, voltarPara = '/app',
+  icon: Icon, titulo, subtitulo, acao, voltarPara = '/app', tituloKey, subtituloKey,
 }: {
   icon: PhosphorIcon; titulo: string; subtitulo: string; acao?: ReactNode; voltarPara?: string | null;
+  /** Chaves estáveis p/ tornar título/subtítulo editáveis no modo admin (opcional). */
+  tituloKey?: string; subtituloKey?: string;
 }) {
   const navigate = useNavigate();
+  const defTitulo: TextoDef | null = tituloKey
+    ? { key: tituloKey, padrao: titulo, conteudoEditavel: true, base: { tamanhoPx: 27, peso: 800, cor: '#ffffff', alinhamento: 'left' } } : null;
+  const defSub: TextoDef | null = subtituloKey
+    ? { key: subtituloKey, padrao: subtitulo, conteudoEditavel: true, base: { tamanhoPx: 13, peso: 500, cor: '#eafff5', alinhamento: 'left' } } : null;
   return (
     <header className="vm-grad relative isolate overflow-hidden px-5 pb-11 pt-[calc(env(safe-area-inset-top)+0.7rem)] text-white">
       {/* Van escolar (identidade), grande, ao fundo-direita. Slot editável (fallback: vetor). */}
@@ -55,9 +63,13 @@ export function VMSectionHeader({
         <div className="mt-4 max-w-[64%]">
           <div className="flex items-center gap-2">
             <Icon size={30} weight="duotone" className="text-mint-200" />
-            <h1 className="font-display text-[27px] font-extrabold leading-none tracking-tight">{titulo}</h1>
+            {defTitulo
+              ? <TextoEditavel def={defTitulo} as="h1" className="font-display text-[27px] font-extrabold leading-none tracking-tight" />
+              : <h1 className="font-display text-[27px] font-extrabold leading-none tracking-tight">{titulo}</h1>}
           </div>
-          <p className="mt-2 text-[13px] font-medium leading-snug text-mint-50/90">{subtitulo}</p>
+          {defSub
+            ? <TextoEditavel def={defSub} as="p" className="mt-2 block text-[13px] font-medium leading-snug text-mint-50/90" />
+            : <p className="mt-2 text-[13px] font-medium leading-snug text-mint-50/90">{subtitulo}</p>}
         </div>
       </div>
 

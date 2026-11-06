@@ -10,6 +10,7 @@ import { MaisPage, ModuloPage } from '@/pages/vambora-motoristas/MaisPage';
 import { CriarRotaPage } from '@/pages/vambora-motoristas/CriarRotaPage';
 import { AparenciaPage } from '@/pages/vambora-motoristas/admin/AparenciaPage';
 import { AppAssetsProvider } from '@/lib/vm/useAppAssets';
+import { UiConfigProvider } from '@/lib/vm/useUiConfig';
 import { EdicaoAparenciaProvider } from '@/lib/vm/useEdicaoAparencia';
 import { Layout } from '@/components/layout/Layout';
 import { ScrollManager } from '@/components/ScrollManager';
@@ -40,6 +41,7 @@ export default function App() {
       <ScrollManager />
       <AuthProvider>
         <AppAssetsProvider>
+        <UiConfigProvider>
         <EdicaoAparenciaProvider>
         <VitrineProvider>
           <StartupExperience>
@@ -88,6 +90,7 @@ export default function App() {
           </StartupExperience>
         </VitrineProvider>
         </EdicaoAparenciaProvider>
+        </UiConfigProvider>
         </AppAssetsProvider>
       </AuthProvider>
     </BrowserRouter>

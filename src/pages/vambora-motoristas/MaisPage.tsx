@@ -60,6 +60,8 @@ export function MaisPage() {
         icon={SquaresFour}
         titulo="Mais"
         subtitulo="Recursos e serviços para o seu dia a dia como motorista escolar."
+        tituloKey="mais.header.titulo"
+        subtituloKey="mais.header.subtitulo"
       />
 
       <div className="space-y-3 px-4 pt-4">
