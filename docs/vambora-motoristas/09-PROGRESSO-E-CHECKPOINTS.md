@@ -60,6 +60,12 @@ Atualizar ao fim de cada fase. Fonte de verdade da continuidade (não depender d
 2. Enviar as **imagens de referência** (pré-requisito da Fase 3).
 3. Aprovar o início da **Fase 3** (design system) — ou pedir a reconciliação do banco (migração 0010 + correção da RPC) antes das fases de rota (7/8).
 
+## Fase 3 (implementação visual) — EM ANDAMENTO
+- **Branch:** `feat/vambora-motoristas-10-telas` (base = audit branch, que tem main `01b8dd9` + doc 10). Commit `f332707`.
+- **Feito (blocos A–E):** app "Vambora Motoristas" em `/app` com as 10 telas navegáveis e responsáveis; indicadores calculados por funções reais (`src/lib/vm/*`), cenário demo como fallback; `/painel`, login, motores e marketplace preservados; entrada e pós-login → `/app`. tsc 0, build ok, 225 testes + 8 todo.
+- **Falta (bloco F — acabamento):** revisão fina de responsividade/fidelidade, ajustes de cores/espacamento vs imagem, estados vazios quando há dados reais, e revisar o 5º item da nav (imagem alterna "Van"/"Mais"). Nenhuma mudança de banco/motor pendente aqui.
+- **Pendências de dado (não bloqueiam o visual):** GAP-1/1b (van/perfil ↔ marketplace), migração 0010 + correção da RPC (Fases 5/7). Ver doc `10`.
+
 ## Log de checkpoints
 - 2026-11-05 — Fase 0 concluída. Documentação criada em `docs/vambora-motoristas/` na branch `docs/plano-vambora-motoristas` (base `011fb14`). Sem alteração de código funcional, banco ou motores.
 - 2026-11-06 — Fase 1 concluída na branch `fase1/protecao-testes-vambora-motoristas` (base `main` `3965b73`, já com PR #14 mergeado). Adicionados 10 testes de regressão + 8 it.todo de lacunas. Suíte: 219 passam + 8 todo; tsc 0; build ok. PR #15 (draft, revisão). Nada funcional/banco/motor alterado.
