@@ -75,7 +75,7 @@ export function DashboardPage() {
                 : 'Monte a sua primeira rota para ver alunos, vagas e horários aqui.'}
             </p>
             <Link
-              to={!dados.veiculo ? '/app/van/cadastro' : '/painel/rota/nova'}
+              to={!dados.veiculo ? '/app/van/cadastro' : '/app/rotas/nova'}
               className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-full bg-mint-500 font-semibold text-white shadow-float active:scale-[0.98]"
             >
               {!dados.veiculo ? 'Cadastrar van' : 'Montar primeira rota'} <ChevronRight className="h-5 w-5" />

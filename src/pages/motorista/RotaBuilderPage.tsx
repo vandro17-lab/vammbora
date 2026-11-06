@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   Loader2, MapPin, Home, School, Plus, Check, X, ArrowUp, ArrowDown, Trash2, Users, Flag, CheckCircle2, AlertCircle,
 } from 'lucide-react';
@@ -39,6 +39,7 @@ export function RotaBuilderPage() {
 function Builder() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { destinos } = useVitrine();
   const [veiculos, setVeiculos] = useState<Veiculo[]>([]);
   const [rota, setRota] = useState<Rota>(rotaNova());
@@ -50,15 +51,18 @@ function Builder() {
   useEffect(() => {
     let vivo = true;
     (async () => {
+      // Van recebida do fluxo guiado VM (handoff), reaproveitada sem persistir aqui.
+      const vanRecebida = (location.state as { veiculo?: Veiculo } | null)?.veiculo ?? null;
       const vs = await listarVeiculos().catch(() => [] as Veiculo[]);
+      const lista = vanRecebida && !vs.some((v) => v.id === vanRecebida.id) ? [vanRecebida, ...vs] : vs;
       let r = rotaNova();
       if (id && id !== 'nova') {
         const existente = await obterRota(id).catch(() => null);
         if (existente) r = existente;
       }
-      if (!r.veiculoId && vs.length === 1) r.veiculoId = vs[0].id;
+      if (!r.veiculoId) r.veiculoId = vanRecebida?.id ?? (lista.length === 1 ? lista[0].id : null);
       if (vivo) {
-        setVeiculos(vs);
+        setVeiculos(lista);
         setRota(r);
         setEtapa(r.paradas.length > 0 ? 'construindo' : 'preparacao');
         setCarregando(false);

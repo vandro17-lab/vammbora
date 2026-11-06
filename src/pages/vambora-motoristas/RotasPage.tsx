@@ -55,7 +55,7 @@ export function RotasPage() {
                 icon={RouteIcon}
                 titulo="Nenhuma rota ainda"
                 texto="Monte sua primeira rota no construtor para ver ocupação, horários e custos aqui."
-                acao={<BotaoMontarRota />}
+                acao={<BotaoMontarRota to="/app/rotas/nova" />}
               />
             ) : (
               <>
@@ -85,7 +85,7 @@ export function RotasPage() {
                   );
                 })}
 
-                <BotaoMontarRota />
+                <BotaoMontarRota to="/app/rotas/nova" />
               </>
             )}
 
@@ -123,9 +123,9 @@ export function RotasPage() {
 }
 
 /** Botão principal "Montar nova rota" (pílula verde com + em círculo). */
-function BotaoMontarRota() {
+function BotaoMontarRota({ to }: { to: string }) {
   return (
-    <Link to="/painel/rota/nova"
+    <Link to={to}
       className="flex h-14 w-full items-center justify-center gap-2.5 rounded-full bg-mint-500 font-display text-base font-bold text-white shadow-float transition active:scale-[0.98]">
       <span className="grid h-7 w-7 place-items-center rounded-full bg-white/25"><Plus className="h-4 w-4" strokeWidth={2.6} /></span>
       Montar nova rota
