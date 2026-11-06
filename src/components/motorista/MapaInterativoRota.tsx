@@ -14,9 +14,11 @@ type LeafletNS = typeof import('leaflet');
  * e desenha o TRAJETO pelas ruas (OSRM público). Quando todas as paradas estão
  * localizadas, devolve os minutos de cada trecho via `onTempos`.
  */
-export function MapaInterativoRota({ paradas, onTempos }: {
+export function MapaInterativoRota({ paradas, onTempos, bare = false }: {
   paradas: ParadaRota[];
   onTempos?: (temposMin: number[]) => void;
+  /** Quando true, renderiza SÓ o mapa (sem card/título/notas), para encaixar em um container próprio. */
+  bare?: boolean;
 }) {
   const elRef = useRef<HTMLDivElement | null>(null);
   const LRef = useRef<LeafletNS | null>(null);
@@ -99,6 +101,11 @@ export function MapaInterativoRota({ paradas, onTempos }: {
     if (prontoRef.current) void desenhar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [assinatura]);
+
+  // Modo "bare": só o mapa (o container pai define moldura, cantos e altura).
+  if (bare) {
+    return <div ref={elRef} className="h-full w-full bg-navy-50" aria-label="Mapa da rota" />;
+  }
 
   return (
     <section className="card mt-4 p-5" aria-label="Mapa da rota">
