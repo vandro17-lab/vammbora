@@ -7,6 +7,8 @@ import { OportunidadesPage, SimularEncaixePage as VMSimularPage } from '@/pages/
 import { InteligenciaPage } from '@/pages/vambora-motoristas/InteligenciaPage';
 import { MinhaVanPage, CadastroVanPage } from '@/pages/vambora-motoristas/MinhaVanPage';
 import { MaisPage, ModuloPage } from '@/pages/vambora-motoristas/MaisPage';
+import { AparenciaPage } from '@/pages/vambora-motoristas/admin/AparenciaPage';
+import { AppAssetsProvider } from '@/lib/vm/useAppAssets';
 import { Layout } from '@/components/layout/Layout';
 import { ScrollManager } from '@/components/ScrollManager';
 import { PageTransition } from '@/components/motion/PageTransition';
@@ -35,6 +37,7 @@ export default function App() {
     <BrowserRouter>
       <ScrollManager />
       <AuthProvider>
+        <AppAssetsProvider>
         <VitrineProvider>
           <StartupExperience>
           <Routes>
@@ -70,6 +73,7 @@ export default function App() {
               <Route path="van/cadastro" element={<CadastroVanPage />} />
               <Route path="mais" element={<MaisPage />} />
               <Route path="mais/:modulo" element={<ModuloPage />} />
+              <Route path="admin/aparencia" element={<AparenciaPage />} />
             </Route>
             {/* Vambora Pro — PRÉVIA demonstrativa anterior (preservada como referência) */}
             <Route path="/pro" element={<VamboraProPage />} />
@@ -79,6 +83,7 @@ export default function App() {
           </Routes>
           </StartupExperience>
         </VitrineProvider>
+        </AppAssetsProvider>
       </AuthProvider>
     </BrowserRouter>
   );
