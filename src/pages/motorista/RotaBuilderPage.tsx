@@ -425,35 +425,34 @@ function FormEndereco({ titulo, dica, botao, locais, onConfirmar, onCancelar }: 
   onCancelar: (() => void) | null;
 }) {
   const [texto, setTexto] = useState('');
-  const [numero, setNumero] = useState('');
   const [coord, setCoord] = useState<{ lat: number; lng: number } | null>(null);
   const [precisao, setPrecisao] = useState<Precisao | undefined>(undefined);
   const [buscandoExato, setBuscandoExato] = useState(false);
   const [enderecoNoMapa, setEnderecoNoMapa] = useState<string | null>(null);
 
   function montarRotulo(): string {
-    const base = texto.trim();
-    const n = numero.trim();
-    if (!n) return base;
-    return new RegExp(`\\b${n}\\b`).test(base) ? base : `${base}, nº ${n}`;
+    return texto.trim();
   }
 
-  // Geocodificação PRECISA (estruturada) sempre que há rua + número: move o
-  // alfinete para o número informado, não para o meio da rua.
+  // A busca atual aceita rua e número no mesmo campo. Preserva a geocodificação
+  // estruturada do proxy, que extrai o número do texto automaticamente.
   useEffect(() => {
-    const rua = texto.trim();
-    if (rua.length < 3 || !numero.trim()) return;
+    const endereco = texto.trim();
+    if (endereco.length < 3) return;
     const ctrl = new AbortController();
     let vivo = true;
     setBuscandoExato(true);
     const t = setTimeout(async () => {
-      const p = await geocodificarPreciso(rua, numero.trim(), ctrl.signal);
-      if (!vivo) return;
-      if (p) { setCoord({ lat: p.lat, lng: p.lng }); setPrecisao(p.precisao); setEnderecoNoMapa(p.rotulo || null); }
-      setBuscandoExato(false);
+      try {
+        const p = await geocodificarPreciso(endereco, '', ctrl.signal);
+        if (!vivo) return;
+        if (p) { setCoord({ lat: p.lat, lng: p.lng }); setPrecisao(p.precisao); setEnderecoNoMapa(p.rotulo || null); }
+      } finally {
+        if (vivo) setBuscandoExato(false);
+      }
     }, 600);
     return () => { vivo = false; ctrl.abort(); clearTimeout(t); };
-  }, [texto, numero]);
+  }, [texto]);
 
   // Arraste manual do alfinete: assume o ponto e confirma o endereço embaixo dele.
   function aoArrastar(lat: number, lng: number) {
@@ -467,7 +466,7 @@ function FormEndereco({ titulo, dica, botao, locais, onConfirmar, onCancelar }: 
   const aviso = buscandoExato
     ? { c: 'bg-navy-50 text-navy-700', t: 'Localizando o número exato no mapa…' }
     : !temPonto
-      ? { c: 'bg-amber-50 text-amber-800', t: 'Informe a rua e o número, ou toque no mapa para marcar o ponto.' }
+      ? { c: 'bg-amber-50 text-amber-800', t: 'Informe rua e número no mesmo campo, ou marque o ponto no mapa.' }
       : precisao === 'exato'
         ? { c: 'bg-mint-50 text-mint-800', t: 'Número localizado ✓ — confira no mapa e ajuste se precisar.' }
         : precisao === 'ajustado'
@@ -480,11 +479,11 @@ function FormEndereco({ titulo, dica, botao, locais, onConfirmar, onCancelar }: 
       {dica && <p className="mt-1 text-sm text-navy-500">{dica}</p>}
 
       <div className="mt-3">
-        <label className="field-label">Endereço (rua e bairro)</label>
+        <label className="field-label">Endereço (rua e número)</label>
         <AutocompleteEndereco
           value={texto}
           locais={locais}
-          placeholder="Comece a digitar a rua — Araçatuba"
+          placeholder="Ex.: Rua José Geraldo, 580"
           onChange={(t, c) => {
             setTexto(t);
             // Sugestão escolhida: ponto provisório (nível de rua) até a geocodificação precisa.
@@ -492,12 +491,7 @@ function FormEndereco({ titulo, dica, botao, locais, onConfirmar, onCancelar }: 
             else if (!t.trim()) { setCoord(null); setPrecisao(undefined); setEnderecoNoMapa(null); }
           }}
         />
-        <p className="mt-1 text-xs text-navy-400">Escolha uma sugestão; o número abaixo fixa o ponto exato.</p>
-      </div>
-
-      <div className="mt-3">
-        <label className="field-label" htmlFor="numero-parada">Número</label>
-        <input id="numero-parada" className="field-input" inputMode="numeric" placeholder="Ex.: 450 (ou s/n)" value={numero} onChange={(e) => setNumero(e.target.value)} />
+        <p className="mt-1 text-xs text-navy-400">Digite rua e número juntos. Confira o ponto localizado no mapa.</p>
       </div>
 
       <p className={cn('mt-3 rounded-xl p-2.5 text-sm', aviso.c)}>{aviso.t}</p>
