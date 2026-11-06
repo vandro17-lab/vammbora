@@ -4,6 +4,7 @@ import { AnimatePresence } from 'framer-motion';
 import { SlidersHorizontal, ArrowLeft, SearchX, WifiOff, RefreshCw } from 'lucide-react';
 import { paramsParaCriterios } from '@/lib/searchParams';
 import { buscarComMotor } from '@/lib/busca-encaixe';
+import { buscarRotasReais, mapearParaCartoes } from '@/lib/busca-rotas-reais-cliente';
 import { useVitrine } from '@/data/VitrineProvider';
 import { CIDADE_PADRAO } from '@/data/cidades';
 import { ResultCard } from '@/components/results/ResultCard';
@@ -33,6 +34,35 @@ export function SearchResultsPage() {
   const [tempoAnimacao, setTempoAnimacao] = useState(true);
   const [soComVaga, setSoComVaga] = useState(false);
 
+  // BUSCA REAL (operacional): quando o Supabase está ativo, consulta rotas reais
+  // via função server-side. Se o endpoint não estiver configurado (503) ou falhar,
+  // mantém a busca atual (estimativa pela região) — sem quebrar o fluxo.
+  const motoristasPorSlug = useMemo(() => {
+    const m: Record<string, (typeof motoristas)[number]> = {};
+    for (const mot of motoristas) if (mot.slug) m[mot.slug] = mot;
+    return m;
+  }, [motoristas]);
+
+  const [real, setReal] = useState<{ operando: boolean; cartoes: typeof elegiveis } | null>(null);
+  useEffect(() => {
+    if (modoDemo) { setReal(null); return; }
+    let vivo = true;
+    buscarRotasReais(criterios)
+      .then(({ estado, resultados }) => {
+        if (!vivo) return;
+        // Só "opera" com rotas reais quando o servidor respondeu (ok). Em
+        // 'nao_configurado'/'erro', deixa a busca atual assumir.
+        setReal(estado === 'ok'
+          ? { operando: true, cartoes: mapearParaCartoes(resultados, motoristasPorSlug) }
+          : { operando: false, cartoes: [] });
+      })
+      .catch(() => { if (vivo) setReal({ operando: false, cartoes: [] }); });
+    return () => { vivo = false; };
+  }, [criterios, modoDemo, motoristasPorSlug]);
+
+  const usandoReal = !modoDemo && !!real?.operando;
+  const base = usandoReal ? real!.cartoes : elegiveis;
+
   // A tela de busca roda por ~3,8s; só revelamos quando a animação terminou E os
   // dados já chegaram. Em caso de erro, saímos da animação assim que ela termina.
   useEffect(() => {
@@ -43,7 +73,7 @@ export function SearchResultsPage() {
 
   const carregando = tempoAnimacao || status === 'carregando';
   const destino = criterios.destinoId ? destinosPorId[criterios.destinoId] : null;
-  const listaFiltrada = soComVaga ? elegiveis.filter((r) => r.motorista.vagasDisponiveis > 0) : elegiveis;
+  const listaFiltrada = soComVaga ? base.filter((r) => r.motorista.vagasDisponiveis > 0) : base;
   const dataAvulso = formatarData(criterios.dataAvulso);
 
   return (
@@ -91,7 +121,7 @@ export function SearchResultsPage() {
           <div className="min-h-[40vh]" aria-hidden="true" />
         ) : status === 'erro' ? (
           <ErroConexao onTentar={recarregar} />
-        ) : elegiveis.length === 0 ? (
+        ) : base.length === 0 ? (
           <NenhumResultado>
             <WaitlistForm criterios={criterios} />
           </NenhumResultado>
