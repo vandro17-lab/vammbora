@@ -1,8 +1,10 @@
+import { useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 // Ícones premium (duotone) para o hub — Phosphor:
 import {
   SquaresFour, Van, CalendarBlank, Wrench, GasPump, ChartBar, FileText as FileDoc,
-  Headset, GearSix, Crown, Gift, CaretRight, SealCheck, Percent, ImageSquare,
+  Headset, GearSix, Crown, Gift, CaretRight, SealCheck, Percent,
+  PencilSimpleLine, ListBullets, Bell, UserCircle,
 } from '@phosphor-icons/react';
 // Ícones das telas de detalhe (ModuloPage) — lucide (mantidos):
 import {
@@ -14,6 +16,7 @@ import { VMShell } from '@/components/vm/VMShell';
 import { VMSectionHeader } from '@/components/vm/VMHeader';
 import { Card, SubHeader, LinhaValor, DemoChip } from '@/components/vm/ui';
 import { SlotIlustracao, SlotIcone } from '@/components/vm/SlotImagem';
+import { useEdicaoAparencia } from '@/lib/vm/useEdicaoAparencia';
 import { useDadosMotorista, lerPrefs } from '@/lib/vm/useDadosMotorista';
 import { MOTORISTA_DEMO, MANUTENCAO_DEMO, DOCUMENTOS_DEMO, CALENDARIO_DEMO } from '@/data/motorista-demo';
 import { useAuth } from '@/lib/auth';
@@ -43,7 +46,8 @@ const MODULO_TITULOS: Record<string, string> = {
 /* ============================== TELA 10 — Mais ============================== */
 export function MaisPage() {
   const navigate = useNavigate();
-  const { sair, session, isAdmin } = useAuth();
+  const { sair, session } = useAuth();
+  const { disponivel, ativar } = useEdicaoAparencia();
   const { dados } = useDadosMotorista();
 
   const meta = session?.user?.user_metadata ?? {};
@@ -56,6 +60,8 @@ export function MaisPage() {
         icon={SquaresFour}
         titulo="Mais"
         subtitulo="Recursos e serviços para o seu dia a dia como motorista escolar."
+        tituloKey="mais.header.titulo"
+        subtituloKey="mais.header.subtitulo"
       />
 
       <div className="space-y-3 px-4 pt-4">
@@ -115,15 +121,20 @@ export function MaisPage() {
           ))}
         </div>
 
-        {isAdmin && (
-          <button onClick={() => navigate('/app/admin/aparencia')} className="vm-press flex w-full items-center gap-3 rounded-2xl bg-white p-4 text-left shadow-card ring-1 ring-navy-100">
-            <span className="vm-chip-ico vm-ico-navy"><ImageSquare size={20} weight="duotone" /></span>
-            <div className="flex-1">
-              <p className="font-display text-[14px] font-bold text-navy-900">Aparência do app</p>
-              <p className="text-[11px] text-navy-500">Publicar artes nos espaços (admin)</p>
-            </div>
-            <CaretRight size={16} weight="bold" className="text-navy-300" />
-          </button>
+        {disponivel && (
+          <div className="space-y-2">
+            <button onClick={ativar} className="vm-press flex w-full items-center gap-3 rounded-2xl bg-white p-4 text-left shadow-card ring-1 ring-navy-100">
+              <span className="vm-chip-ico vm-ico-navy"><PencilSimpleLine size={20} weight="duotone" /></span>
+              <div className="flex-1">
+                <p className="font-display text-[14px] font-bold text-navy-900">Editar aparência</p>
+                <p className="text-[11px] text-navy-500">Personalize as imagens direto nas telas reais (admin)</p>
+              </div>
+              <CaretRight size={16} weight="bold" className="text-navy-300" />
+            </button>
+            <button onClick={() => navigate('/app/admin/aparencia')} className="flex w-full items-center justify-center gap-1.5 py-1 text-[12px] font-semibold text-navy-500">
+              <ListBullets size={14} weight="bold" /> Abrir lista completa de espaços
+            </button>
+          </div>
         )}
 
         {session && (
@@ -150,7 +161,8 @@ export function ModuloPage() {
         {modulo === 'combustivel' && <Combustivel />}
         {modulo === 'calendario' && <Calendario />}
         {modulo === 'clube' && <Clube />}
-        {(modulo === 'relatorios' || modulo === 'ajuda' || modulo === 'config') && <EmBreve titulo={titulo} />}
+        {(modulo === 'relatorios' || modulo === 'ajuda') && <EmBreve titulo={titulo} />}
+        {modulo === 'config' && <Config />}
       </div>
     </VMShell>
   );
@@ -225,21 +237,38 @@ function Calendario() {
 }
 
 const CLUBE = [
-  { cat: 'Postos', nome: 'Rede de combustível parceira', oferta: 'Condição especial para motoristas escolares', Icone: Fuel, cor: 'vm-ico-rose' },
-  { cat: 'Oficinas', nome: 'Oficina mecânica', oferta: 'Revisão com prioridade de agenda', Icone: WrenchL, cor: 'vm-ico-slate' },
-  { cat: 'Pneus', nome: 'Centro automotivo', oferta: 'Alinhamento + balanceamento', Icone: RouteIcon, cor: 'vm-ico-navy' },
-  { cat: 'Seguro', nome: 'Seguro veicular', oferta: 'Cotação para transporte escolar', Icone: Tag, cor: 'vm-ico-green' },
+  { slot: 'clube.card.postos', cat: 'Postos', nome: 'Rede de combustível parceira', oferta: 'Condição especial para motoristas escolares', Icone: Fuel, cor: 'vm-ico-rose' },
+  { slot: 'clube.card.oficinas', cat: 'Oficinas', nome: 'Oficina mecânica', oferta: 'Revisão com prioridade de agenda', Icone: WrenchL, cor: 'vm-ico-slate' },
+  { slot: 'clube.card.pneus', cat: 'Pneus', nome: 'Centro automotivo', oferta: 'Alinhamento + balanceamento', Icone: RouteIcon, cor: 'vm-ico-navy' },
+  { slot: 'clube.card.seguro', cat: 'Seguro', nome: 'Seguro veicular', oferta: 'Cotação para transporte escolar', Icone: Tag, cor: 'vm-ico-green' },
 ];
 function Clube() {
   return (
     <>
+      {/* Topo do Clube — ilustração/banner editável (fallback: coroa vetorial). */}
+      <div className="relative overflow-hidden rounded-[1.25rem] p-4 text-white shadow-card"
+        style={{ background: 'linear-gradient(135deg,#17306b 0%,#0b1f3a 62%)' }}>
+        <div className="pointer-events-none absolute -right-2 -top-1 h-24 w-32">
+          <SlotIlustracao slot="clube.hero" alt="Clube do Motorista"
+            fallback={<Crown size={84} weight="duotone" className="absolute right-2 top-2 text-amber-300/80" />} />
+        </div>
+        <div className="relative max-w-[72%]">
+          <p className="inline-flex items-center gap-1.5 font-display text-base font-extrabold">
+            <Crown size={18} weight="fill" className="text-amber-300" /> Clube do Motorista
+          </p>
+          <p className="mt-0.5 text-[12px] leading-snug text-white/80">Benefícios e parcerias para a sua operação escolar.</p>
+        </div>
+      </div>
+
       <div className="flex items-center justify-between">
         <p className="text-sm text-navy-600">Vantagens para motoristas escolares de Araçatuba.</p>
         <DemoChip />
       </div>
       {CLUBE.map((c) => (
         <Card key={c.nome} className="flex items-center gap-3 p-3.5">
-          <span className={cn('vm-chip-ico', c.cor)}><c.Icone className="h-5 w-5" /></span>
+          <span className={cn('vm-chip-ico overflow-hidden', c.cor)}>
+            <SlotIcone slot={c.slot} fallback={<c.Icone className="h-5 w-5" />} />
+          </span>
           <div className="min-w-0 flex-1">
             <p className="text-[10px] font-semibold uppercase tracking-wide text-navy-400">{c.cat}</p>
             <p className="truncate text-sm font-semibold text-navy-900">{c.nome}</p>
@@ -249,6 +278,62 @@ function Clube() {
         </Card>
       ))}
       <p className="text-center text-[11px] text-navy-400">Ofertas ilustrativas — parcerias comerciais a confirmar. Estrutura pronta para ofertas reais.</p>
+    </>
+  );
+}
+
+/* ---- Configurações: inclui o ATALHO OCULTO para o modo "Editar aparência" ----
+   Toque 7 vezes seguidas na linha da versão (rodapé) para abrir o modo de edição,
+   sem precisar de um botão de admin à vista. Publicar/salvar continua protegido
+   pelo banco (só admin autenticado grava de verdade). */
+function Config() {
+  const navigate = useNavigate();
+  const { ativarOculto } = useEdicaoAparencia();
+  const toquesRef = useRef(0);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  function tocarVersao() {
+    toquesRef.current += 1;
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => { toquesRef.current = 0; }, 1200);
+    if (toquesRef.current >= 7) {
+      toquesRef.current = 0;
+      ativarOculto();
+      navigate('/app/mais'); // começa a editar pela tela Mais; a barra do modo aparece
+    }
+  }
+
+  return (
+    <>
+      <Card className="divide-y divide-navy-50 p-0">
+        {[
+          [Bell, 'Notificações', 'Avisos de documentos e oportunidades'],
+          [UserCircle, 'Conta', 'E-mail, telefone e cidade'],
+          [GearSix, 'Preferências', 'Idioma, aparência e privacidade'],
+        ].map(([Ico, t, d]) => {
+          const I = Ico as PhosphorIcon;
+          return (
+            <div key={t as string} className="flex items-center gap-3 p-4">
+              <span className="vm-chip-ico vm-ico-navy"><I size={18} weight="duotone" /></span>
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-navy-900">{t as string}</p>
+                <p className="text-[11px] text-navy-500">{d as string}</p>
+              </div>
+              <span className="chip bg-navy-50 text-navy-400">em breve</span>
+            </div>
+          );
+        })}
+      </Card>
+
+      {/* Rodapé com a versão — também é o atalho oculto (toque 7×). */}
+      <button
+        type="button"
+        onClick={tocarVersao}
+        className="mx-auto mt-5 block w-full select-none py-3 text-center text-[11px] text-navy-400"
+        aria-label="Versão do aplicativo"
+      >
+        Vambora Motoristas · versão 0.1.0
+      </button>
     </>
   );
 }

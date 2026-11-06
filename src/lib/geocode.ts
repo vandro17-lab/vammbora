@@ -132,16 +132,48 @@ export async function geocodificarPreciso(texto: string, numero: string, signal?
       } else if (r.ok) {
         const d = (await r.json()) as { ponto?: PontoPreciso | null };
         if (d.ponto && Number.isFinite(d.ponto.lat) && Number.isFinite(d.ponto.lng)) return d.ponto;
-        return null; // o proxy respondeu, mas não achou o endereço
+        // Proxy respondeu sem ponto: ainda tentamos os fallbacks abaixo.
       }
     } catch {
       /* segue para o fallback */
     }
   }
 
-  // Fallback SEM CHAVE: Photon. Lê housenumber para classificar a precisão.
+  const { rua: via, num } = separarRuaNumero(rua, numero);
+
+  // Fallback SEM CHAVE (1): Nominatim estruturado — resolve o NÚMERO da casa
+  // melhor que o Photon (interpolação do OpenStreetMap), quando há número.
+  if (num) {
+    try {
+      const u = new URL('https://nominatim.openstreetmap.org/search');
+      u.searchParams.set('format', 'json');
+      u.searchParams.set('addressdetails', '1');
+      u.searchParams.set('limit', '1');
+      u.searchParams.set('countrycodes', 'br');
+      u.searchParams.set('city', 'Araçatuba');
+      u.searchParams.set('street', `${num} ${via}`);
+      const r = await fetch(u, { signal, headers: { Accept: 'application/json' } });
+      if (r.ok) {
+        const arr = (await r.json()) as Array<{ lat: string; lon: string; address?: Record<string, string> }>;
+        const f = arr?.[0];
+        const lat = f ? Number(f.lat) : NaN;
+        const lng = f ? Number(f.lon) : NaN;
+        if (f && Number.isFinite(lat) && Number.isFinite(lng) && dentroDeAracatuba(lat, lng)) {
+          const hn = f.address?.house_number;
+          const viaNome = f.address?.road || via;
+          const bairro = f.address?.suburb || f.address?.neighbourhood || f.address?.city_district;
+          const cidade = f.address?.city || f.address?.town || f.address?.municipality;
+          const rotulo = [`${viaNome}${hn ? ', ' + hn : (num ? ', ' + num : '')}`, bairro, cidade].filter(Boolean).join(', ');
+          if (hn) return { rotulo, lat, lng, precisao: 'exato' };
+        }
+      }
+    } catch {
+      /* segue para o Photon */
+    }
+  }
+
+  // Fallback SEM CHAVE (2): Photon. Lê housenumber para classificar a precisão.
   try {
-    const { rua: via, num } = separarRuaNumero(rua, numero);
     const u = new URL('https://photon.komoot.io/api/');
     u.searchParams.set('q', `${[via, num].filter(Boolean).join(' ')}, Araçatuba`);
     u.searchParams.set('lat', String(ARACATUBA.lat));

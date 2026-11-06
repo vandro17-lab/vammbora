@@ -6,6 +6,10 @@
  * não houver arte publicada, o app mostra o visual atual (fallback) — nada
  * quebra. A estrutura é reutilizável: para criar um novo espaço, basta
  * acrescentar um item aqui e consumir com <SlotIlustracao/>/<SlotIcone/>.
+ *
+ * O mesmo registro alimenta duas experiências:
+ *   1) o MODO "Editar aparência" dentro do próprio app (edição no layout real);
+ *   2) o índice completo (admin) para alcançar slots que não estão na tela atual.
  */
 
 export type SlotKind = 'ilustracao' | 'icone';
@@ -40,6 +44,24 @@ const ICONES_MAIS: Array<[string, string]> = [
   ['icon.config', 'Configurações'],
 ];
 
+/** Cartões de parceria do Clube do Motorista (ícone = logo do parceiro). */
+const CARTOES_CLUBE: Array<[string, string]> = [
+  ['clube.card.postos', 'Postos / combustível'],
+  ['clube.card.oficinas', 'Oficinas'],
+  ['clube.card.pneus', 'Pneus / centro automotivo'],
+  ['clube.card.seguro', 'Seguro veicular'],
+];
+
+/** Fábrica de slot de ícone quadrado transparente (reaproveitada nos grupos). */
+function slotIcone(id: string, grupo: string, titulo: string, descricao: string): SlotDef {
+  return {
+    id, grupo, titulo, descricao, kind: 'icone',
+    largura: 120, altura: 120,
+    formatos: FORMATOS_TRANSP, transparencia: true,
+    areaSegura: 'Fundo transparente, ícone/logo centralizado com ~12% de margem interna.',
+  };
+}
+
 export const SLOTS: SlotDef[] = [
   {
     id: 'header.van',
@@ -52,10 +74,73 @@ export const SLOTS: SlotDef[] = [
     transparencia: true,
     areaSegura: 'Fundo transparente. A van aparece sobre o verde, alinhada à direita; deixe respiro nas bordas.',
   },
+
+  /* ----------------------------- Início (Dashboard) ----------------------------- */
+  {
+    id: 'dash.van',
+    grupo: 'Início',
+    titulo: 'Van da ocupação',
+    descricao: 'Ilustração da van no cartão de "Ocupação da van" da tela inicial.',
+    kind: 'ilustracao',
+    largura: 320, altura: 200,
+    formatos: FORMATOS_TRANSP,
+    transparencia: true,
+    areaSegura: 'Fundo transparente, van centralizada. Aparece pequena ao lado do número de ocupação.',
+  },
+  {
+    id: 'dash.primeirosPassos',
+    grupo: 'Início',
+    titulo: 'Ilustração "Vamos preparar o seu app"',
+    descricao: 'Arte do onboarding exibido quando o motorista ainda não cadastrou van/rota.',
+    kind: 'ilustracao',
+    largura: 320, altura: 240,
+    formatos: FORMATOS_TRANSP,
+    transparencia: true,
+    areaSegura: 'Fundo transparente, elemento central. Sem texto (o app já renderiza o título).',
+  },
+
+  /* -------------------------------- Minha Van -------------------------------- */
+  {
+    id: 'van.ilustracao',
+    grupo: 'Minha Van',
+    titulo: 'Ilustração da van',
+    descricao: 'Ilustração/render exibido no cartão principal da tela Minha Van.',
+    kind: 'ilustracao',
+    largura: 320, altura: 200,
+    formatos: FORMATOS_TRANSP,
+    transparencia: true,
+    areaSegura: 'Fundo transparente, van centralizada à esquerda do cartão.',
+  },
+  {
+    id: 'van.vazio',
+    grupo: 'Minha Van',
+    titulo: 'Estado vazio "Cadastre sua van"',
+    descricao: 'Arte exibida quando ainda não há van cadastrada.',
+    kind: 'ilustracao',
+    largura: 320, altura: 240,
+    formatos: FORMATOS_TRANSP,
+    transparencia: true,
+    areaSegura: 'Fundo transparente, elemento central. Sem texto.',
+  },
+
+  /* ------------------------------ Oportunidades ------------------------------ */
+  {
+    id: 'oportunidades.vazio',
+    grupo: 'Oportunidades',
+    titulo: 'Estado vazio de oportunidades',
+    descricao: 'Arte exibida quando não há oportunidades compatíveis no momento.',
+    kind: 'ilustracao',
+    largura: 320, altura: 240,
+    formatos: FORMATOS_TRANSP,
+    transparencia: true,
+    areaSegura: 'Fundo transparente, elemento central. Sem texto.',
+  },
+
+  /* --------------------------------- Tela Mais --------------------------------- */
   {
     id: 'clube.art',
     grupo: 'Tela Mais',
-    titulo: 'Arte do Clube do Motorista',
+    titulo: 'Arte do banner Clube do Motorista',
     descricao: 'Ilustração do brinde/benefício que aparece no banner do Clube do Motorista.',
     kind: 'ilustracao',
     largura: 360, altura: 360,
@@ -63,17 +148,23 @@ export const SLOTS: SlotDef[] = [
     transparencia: true,
     areaSegura: 'Fundo transparente, elemento central. Sem texto (o título já é renderizado pelo app).',
   },
-  ...ICONES_MAIS.map(([id, nome]): SlotDef => ({
-    id,
-    grupo: 'Tela Mais — ícones',
-    titulo: `Ícone · ${nome}`,
-    descricao: `Ícone do atalho "${nome}" na grade da tela Mais.`,
-    kind: 'icone',
-    largura: 120, altura: 120,
+  ...ICONES_MAIS.map(([id, nome]) =>
+    slotIcone(id, 'Tela Mais — ícones', `Ícone · ${nome}`, `Ícone do atalho "${nome}" na grade da tela Mais.`)),
+
+  /* ---------------------------- Clube do Motorista ---------------------------- */
+  {
+    id: 'clube.hero',
+    grupo: 'Clube do Motorista',
+    titulo: 'Topo da tela Clube',
+    descricao: 'Banner/ilustração de destaque no topo da tela do Clube do Motorista.',
+    kind: 'ilustracao',
+    largura: 480, altura: 240,
     formatos: FORMATOS_TRANSP,
     transparencia: true,
-    areaSegura: 'Fundo transparente, ícone centralizado com ~12% de margem interna.',
-  })),
+    areaSegura: 'Fundo transparente, elemento à direita. O título do Clube é renderizado por cima à esquerda.',
+  },
+  ...CARTOES_CLUBE.map(([id, nome]) =>
+    slotIcone(id, 'Clube do Motorista — cartões', `Logo · ${nome}`, `Ícone/logo do cartão de parceria "${nome}".`)),
 ];
 
 export function slotPorId(id: string): SlotDef | undefined {

@@ -1,16 +1,15 @@
-import { useState, type ChangeEvent, type CSSProperties } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
-import Cropper from 'react-easy-crop';
-import 'react-easy-crop/react-easy-crop.css';
-import { ImageSquare, UploadSimple, Trash, Eye, LockKey, X, CheckCircle, Info } from '@phosphor-icons/react';
+import { ImageSquare, UploadSimple, Trash, LockKey, CheckCircle, Info, PencilSimpleLine } from '@phosphor-icons/react';
 import { VMShell } from '@/components/vm/VMShell';
 import { Card, SubHeader } from '@/components/vm/ui';
+import { EditorArte, proporcaoTexto, formatosTexto } from '@/components/vm/EditorArte';
 import { useAuth } from '@/lib/auth';
 import { USE_SUPABASE } from '@/lib/supabase';
 import { useAppAssets } from '@/lib/vm/useAppAssets';
-import { publicarAppAsset, removerAppAsset, type AppAsset } from '@/data/app-assets';
-import { SLOTS, slotsPorGrupo, aspecto, TAMANHO_MAX_BYTES, type SlotDef } from '@/lib/vm/slots';
-import { recortarParaBlob, type AreaPixels } from '@/lib/vm/recorte';
+import { useEdicaoAparencia } from '@/lib/vm/useEdicaoAparencia';
+import { removerAppAsset, type AppAsset } from '@/data/app-assets';
+import { SLOTS, slotsPorGrupo, type SlotDef } from '@/lib/vm/slots';
 import { cn } from '@/lib/utils';
 
 /* -------- padrão xadrez (indica transparência) -------- */
@@ -21,10 +20,6 @@ const XADREZ: CSSProperties = {
   backgroundSize: '16px 16px',
   backgroundPosition: '0 0,0 8px,8px -8px,-8px 0px',
 };
-
-function gcd(a: number, b: number): number { return b === 0 ? a : gcd(b, a % b); }
-function proporcaoTexto(s: SlotDef): string { const g = gcd(s.largura, s.altura); return `${s.largura / g}:${s.altura / g}`; }
-function formatosTexto(s: SlotDef): string { return s.formatos.map((f) => f.split('/')[1].toUpperCase()).join(' / '); }
 
 /* ============================ Página (com guarda) ============================ */
 export function AparenciaPage() {
@@ -59,25 +54,40 @@ function Aviso({ icon: Icon, titulo, texto, onVoltar }: { icon: typeof Info; tit
   );
 }
 
-/* ============================== Gerenciador ============================== */
+/* ============================== Gerenciador (índice completo) ============================== */
 function Gerenciador() {
   const navigate = useNavigate();
+  const { ativar } = useEdicaoAparencia();
   const { assets, recarregar } = useAppAssets();
   const [editando, setEditando] = useState<SlotDef | null>(null);
   const grupos = slotsPorGrupo();
   const publicados = SLOTS.filter((s) => assets[s.id]).length;
 
+  function editarNasTelas() {
+    ativar();
+    navigate('/app/mais');
+  }
+
   return (
     <VMShell nav={false}>
       <SubHeader titulo="Aparência do app" onVoltar={() => navigate('/app/mais')} />
       <div className="space-y-5 px-4 pb-10 pt-4">
+        <button onClick={editarNasTelas}
+          className="vm-press flex w-full items-center gap-3 rounded-2xl bg-navy-900 p-3.5 text-left text-white shadow-card">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-mint-500"><PencilSimpleLine size={20} weight="bold" /></span>
+          <div className="min-w-0 flex-1">
+            <p className="font-display text-sm font-bold">Editar direto nas telas</p>
+            <p className="text-[11px] text-white/70">Ative o modo de edição e personalize cada arte no próprio lugar.</p>
+          </div>
+        </button>
+
         <Card className="flex items-start gap-3 p-3.5">
           <span className="vm-chip-ico vm-ico-green shrink-0"><ImageSquare size={20} weight="duotone" /></span>
           <div>
             <p className="text-sm font-semibold text-navy-900">{publicados} de {SLOTS.length} espaços personalizados</p>
             <p className="mt-0.5 text-[12px] leading-snug text-navy-500">
-              Envie imagens profissionais nos espaços abaixo. Sem arte publicada, o app mantém o visual padrão.
-              Prefira PNG/WebP com fundo transparente. Nada é publicado antes de o envio ser confirmado.
+              Esta é a lista completa dos espaços — útil para alcançar artes que não estão na tela aberta.
+              Sem arte publicada, o app mantém o visual padrão. Prefira PNG/WebP com fundo transparente.
             </p>
           </div>
         </Card>
@@ -95,8 +105,13 @@ function Gerenciador() {
       </div>
 
       {editando && (
-        <EditorArte slot={editando} onFechar={() => setEditando(null)}
-          onPublicado={async () => { await recarregar(); setEditando(null); }} />
+        <EditorArte
+          slot={editando}
+          atual={assets[editando.id]}
+          onFechar={() => setEditando(null)}
+          onPublicado={async () => { await recarregar(); setEditando(null); }}
+          onRestaurado={async () => { await recarregar(); setEditando(null); }}
+        />
       )}
     </VMShell>
   );
@@ -147,119 +162,5 @@ function SlotCard({ slot, atual, onEditar, onMudou }: {
         )}
       </div>
     </Card>
-  );
-}
-
-/* ------------------------------- Editor (recorte) ------------------------------- */
-function EditorArte({ slot, onFechar, onPublicado }: {
-  slot: SlotDef; onFechar: () => void; onPublicado: () => Promise<void>;
-}) {
-  const [src, setSrc] = useState<string | null>(null);
-  const [tipo, setTipo] = useState<'image/png' | 'image/webp'>('image/png');
-  const [crop, setCrop] = useState({ x: 0, y: 0 });
-  const [zoom, setZoom] = useState(1);
-  const [area, setArea] = useState<AreaPixels | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [erro, setErro] = useState<string | null>(null);
-  const [publicando, setPublicando] = useState(false);
-
-  function escolher(e: ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    setErro(null); setPreviewUrl(null); setArea(null); setZoom(1); setCrop({ x: 0, y: 0 });
-    if (!slot.formatos.includes(f.type)) { setErro(`Formato não aceito. Use ${formatosTexto(slot)}.`); return; }
-    if (f.size > TAMANHO_MAX_BYTES) { setErro('Arquivo muito grande (máximo 5 MB).'); return; }
-    setTipo(f.type === 'image/webp' ? 'image/webp' : 'image/png');
-    setSrc(URL.createObjectURL(f));
-  }
-
-  async function gerarPrevia() {
-    if (!src || !area) return;
-    try { const blob = await recortarParaBlob(src, area, { largura: slot.largura, altura: slot.altura }, tipo); setPreviewUrl(URL.createObjectURL(blob)); }
-    catch (e) { setErro((e as Error).message); }
-  }
-
-  async function publicar() {
-    if (!src || !area) { setErro('Selecione e enquadre uma imagem.'); return; }
-    setPublicando(true); setErro(null);
-    try {
-      const blob = await recortarParaBlob(src, area, { largura: slot.largura, altura: slot.altura }, tipo);
-      await publicarAppAsset(slot.id, blob, { width: slot.largura, height: slot.altura });
-      await onPublicado(); // só avança após upload + registro confirmados
-    } catch (e) {
-      setErro('Falha ao publicar: ' + (e as Error).message);
-      setPublicando(false);
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-navy-950/60" onClick={onFechar}>
-      <div className="mt-auto max-h-[94dvh] overflow-y-auto rounded-t-3xl bg-white p-5 pb-[max(env(safe-area-inset-bottom),1rem)]" onClick={(e) => e.stopPropagation()}>
-        <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-navy-100" />
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <h2 className="font-display text-lg font-bold text-navy-900">{slot.titulo}</h2>
-            <p className="text-[12px] text-navy-500">{slot.largura}×{slot.altura}px · {proporcaoTexto(slot)} · {formatosTexto(slot)}</p>
-          </div>
-          <button onClick={onFechar} className="grid h-8 w-8 place-items-center rounded-full bg-navy-50 text-navy-500"><X size={18} weight="bold" /></button>
-        </div>
-
-        <div className="mt-2 rounded-xl bg-mint-50 p-2.5 text-[11px] leading-snug text-mint-800">
-          <Info size={13} weight="fill" className="mr-1 inline" />Área segura: {slot.areaSegura}
-        </div>
-
-        {!src ? (
-          <label className="mt-4 flex cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-navy-200 bg-navy-50/40 py-10 text-center">
-            <UploadSimple size={30} weight="duotone" className="text-mint-600" />
-            <span className="text-sm font-semibold text-navy-700">Escolher imagem</span>
-            <span className="text-[11px] text-navy-400">{formatosTexto(slot)} · até 5 MB</span>
-            <input type="file" accept={slot.formatos.join(',')} className="hidden" onChange={escolher} />
-          </label>
-        ) : (
-          <>
-            <div className="relative mt-4 h-72 w-full overflow-hidden rounded-2xl" style={XADREZ}>
-              <Cropper
-                image={src} crop={crop} zoom={zoom} aspect={aspecto(slot)}
-                onCropChange={setCrop} onZoomChange={setZoom}
-                onCropComplete={(_a, px) => setArea(px)}
-                objectFit="contain" showGrid restrictPosition={false}
-              />
-            </div>
-            <div className="mt-3 flex items-center gap-3">
-              <span className="text-[11px] font-semibold text-navy-500">Zoom</span>
-              <input type="range" min={1} max={4} step={0.01} value={zoom} onChange={(e) => setZoom(Number(e.target.value))} className="w-full accent-mint-500" />
-            </div>
-            <div className="mt-3 flex flex-wrap items-center gap-3">
-              <label className="cursor-pointer text-[12px] font-semibold text-mint-700 underline">
-                Trocar imagem
-                <input type="file" accept={slot.formatos.join(',')} className="hidden" onChange={escolher} />
-              </label>
-              <button onClick={gerarPrevia} className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-navy-600">
-                <Eye size={15} weight="bold" /> Pré-visualizar
-              </button>
-            </div>
-
-            {previewUrl && (
-              <div className="mt-3 flex items-center gap-3 rounded-xl bg-navy-50 p-3">
-                <div className="grid h-16 w-16 place-items-center overflow-hidden rounded-lg ring-1 ring-navy-100" style={XADREZ}>
-                  <img src={previewUrl} alt="" className="h-full w-full object-contain" />
-                </div>
-                <p className="text-[11px] text-navy-500">Prévia no tamanho final ({slot.largura}×{slot.altura}px). Confirme para publicar.</p>
-              </div>
-            )}
-          </>
-        )}
-
-        {erro && <p className="mt-3 rounded-lg bg-red-50 p-2.5 text-[12px] font-medium text-red-600">{erro}</p>}
-
-        <div className="mt-4 flex gap-2">
-          <button onClick={onFechar} className="rounded-full bg-white px-5 py-3 text-sm font-semibold text-navy-600 ring-1 ring-navy-100">Cancelar</button>
-          <button onClick={publicar} disabled={!src || publicando}
-            className="flex flex-1 items-center justify-center gap-2 rounded-full bg-mint-500 py-3 text-sm font-bold text-white disabled:opacity-60">
-            {publicando ? 'Publicando…' : <><CheckCircle size={18} weight="fill" /> Publicar</>}
-          </button>
-        </div>
-      </div>
-    </div>
   );
 }

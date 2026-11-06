@@ -4,6 +4,7 @@ import { Sparkles, MapPin, CheckCircle2, AlertTriangle, ChevronRight, Zap, Users
 import { Avatar } from '@/components/brand/Avatar';
 import { VMShell } from '@/components/vm/VMShell';
 import { Card, SubHeader, DemoChip, EstadoVazio } from '@/components/vm/ui';
+import { SlotIlustracao } from '@/components/vm/SlotImagem';
 import { useDadosMotorista } from '@/lib/vm/useDadosMotorista';
 import { OPORTUNIDADES_VM, simularEncaixe, DIAS_UTEIS_MES } from '@/lib/vm/encaixe';
 import { formatBRL, cn } from '@/lib/utils';
@@ -44,6 +45,7 @@ export function OportunidadesPage() {
             {compativeis.length === 0 && (
               <EstadoVazio
                 icon={Zap}
+                ilustracao={<SlotIlustracao slot="oportunidades.vazio" alt="" fallback={<Zap className="h-8 w-8" />} />}
                 titulo="Nenhuma oportunidade compatível"
                 texto="Quando houver famílias que encaixam na sua rota sem atrasar os outros alunos, elas aparecem aqui. Veja também as novas da região."
               />

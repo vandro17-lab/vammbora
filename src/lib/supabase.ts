@@ -11,8 +11,22 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
  *
  * A segurança real vem das políticas RLS no banco, não de esconder a chave anon.
  */
-const url = import.meta.env.VITE_SUPABASE_URL;
-const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+/**
+ * PADRÃO do projeto Supabase do Vambora (para o app já nascer conectado sem
+ * depender de variáveis de ambiente no provedor de deploy).
+ *
+ * A chave abaixo é a ANON/pública (role "anon"): ela já vai embutida no bundle
+ * do site de qualquer forma — não é segredo. A segurança real é garantida pelas
+ * políticas RLS no banco (ex.: escrever artes só admin). Para apontar outro
+ * projeto, basta definir as variáveis VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY;
+ * para forçar o modo demonstração (sem banco), defina VITE_USE_SUPABASE=false.
+ */
+const DEFAULT_SUPABASE_URL = 'https://rnulmjdsvvuirqijemzy.supabase.co';
+const DEFAULT_SUPABASE_ANON_KEY =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJudWxtamRzdnZ1aXJxaWplbXp5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM3NDk5NjIsImV4cCI6MjEwOTMyNTk2Mn0.Cbne-PvsCtoLcSHgLk89DwmU-bSMPYJvRy61B7_g3a4';
+
+const url = import.meta.env.VITE_SUPABASE_URL || DEFAULT_SUPABASE_URL;
+const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY;
 const flag = import.meta.env.VITE_USE_SUPABASE;
 
 /**

@@ -1,11 +1,16 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Gauge, Fuel, Coins, Route as RouteIcon, FileText, Wrench, Pencil, ChevronRight, Check, Bus, Plus } from 'lucide-react';
+import {
+  Gauge, Fuel, Coins, Route as RouteIcon, FileText, Wrench, Pencil, ChevronRight, Check, Bus, Plus,
+  Minus, CalendarDays, Hash, Lock, Users, Snowflake, ShieldCheck, Accessibility, type LucideIcon,
+} from 'lucide-react';
 import { VMShell } from '@/components/vm/VMShell';
 import { Card, SubHeader, LinhaValor, DemoChip, EstadoVazio } from '@/components/vm/ui';
 import { VanEscolar } from '@/components/vm/VanEscolar';
+import { SlotIlustracao } from '@/components/vm/SlotImagem';
 import { useDadosMotorista, lerPrefs, salvarPrefs } from '@/lib/vm/useDadosMotorista';
 import { salvarVeiculo } from '@/data/motorista-store';
+import { USE_SUPABASE } from '@/lib/supabase';
 import { formatBRL, cn } from '@/lib/utils';
 import type { Veiculo } from '@/types/motorista';
 
@@ -24,6 +29,7 @@ export function MinhaVanPage() {
         <div className="px-4 pt-4">
           <EstadoVazio
             icon={Bus}
+            ilustracao={<SlotIlustracao slot="van.vazio" alt="" fallback={<Bus className="h-8 w-8" />} />}
             titulo="Cadastre sua van"
             texto="Informe modelo, lugares, consumo e preço do diesel para calcularmos custos, rotas e oportunidades."
             acao={
@@ -44,7 +50,9 @@ export function MinhaVanPage() {
         {dados.demo && <div className="flex justify-end"><DemoChip /></div>}
         <Card className="p-4">
           <div className="flex items-center gap-3">
-            <VanEscolar className="w-28 shrink-0" />
+            <div className="w-28 shrink-0">
+              <SlotIlustracao slot="van.ilustracao" alt="Van escolar" fallback={<VanEscolar className="w-full" />} />
+            </div>
             <div className="flex-1">
               <p className="font-display text-lg font-extrabold text-navy-900">{v?.modelo ?? 'Mercedes-Benz Sprinter'}</p>
               <p className="text-sm text-navy-500">{v?.ano ?? 2018} · {v?.lugaresPassageiro ?? 15} lugares</p>
@@ -90,9 +98,12 @@ export function CadastroVanPage() {
   const prefs = lerPrefs();
   const [passo, setPasso] = useState(1);
   const [salvo, setSalvo] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  const [salvando, setSalvando] = useState(false);
 
   const [modelo, setModelo] = useState(dados.veiculo?.modelo ?? 'Mercedes-Benz Sprinter');
   const [ano, setAno] = useState(dados.veiculo?.ano ?? 2018);
+  const [placa, setPlaca] = useState(dados.veiculo?.placa ?? '');
   const [lugares, setLugares] = useState(dados.veiculo?.lugaresPassageiro ?? 15);
   const [consumo, setConsumo] = useState(prefs.consumoKmL);
   const [preco, setPreco] = useState(prefs.precoDiesel);
@@ -104,14 +115,24 @@ export function CadastroVanPage() {
   async function concluir() {
     const veic: Veiculo = {
       id: dados.veiculo?.id ?? '',
-      modelo, ano, placa: dados.veiculo?.placa,
+      modelo, ano, placa: placa.trim() || undefined,
       lugaresPassageiro: lugares, arCondicionado: acEl, acessivel: acessivelEl, cintos: cintosEl,
       fotos: dados.veiculo?.fotos ?? [],
     };
-    try { await salvarVeiculo(veic); } catch { /* protótipo: segue mesmo sem backend */ }
+    setErro(null); setSalvando(true);
+    try {
+      await salvarVeiculo(veic);
+    } catch (e) {
+      setSalvando(false);
+      // Com banco conectado, uma falha real precisa aparecer (não some em silêncio).
+      if (USE_SUPABASE) { setErro('Não foi possível salvar a van: ' + (e as Error).message); return; }
+      // Modo demonstração (sem backend): segue mesmo assim.
+    }
     salvarPrefs({ consumoKmL: consumo, precoDiesel: preco, mensalidade });
+    setSalvando(false);
     setSalvo(true);
-    setTimeout(() => navigate('/app'), 900);
+    // Volta para onde veio (fluxo de criar rota ou Minha Van).
+    setTimeout(() => navigate(-1), 900);
   }
 
   return (
@@ -137,43 +158,70 @@ export function CadastroVanPage() {
         {passo === 1 && (
           <Card className="p-5">
             <div className="flex items-center gap-3">
-              <VanEscolar className="w-24" />
+              <div className="w-24 shrink-0"><SlotIlustracao slot="van.ilustracao" alt="Van escolar" fallback={<VanEscolar className="w-full" />} /></div>
               <div>
-                <p className="font-display font-bold text-navy-900">Conte sobre a sua van</p>
-                <p className="text-xs text-navy-500">Ajuda a calcular custos, consumo e oportunidades.</p>
+                <p className="font-display text-lg font-bold text-navy-900">Adicionar van</p>
+                <p className="text-xs text-navy-500">Cadastre os dados da sua van escolar.</p>
               </div>
             </div>
-            <label className="field-label mt-4">Modelo do veículo</label>
-            <select className="field-input" value={modelo} onChange={(e) => setModelo(e.target.value)}>
-              {MODELOS.map((m) => <option key={m}>{m}</option>)}
-            </select>
-            <div className="mt-3 grid grid-cols-2 gap-3">
-              <div><label className="field-label">Ano</label><input className="field-input" inputMode="numeric" value={ano} onChange={(e) => setAno(Number(e.target.value.replace(/\D/g, '')) || 0)} /></div>
-              <div><label className="field-label">Lugares para alunos</label><input className="field-input" inputMode="numeric" value={lugares} onChange={(e) => setLugares(Number(e.target.value.replace(/\D/g, '')) || 0)} /></div>
+
+            <CampoVan icon={Bus} label="Modelo da van">
+              <input className="field-input" list="modelos-van" placeholder="Ex.: Sprinter, Master, Ducato…"
+                value={modelo} onChange={(e) => setModelo(e.target.value)} />
+              <datalist id="modelos-van">{MODELOS.map((m) => <option key={m} value={m} />)}</datalist>
+            </CampoVan>
+
+            <CampoVan icon={CalendarDays} label="Ano (opcional)">
+              <input className="field-input" inputMode="numeric" placeholder="Ex.: 2020"
+                value={ano || ''} onChange={(e) => setAno(Number(e.target.value.replace(/\D/g, '')) || 0)} />
+            </CampoVan>
+
+            <CampoVan icon={Hash} label="Placa (fica privada)">
+              <input className="field-input" placeholder="Ex.: ABC0D12" maxLength={8}
+                value={placa} onChange={(e) => setPlaca(e.target.value.toUpperCase())}
+                style={{ textTransform: placa ? 'uppercase' : 'none' }} />
+              <p className="mt-1 inline-flex items-center gap-1 text-[11px] text-navy-400"><Lock className="h-3 w-3" /> Só a equipe vê. Não aparece às famílias.</p>
+            </CampoVan>
+
+            <div className="mt-4">
+              <p className="field-label inline-flex items-center gap-1.5"><Users className="h-4 w-4 text-navy-400" /> Quantos lugares para alunos?</p>
+              <div className="mt-2 flex items-center gap-4">
+                <button type="button" onClick={() => setLugares(Math.max(1, lugares - 1))} aria-label="Menos um lugar"
+                  className="grid h-11 w-11 place-items-center rounded-full bg-navy-50 text-navy-700 ring-1 ring-navy-100 active:scale-95"><Minus className="h-5 w-5" /></button>
+                <span className="w-12 text-center font-display text-3xl font-extrabold tabular-nums text-navy-900">{lugares}</span>
+                <button type="button" onClick={() => setLugares(lugares + 1)} aria-label="Mais um lugar"
+                  className="grid h-11 w-11 place-items-center rounded-full bg-mint-500 text-white active:scale-95"><Plus className="h-5 w-5" /></button>
+              </div>
+              <p className="mt-1.5 text-[11px] text-navy-400">Sem contar você, o motorista.</p>
             </div>
-            <label className="field-label mt-3">Rendimento (km/l)</label>
-            <input className="field-input" inputMode="decimal" value={String(consumo).replace('.', ',')} onChange={(e) => setConsumo(Number(e.target.value.replace(',', '.').replace(/[^\d.]/g, '')) || 0)} />
-            <label className="field-label mt-3">Preço do diesel (R$/litro)</label>
-            <input className="field-input" inputMode="decimal" value={String(preco).replace('.', ',')} onChange={(e) => setPreco(Number(e.target.value.replace(',', '.').replace(/[^\d.]/g, '')) || 0)} />
+
+            <div className="mt-4">
+              <p className="field-label">A van tem:</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <ChipRecurso icon={Snowflake} label="Ar-condicionado" ativo={acEl} onClick={() => setAc(!acEl)} />
+                <ChipRecurso icon={ShieldCheck} label="Cintos" ativo={cintosEl} onClick={() => setCintos(!cintosEl)} />
+                <ChipRecurso icon={Accessibility} label="Acessível" ativo={acessivelEl} onClick={() => setAcessivel(!acessivelEl)} />
+              </div>
+            </div>
           </Card>
         )}
 
         {passo === 2 && (
           <Card className="p-5">
             <p className="font-display font-bold text-navy-900">Operação</p>
-            <p className="text-xs text-navy-500">Como você costuma cobrar e equipar a van.</p>
-            <label className="field-label mt-4">Mensalidade por aluno (R$)</label>
-            <input className="field-input" inputMode="numeric" value={mensalidade} onChange={(e) => setMensalidade(Number(e.target.value.replace(/\D/g, '')) || 0)} />
-            <p className="field-label mt-4">Recursos da van</p>
-            {[['Ar-condicionado', acEl, setAc], ['Cintos de 3 pontos', cintosEl, setCintos], ['Acessível (PCD)', acessivelEl, setAcessivel]].map(([label, val, set]) => (
-              <button key={label as string} onClick={() => (set as (v: boolean) => void)(!(val as boolean))}
-                className="mt-2 flex w-full items-center justify-between rounded-xl bg-navy-50 px-4 py-3 text-sm font-medium text-navy-700">
-                {label as string}
-                <span className={cn('grid h-6 w-11 items-center rounded-full p-0.5 transition', val ? 'bg-mint-500' : 'bg-navy-200')}>
-                  <span className={cn('h-5 w-5 rounded-full bg-white transition', val ? 'translate-x-5' : '')} />
-                </span>
-              </button>
-            ))}
+            <p className="text-xs text-navy-500">Consumo e valores para calcular custos, rotas e oportunidades.</p>
+            <CampoVan icon={Gauge} label="Rendimento (km/l)">
+              <input className="field-input" inputMode="decimal" value={String(consumo).replace('.', ',')}
+                onChange={(e) => setConsumo(Number(e.target.value.replace(',', '.').replace(/[^\d.]/g, '')) || 0)} />
+            </CampoVan>
+            <CampoVan icon={Fuel} label="Preço do diesel (R$/litro)">
+              <input className="field-input" inputMode="decimal" value={String(preco).replace('.', ',')}
+                onChange={(e) => setPreco(Number(e.target.value.replace(',', '.').replace(/[^\d.]/g, '')) || 0)} />
+            </CampoVan>
+            <CampoVan icon={Coins} label="Mensalidade por aluno (R$)">
+              <input className="field-input" inputMode="numeric" value={mensalidade}
+                onChange={(e) => setMensalidade(Number(e.target.value.replace(/\D/g, '')) || 0)} />
+            </CampoVan>
           </Card>
         )}
 
@@ -199,13 +247,35 @@ export function CadastroVanPage() {
           </Card>
         )}
 
+        {erro && <p className="mt-3 rounded-xl bg-red-50 p-2.5 text-sm font-medium text-red-600">{erro}</p>}
+
         {!salvo && (
-          <button onClick={() => (passo < 3 ? setPasso(passo + 1) : concluir())}
-            className="mt-4 flex h-14 w-full items-center justify-center gap-2 rounded-full bg-mint-500 text-base font-bold text-white shadow-float active:scale-[0.98]">
-            {passo < 3 ? 'Continuar →' : 'Salvar van'}
+          <button onClick={() => (passo < 3 ? setPasso(passo + 1) : concluir())} disabled={salvando}
+            className="mt-4 flex h-14 w-full items-center justify-center gap-2 rounded-full bg-mint-500 text-base font-bold text-white shadow-float transition active:scale-[0.98] disabled:opacity-60">
+            {passo < 3 ? 'Continuar →' : (salvando ? 'Salvando…' : 'Salvar van')}
           </button>
         )}
       </div>
     </VMShell>
+  );
+}
+
+/* -------------------- Auxiliares do formulário de van -------------------- */
+function CampoVan({ icon: Icon, label, children }: { icon: LucideIcon; label: string; children: ReactNode }) {
+  return (
+    <div className="mt-3.5">
+      <label className="field-label inline-flex items-center gap-1.5"><Icon className="h-4 w-4 text-navy-400" /> {label}</label>
+      {children}
+    </div>
+  );
+}
+
+function ChipRecurso({ icon: Icon, label, ativo, onClick }: { icon: LucideIcon; label: string; ativo: boolean; onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} aria-pressed={ativo}
+      className={cn('inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-semibold ring-1 transition active:scale-95',
+        ativo ? 'bg-mint-500 text-white ring-mint-500' : 'bg-white text-navy-600 ring-navy-200')}>
+      {ativo ? <Check className="h-4 w-4" /> : <Icon className="h-4 w-4" />} {label}
+    </button>
   );
 }

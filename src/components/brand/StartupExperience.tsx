@@ -23,7 +23,7 @@ export function StartupExperience({ children }: { children: ReactNode }) {
   const [tempoMinimo, setTempoMinimo] = useState(false);
   const [demorando, setDemorando] = useState(false);
   const conteudo = useRef<HTMLDivElement>(null);
-  const pular = useRef<HTMLButtonElement>(null);
+  const dialogo = useRef<HTMLDivElement>(null);
   const focoAnterior = useRef<HTMLElement | null>(null);
 
   const fechar = useCallback(() => {
@@ -47,7 +47,7 @@ export function StartupExperience({ children }: { children: ReactNode }) {
     const anterior = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     if (conteudo.current) conteudo.current.inert = true;
-    pular.current?.focus({ preventScroll: true });
+    dialogo.current?.focus({ preventScroll: true });
     return () => {
       document.body.style.overflow = anterior;
       if (conteudo.current) conteudo.current.inert = false;
@@ -61,9 +61,10 @@ export function StartupExperience({ children }: { children: ReactNode }) {
       else document.getElementById('conteudo')?.focus({ preventScroll: true });
     }}>
       {aberto && <motion.div
+        ref={dialogo} tabIndex={-1}
         key="vambora-opening" className="startup" role="dialog" aria-modal="true" aria-label="Boas-vindas ao Vambora"
         initial={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: reduzir ? 0 : 0.4, ease: [0.22, 1, 0.36, 1] }}
-        onKeyDown={e => { if (e.key === 'Escape') fechar(); if (e.key === 'Tab') { e.preventDefault(); pular.current?.focus(); } }}
+        onKeyDown={e => { if (e.key === 'Escape') fechar(); if (e.key === 'Tab') { e.preventDefault(); dialogo.current?.focus(); } }}
       >
         <div className="startup-glow" aria-hidden="true" />
         <div className="startup-grid" aria-hidden="true" />
@@ -83,7 +84,7 @@ export function StartupExperience({ children }: { children: ReactNode }) {
             <span className="startup-status">{demorando && carregando ? 'Preparando suas opções…' : 'Escolar e universitário'}</span>
           </div>
         </div>
-        <div className="startup-bottom"><span>ARAÇATUBA E REGIÃO</span><button ref={pular} type="button" onClick={fechar}>Pular abertura <span aria-hidden="true">↗</span></button></div>
+        <div className="startup-bottom"><span>ARAÇATUBA E REGIÃO</span></div>
       </motion.div>}
     </AnimatePresence>
   </>;

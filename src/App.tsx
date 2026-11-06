@@ -7,8 +7,11 @@ import { OportunidadesPage, SimularEncaixePage as VMSimularPage } from '@/pages/
 import { InteligenciaPage } from '@/pages/vambora-motoristas/InteligenciaPage';
 import { MinhaVanPage, CadastroVanPage } from '@/pages/vambora-motoristas/MinhaVanPage';
 import { MaisPage, ModuloPage } from '@/pages/vambora-motoristas/MaisPage';
+import { CriarRotaPage } from '@/pages/vambora-motoristas/CriarRotaPage';
 import { AparenciaPage } from '@/pages/vambora-motoristas/admin/AparenciaPage';
 import { AppAssetsProvider } from '@/lib/vm/useAppAssets';
+import { UiConfigProvider } from '@/lib/vm/useUiConfig';
+import { EdicaoAparenciaProvider } from '@/lib/vm/useEdicaoAparencia';
 import { Layout } from '@/components/layout/Layout';
 import { ScrollManager } from '@/components/ScrollManager';
 import { PageTransition } from '@/components/motion/PageTransition';
@@ -38,6 +41,8 @@ export default function App() {
       <ScrollManager />
       <AuthProvider>
         <AppAssetsProvider>
+        <UiConfigProvider>
+        <EdicaoAparenciaProvider>
         <VitrineProvider>
           <StartupExperience>
           <Routes>
@@ -65,6 +70,7 @@ export default function App() {
             <Route path="/app" element={<ExigirMotorista><Outlet /></ExigirMotorista>}>
               <Route index element={<DashboardPage />} />
               <Route path="rotas" element={<RotasPage />} />
+              <Route path="rotas/nova" element={<CriarRotaPage />} />
               <Route path="rotas/:id" element={<RotaDetalhePage />} />
               <Route path="oportunidades" element={<OportunidadesPage />} />
               <Route path="oportunidades/:id" element={<VMSimularPage />} />
@@ -83,6 +89,8 @@ export default function App() {
           </Routes>
           </StartupExperience>
         </VitrineProvider>
+        </EdicaoAparenciaProvider>
+        </UiConfigProvider>
         </AppAssetsProvider>
       </AuthProvider>
     </BrowserRouter>

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   Loader2, MapPin, Home, School, Plus, Check, X, ArrowUp, ArrowDown, Trash2, Users, Flag, CheckCircle2, AlertCircle,
 } from 'lucide-react';
@@ -19,7 +19,7 @@ import { TURNO_LABEL, cn, minutosParaTextoHora, horaParaMinutos, nomeDestinoPara
 const DIAS = [['seg', 'Seg'], ['ter', 'Ter'], ['qua', 'Qua'], ['qui', 'Qui'], ['sex', 'Sex']] as const;
 const TURNOS: Turno[] = ['manha', 'tarde', 'noite', 'integral'];
 
-function rotaNova(): Rota {
+export function rotaNova(): Rota {
   return {
     id: '', nome: '', sentido: 'ida', turno: 'manha', dias: ['seg', 'ter', 'qua', 'qui', 'sex'],
     veiculoId: null, monitor: false, monitorOcupaLugar: false, lugaresReservados: 0,
@@ -39,6 +39,7 @@ export function RotaBuilderPage() {
 function Builder() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { destinos } = useVitrine();
   const [veiculos, setVeiculos] = useState<Veiculo[]>([]);
   const [rota, setRota] = useState<Rota>(rotaNova());
@@ -50,15 +51,18 @@ function Builder() {
   useEffect(() => {
     let vivo = true;
     (async () => {
+      // Van recebida do fluxo guiado VM (handoff), reaproveitada sem persistir aqui.
+      const vanRecebida = (location.state as { veiculo?: Veiculo } | null)?.veiculo ?? null;
       const vs = await listarVeiculos().catch(() => [] as Veiculo[]);
+      const lista = vanRecebida && !vs.some((v) => v.id === vanRecebida.id) ? [vanRecebida, ...vs] : vs;
       let r = rotaNova();
       if (id && id !== 'nova') {
         const existente = await obterRota(id).catch(() => null);
         if (existente) r = existente;
       }
-      if (!r.veiculoId && vs.length === 1) r.veiculoId = vs[0].id;
+      if (!r.veiculoId) r.veiculoId = vanRecebida?.id ?? (lista.length === 1 ? lista[0].id : null);
       if (vivo) {
-        setVeiculos(vs);
+        setVeiculos(lista);
         setRota(r);
         setEtapa(r.paradas.length > 0 ? 'construindo' : 'preparacao');
         setCarregando(false);
@@ -264,7 +268,7 @@ function Preparacao({ rota, setRota, veiculos, veiculo, capacidade, onComecar }:
 }
 
 /* ----------------------------- Van visual ----------------------------- */
-function VanViz({ capacidade, aBordo, rota, veiculo }: { capacidade: number; aBordo: number; rota: Rota; veiculo: Veiculo | null }) {
+export function VanViz({ capacidade, aBordo, rota, veiculo }: { capacidade: number; aBordo: number; rota: Rota; veiculo: Veiculo | null }) {
   const livres = Math.max(0, capacidade - aBordo);
   return (
     <div className="card overflow-hidden p-5">
@@ -296,7 +300,7 @@ function VanViz({ capacidade, aBordo, rota, veiculo }: { capacidade: number; aBo
 }
 
 /* ----------------------------- Linha do percurso ----------------------------- */
-function LinhaPercurso({ rota, setRota }: { rota: Rota; setRota: (r: Rota) => void }) {
+export function LinhaPercurso({ rota, setRota }: { rota: Rota; setRota: (r: Rota) => void }) {
   if (rota.paradas.length === 0) return null;
   const paradas = [...rota.paradas].sort((a, b) => a.ordem - b.ordem);
 
@@ -354,7 +358,7 @@ function LinhaPercurso({ rota, setRota }: { rota: Rota; setRota: (r: Rota) => vo
 }
 
 /* ----------------------------- Ação: adicionar parada ----------------------------- */
-function AcaoParada({ rota, setRota, destinos, locais, aBordo, capacidade }: {
+export function AcaoParada({ rota, setRota, destinos, locais, aBordo, capacidade }: {
   rota: Rota; setRota: (r: Rota) => void;
   destinos: { id: string; nome: string; bairro: string; lat?: number | null; lng?: number | null }[];
   locais: SugestaoEndereco[];
@@ -618,7 +622,7 @@ function FormEscola({ rota, setRota, destinos, proxOrdem, aBordo, onFechar }: {
 }
 
 /* ----------------------------- Horários ----------------------------- */
-function Horarios({ rota, setRota, onConfirmar, salvando }: { rota: Rota; setRota: (r: Rota) => void; onConfirmar: () => void; salvando: boolean }) {
+export function Horarios({ rota, setRota, onConfirmar, salvando }: { rota: Rota; setRota: (r: Rota) => void; onConfirmar: () => void; salvando: boolean }) {
   const [hora, setHora] = useState(rota.ultimoDesembarqueMin != null ? minutosParaTextoHora(rota.ultimoDesembarqueMin).replace('h', ':') : '');
   const [antecip, setAntecip] = useState(rota.limiteAntecipacaoMin != null ? String(rota.limiteAntecipacaoMin) : '');
 
