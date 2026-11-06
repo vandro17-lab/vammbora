@@ -68,8 +68,11 @@ export async function salvarVeiculo(v: Veiculo): Promise<Veiculo> {
     const { data: u } = await supabase.auth.getUser();
     const ownerId = u.user?.id;
     if (!ownerId) throw new Error('Faça login para salvar a van.');
+    // IDs de cenários demonstrativos não são UUIDs do banco.
+    // Nesse caso, criamos um registro novo e deixamos o Postgres gerar o UUID.
+    const uuidValido = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v.id);
     const payload = {
-      id: v.id || undefined,
+      ...(uuidValido ? { id: v.id } : {}),
       owner_id: ownerId,
       model: v.modelo,
       year: v.ano ?? null,
