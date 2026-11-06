@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { CaretLeft, Bell, Check } from '@phosphor-icons/react';
 import type { Icon as PhosphorIcon } from '@phosphor-icons/react';
 import { VanEscolar } from '@/components/vm/VanEscolar';
+import { SlotIlustracao } from '@/components/vm/SlotImagem';
 
 /**
  * Cabeçalho premium de seção do app Vambora Motoristas (fiel à referência):
@@ -18,8 +19,10 @@ export function VMSectionHeader({
   const navigate = useNavigate();
   return (
     <header className="vm-grad relative isolate overflow-hidden px-5 pb-11 pt-[calc(env(safe-area-inset-top)+0.7rem)] text-white">
-      {/* Van escolar (identidade), grande, ao fundo-direita */}
-      <VanEscolar className="pointer-events-none absolute -right-3 top-8 w-44 opacity-[0.97] drop-shadow-xl" />
+      {/* Van escolar (identidade), grande, ao fundo-direita. Slot editável (fallback: vetor). */}
+      <div className="pointer-events-none absolute -right-3 top-8 w-44 drop-shadow-xl">
+        <SlotIlustracao slot="header.van" alt="Van escolar" fallback={<VanEscolar className="w-full opacity-[0.97]" />} />
+      </div>
       {/* Brilho suave de topo */}
       <div className="pointer-events-none absolute -left-10 -top-16 h-40 w-40 rounded-full bg-white/10 blur-2xl" />
 
