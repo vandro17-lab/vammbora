@@ -64,8 +64,13 @@ export async function listarVeiculos(): Promise<Veiculo[]> {
 
 export async function salvarVeiculo(v: Veiculo): Promise<Veiculo> {
   if (USE_SUPABASE && supabase) {
+    // owner_id é obrigatório (NOT NULL) e usado pela RLS: preenche com o usuário logado.
+    const { data: u } = await supabase.auth.getUser();
+    const ownerId = u.user?.id;
+    if (!ownerId) throw new Error('Faça login para salvar a van.');
     const payload = {
       id: v.id || undefined,
+      owner_id: ownerId,
       model: v.modelo,
       year: v.ano ?? null,
       plate: v.placa ?? null,

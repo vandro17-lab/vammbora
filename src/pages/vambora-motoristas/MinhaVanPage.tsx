@@ -10,6 +10,7 @@ import { VanEscolar } from '@/components/vm/VanEscolar';
 import { SlotIlustracao } from '@/components/vm/SlotImagem';
 import { useDadosMotorista, lerPrefs, salvarPrefs } from '@/lib/vm/useDadosMotorista';
 import { salvarVeiculo } from '@/data/motorista-store';
+import { USE_SUPABASE } from '@/lib/supabase';
 import { formatBRL, cn } from '@/lib/utils';
 import type { Veiculo } from '@/types/motorista';
 
@@ -97,6 +98,8 @@ export function CadastroVanPage() {
   const prefs = lerPrefs();
   const [passo, setPasso] = useState(1);
   const [salvo, setSalvo] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  const [salvando, setSalvando] = useState(false);
 
   const [modelo, setModelo] = useState(dados.veiculo?.modelo ?? 'Mercedes-Benz Sprinter');
   const [ano, setAno] = useState(dados.veiculo?.ano ?? 2018);
@@ -116,10 +119,20 @@ export function CadastroVanPage() {
       lugaresPassageiro: lugares, arCondicionado: acEl, acessivel: acessivelEl, cintos: cintosEl,
       fotos: dados.veiculo?.fotos ?? [],
     };
-    try { await salvarVeiculo(veic); } catch { /* protótipo: segue mesmo sem backend */ }
+    setErro(null); setSalvando(true);
+    try {
+      await salvarVeiculo(veic);
+    } catch (e) {
+      setSalvando(false);
+      // Com banco conectado, uma falha real precisa aparecer (não some em silêncio).
+      if (USE_SUPABASE) { setErro('Não foi possível salvar a van: ' + (e as Error).message); return; }
+      // Modo demonstração (sem backend): segue mesmo assim.
+    }
     salvarPrefs({ consumoKmL: consumo, precoDiesel: preco, mensalidade });
+    setSalvando(false);
     setSalvo(true);
-    setTimeout(() => navigate('/app'), 900);
+    // Volta para onde veio (fluxo de criar rota ou Minha Van).
+    setTimeout(() => navigate(-1), 900);
   }
 
   return (
@@ -234,10 +247,12 @@ export function CadastroVanPage() {
           </Card>
         )}
 
+        {erro && <p className="mt-3 rounded-xl bg-red-50 p-2.5 text-sm font-medium text-red-600">{erro}</p>}
+
         {!salvo && (
-          <button onClick={() => (passo < 3 ? setPasso(passo + 1) : concluir())}
-            className="mt-4 flex h-14 w-full items-center justify-center gap-2 rounded-full bg-mint-500 text-base font-bold text-white shadow-float active:scale-[0.98]">
-            {passo < 3 ? 'Continuar →' : 'Salvar van'}
+          <button onClick={() => (passo < 3 ? setPasso(passo + 1) : concluir())} disabled={salvando}
+            className="mt-4 flex h-14 w-full items-center justify-center gap-2 rounded-full bg-mint-500 text-base font-bold text-white shadow-float transition active:scale-[0.98] disabled:opacity-60">
+            {passo < 3 ? 'Continuar →' : (salvando ? 'Salvando…' : 'Salvar van')}
           </button>
         )}
       </div>
