@@ -14,6 +14,9 @@
     "icons": "node scripts/generate-icons.mjs"
   },
   "dependencies": {
+    "@fontsource/inter": "^5.1.0",
+    "@fontsource/plus-jakarta-sans": "^5.1.0",
+    "@phosphor-icons/react": "^2.1.7",
     "@supabase/supabase-js": "^2.45.4",
     "@types/leaflet": "^1.9.12",
     "clsx": "2.1.1",
@@ -22,6 +25,7 @@
     "lucide-react": "0.439.0",
     "react": "18.3.1",
     "react-dom": "18.3.1",
+    "react-easy-crop": "^5.4.1",
     "react-router-dom": "6.26.2",
     "tailwind-merge": "2.5.2"
   },

@@ -1,67 +1,133 @@
 import { useParams, useNavigate } from 'react-router-dom';
+// Ícones premium (duotone) para o hub — Phosphor:
 import {
-  FileText, CalendarDays, Wrench, Fuel, BarChart3, Gift, HelpCircle, Settings,
-  ChevronRight, CheckCircle2, Clock, AlertTriangle, Gauge, Coins, Route as RouteIcon, Tag, LogOut, User, Bus,
+  SquaresFour, Van, CalendarBlank, Wrench, GasPump, ChartBar, FileText as FileDoc,
+  Headset, GearSix, Crown, Gift, CaretRight, SealCheck, Percent, ImageSquare,
+} from '@phosphor-icons/react';
+// Ícones das telas de detalhe (ModuloPage) — lucide (mantidos):
+import {
+  FileText, CalendarDays, Wrench as WrenchL, Fuel, Gauge, Coins, Route as RouteIcon, Tag,
+  CheckCircle2, Clock, AlertTriangle, LogOut, User,
 } from 'lucide-react';
 import { Avatar } from '@/components/brand/Avatar';
 import { VMShell } from '@/components/vm/VMShell';
+import { VMSectionHeader } from '@/components/vm/VMHeader';
 import { Card, SubHeader, LinhaValor, DemoChip } from '@/components/vm/ui';
+import { SlotIlustracao, SlotIcone } from '@/components/vm/SlotImagem';
 import { useDadosMotorista, lerPrefs } from '@/lib/vm/useDadosMotorista';
 import { MOTORISTA_DEMO, MANUTENCAO_DEMO, DOCUMENTOS_DEMO, CALENDARIO_DEMO } from '@/data/motorista-demo';
 import { useAuth } from '@/lib/auth';
 import { formatBRL, cn } from '@/lib/utils';
+import type { Icon as PhosphorIcon } from '@phosphor-icons/react';
 
-const MODULOS = [
-  { k: 'documentacao', Icone: FileText, label: 'Documentação', cor: 'vm-ico-teal' },
-  { k: 'calendario', Icone: CalendarDays, label: 'Calendário escolar', cor: 'vm-ico-purple' },
-  { k: 'manutencao', Icone: Wrench, label: 'Manutenção', cor: 'vm-ico-slate' },
-  { k: 'combustivel', Icone: Fuel, label: 'Combustível', cor: 'vm-ico-rose' },
-  { k: 'relatorios', Icone: BarChart3, label: 'Relatórios', cor: 'vm-ico-blue' },
-  { k: 'clube', Icone: Gift, label: 'Clube do Motorista', cor: 'vm-ico-green' },
-  { k: 'ajuda', Icone: HelpCircle, label: 'Ajuda e Suporte', cor: 'vm-ico-amber' },
-  { k: 'config', Icone: Settings, label: 'Configurações', cor: 'vm-ico-navy' },
-] as const;
+/** Atalhos do hub (grade de 2 colunas, fiel à referência). */
+interface Atalho { to: string; slot: string; label: string; descr: string; Icone: PhosphorIcon; cor: string }
+const ATALHOS: Atalho[] = [
+  { to: '/app/van', slot: 'icon.minhaVan', label: 'Minha Van', descr: 'Veículo, consumo e documentos', Icone: Van, cor: 'vm-ico-green' },
+  { to: '/app/mais/calendario', slot: 'icon.calendario', label: 'Calendário escolar', descr: 'Datas, eventos e planejamento', Icone: CalendarBlank, cor: 'vm-ico-purple' },
+  { to: '/app/mais/manutencao', slot: 'icon.manutencao', label: 'Manutenção', descr: 'Revisões, histórico e lembretes', Icone: Wrench, cor: 'vm-ico-slate' },
+  { to: '/app/mais/combustivel', slot: 'icon.combustivel', label: 'Combustível', descr: 'Consumo, preços e estimativas', Icone: GasPump, cor: 'vm-ico-rose' },
+  { to: '/app/mais/relatorios', slot: 'icon.relatorios', label: 'Relatórios', descr: 'Desempenho, rotas e resultados', Icone: ChartBar, cor: 'vm-ico-blue' },
+  { to: '/app/mais/documentacao', slot: 'icon.documentacao', label: 'Documentação', descr: 'Licenças e órgãos obrigatórios', Icone: FileDoc, cor: 'vm-ico-teal' },
+  { to: '/app/mais/ajuda', slot: 'icon.ajuda', label: 'Ajuda e Suporte', descr: 'Tire suas dúvidas e fale conosco', Icone: Headset, cor: 'vm-ico-amber' },
+  { to: '/app/mais/config', slot: 'icon.config', label: 'Configurações', descr: 'Preferências, conta e notificações', Icone: GearSix, cor: 'vm-ico-navy' },
+];
+
+/** Títulos das telas de detalhe (ModuloPage). */
+const MODULO_TITULOS: Record<string, string> = {
+  documentacao: 'Documentação', calendario: 'Calendário escolar', manutencao: 'Manutenção',
+  combustivel: 'Combustível', relatorios: 'Relatórios', clube: 'Clube do Motorista',
+  ajuda: 'Ajuda e Suporte', config: 'Configurações',
+};
 
 /* ============================== TELA 10 — Mais ============================== */
 export function MaisPage() {
   const navigate = useNavigate();
-  const { sair, session } = useAuth();
+  const { sair, session, isAdmin } = useAuth();
+  const { dados } = useDadosMotorista();
+
+  const meta = session?.user?.user_metadata ?? {};
+  const nomeReal = (meta.full_name || meta.name || session?.user?.email?.split('@')[0]) as string | undefined;
+  const nome = dados.demo ? MOTORISTA_DEMO.apelido : (nomeReal || 'Motorista');
+
   return (
     <VMShell>
-      <SubHeader titulo="Mais" />
-      <div className="space-y-3.5 px-4 pt-4">
-        <Card className="flex items-center gap-3 p-4">
-          <Avatar nome={MOTORISTA_DEMO.nome} className="h-12 w-12 text-base" />
-          <div className="flex-1">
-            <p className="font-display font-bold text-navy-900">{MOTORISTA_DEMO.apelido}</p>
-            <p className="inline-flex items-center gap-1 text-xs font-medium text-mint-700"><CheckCircle2 className="h-3.5 w-3.5" /> Motorista verificado</p>
-          </div>
-          <ChevronRight className="h-5 w-5 text-navy-300" />
-        </Card>
+      <VMSectionHeader
+        icon={SquaresFour}
+        titulo="Mais"
+        subtitulo="Recursos e serviços para o seu dia a dia como motorista escolar."
+      />
 
-        {/* Minha Van em destaque (antes acessível só pela aba; agora vive no hub) */}
+      <div className="space-y-3 px-4 pt-4">
+        {/* Cartão do motorista */}
         <button onClick={() => navigate('/app/van')} className="w-full text-left">
-          <Card className="vm-press flex items-center gap-3 p-4">
-            <span className="vm-chip-ico vm-ico-green"><Bus className="h-5 w-5" /></span>
+          <Card className="vm-press flex items-center gap-3 p-3.5">
+            <Avatar nome={dados.demo ? MOTORISTA_DEMO.nome : nome} className="h-12 w-12 text-base" />
             <div className="flex-1">
-              <p className="font-display font-bold text-navy-900">Minha Van</p>
-              <p className="text-xs text-navy-500">Veículo, consumo, custos e documentos</p>
+              <p className="font-display text-[17px] font-bold text-navy-900">{nome}</p>
+              <p className="inline-flex items-center gap-1 text-xs font-semibold text-mint-700">
+                <SealCheck size={15} weight="fill" /> Motorista verificado
+              </p>
             </div>
-            <ChevronRight className="h-5 w-5 text-navy-300" />
+            <CaretRight size={18} weight="bold" className="text-navy-300" />
           </Card>
         </button>
 
+        {/* Banner — Clube do Motorista */}
+        <button onClick={() => navigate('/app/mais/clube')} className="w-full text-left">
+          <div className="vm-press relative overflow-hidden rounded-[1.25rem] p-4 text-white shadow-card"
+            style={{ background: 'linear-gradient(135deg,#17306b 0%,#0b1f3a 62%)' }}>
+            {/* Arte do Clube — slot editável (fallback: presente vetorial) */}
+            <div className="pointer-events-none absolute -right-2 -top-1 h-28 w-28">
+              <SlotIlustracao slot="clube.art" alt="Clube do Motorista"
+                fallback={<Gift size={96} weight="duotone" className="absolute right-1 top-1 text-amber-300/80" />} />
+            </div>
+            <span className="pointer-events-none absolute right-5 top-[4.5rem] grid h-8 w-8 place-items-center rounded-full bg-mint-500 text-white shadow-md ring-4 ring-[#0b1f3a]">
+              <Percent size={16} weight="bold" />
+            </span>
+            <div className="relative max-w-[70%]">
+              <p className="inline-flex items-center gap-1.5 font-display text-lg font-extrabold">
+                <Crown size={22} weight="fill" className="text-amber-300" /> Clube do Motorista
+              </p>
+              <p className="mt-0.5 text-[13px] leading-snug text-white/80">Descontos, benefícios e parcerias exclusivas.</p>
+              <span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-amber-300 px-4 py-2 text-sm font-bold text-navy-900">
+                Ver vantagens <CaretRight size={16} weight="bold" />
+              </span>
+            </div>
+          </div>
+        </button>
+
+        {/* Grade de atalhos */}
         <div className="grid grid-cols-2 gap-3">
-          {MODULOS.map(({ k, Icone, label, cor }) => (
-            <button key={k} onClick={() => navigate(`/app/mais/${k}`)} className="vm-card flex items-center gap-2.5 p-3.5 text-left active:scale-[0.98]">
-              <span className={cn('vm-chip-ico', cor)}><Icone className="h-5 w-5" /></span>
-              <span className="text-sm font-semibold leading-tight text-navy-900">{label}</span>
+          {ATALHOS.map(({ to, slot, label, descr, Icone, cor }) => (
+            <button key={to} onClick={() => navigate(to)} className="h-full w-full text-left">
+              <Card className="vm-press relative flex h-full items-start gap-2.5 p-3.5">
+                <CaretRight size={14} weight="bold" className="absolute right-2.5 top-3.5 text-navy-300" />
+                <span className={cn('vm-chip-ico shrink-0 overflow-hidden', cor)}>
+                  <SlotIcone slot={slot} fallback={<Icone size={20} weight="duotone" />} />
+                </span>
+                <div className="min-w-0 flex-1 pr-3.5">
+                  <p className="font-display text-[13px] font-bold leading-tight tracking-tight text-navy-900">{label}</p>
+                  <p className="mt-1 text-[11px] leading-snug text-navy-500">{descr}</p>
+                </div>
+              </Card>
             </button>
           ))}
         </div>
 
+        {isAdmin && (
+          <button onClick={() => navigate('/app/admin/aparencia')} className="vm-press flex w-full items-center gap-3 rounded-2xl bg-white p-4 text-left shadow-card ring-1 ring-navy-100">
+            <span className="vm-chip-ico vm-ico-navy"><ImageSquare size={20} weight="duotone" /></span>
+            <div className="flex-1">
+              <p className="font-display text-[14px] font-bold text-navy-900">Aparência do app</p>
+              <p className="text-[11px] text-navy-500">Publicar artes nos espaços (admin)</p>
+            </div>
+            <CaretRight size={16} weight="bold" className="text-navy-300" />
+          </button>
+        )}
+
         {session && (
-          <button onClick={sair} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-white py-3.5 text-sm font-semibold text-red-600 shadow-card ring-1 ring-navy-100">
+          <button onClick={sair} className="mt-1 flex w-full items-center justify-center gap-2 rounded-2xl bg-white py-3.5 text-sm font-semibold text-red-600 shadow-card ring-1 ring-navy-100 active:scale-[0.99]">
             <LogOut className="h-4 w-4" /> Sair da conta
           </button>
         )}
@@ -74,7 +140,7 @@ export function MaisPage() {
 export function ModuloPage() {
   const { modulo } = useParams();
   const navigate = useNavigate();
-  const titulo = (MODULOS.find((m) => m.k === modulo)?.label) ?? 'Módulo';
+  const titulo = (modulo && MODULO_TITULOS[modulo]) ?? 'Módulo';
   return (
     <VMShell nav={false}>
       <SubHeader titulo={titulo} onVoltar={() => navigate('/app/mais')} />
@@ -160,7 +226,7 @@ function Calendario() {
 
 const CLUBE = [
   { cat: 'Postos', nome: 'Rede de combustível parceira', oferta: 'Condição especial para motoristas escolares', Icone: Fuel, cor: 'vm-ico-rose' },
-  { cat: 'Oficinas', nome: 'Oficina mecânica', oferta: 'Revisão com prioridade de agenda', Icone: Wrench, cor: 'vm-ico-slate' },
+  { cat: 'Oficinas', nome: 'Oficina mecânica', oferta: 'Revisão com prioridade de agenda', Icone: WrenchL, cor: 'vm-ico-slate' },
   { cat: 'Pneus', nome: 'Centro automotivo', oferta: 'Alinhamento + balanceamento', Icone: RouteIcon, cor: 'vm-ico-navy' },
   { cat: 'Seguro', nome: 'Seguro veicular', oferta: 'Cotação para transporte escolar', Icone: Tag, cor: 'vm-ico-green' },
 ];

@@ -13,9 +13,18 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
  */
 const url = import.meta.env.VITE_SUPABASE_URL;
 const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const flag = import.meta.env.VITE_USE_SUPABASE;
 
-export const USE_SUPABASE =
-  import.meta.env.VITE_USE_SUPABASE === 'true' && !!url && !!anonKey;
+/**
+ * O Supabase é considerado ATIVO quando há URL + chave anon (ou seja, quando o
+ * projeto foi configurado). A flag `VITE_USE_SUPABASE` é OPCIONAL e serve apenas
+ * para FORÇAR o desligamento (`="false"`) — ex.: publicar uma demo sem banco
+ * mesmo tendo as chaves. Assim, "configurei o Supabase" passa a bastar.
+ *
+ * Lembrete: estas variáveis são lidas no BUILD (Vite). Após configurá-las no
+ * provedor de hospedagem, é preciso refazer o deploy para o app enxergá-las.
+ */
+export const USE_SUPABASE = !!url && !!anonKey && flag !== 'false';
 
 export const supabase: SupabaseClient | null = USE_SUPABASE
   ? createClient(url as string, anonKey as string, {
