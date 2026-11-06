@@ -4,6 +4,8 @@ import { AnimatePresence } from 'framer-motion';
 import { SlidersHorizontal, ArrowLeft, SearchX, WifiOff, RefreshCw } from 'lucide-react';
 import { paramsParaCriterios } from '@/lib/searchParams';
 import { buscarComMotor } from '@/lib/busca-encaixe';
+import { buscarRotasReais, buscarRotasReaisDemo, type CartaoRotaRealDados } from '@/lib/busca-rotas-reais-cliente';
+import { CartaoRotaReal } from '@/components/results/CartaoRotaReal';
 import { useVitrine } from '@/data/VitrineProvider';
 import { CIDADE_PADRAO } from '@/data/cidades';
 import { ResultCard } from '@/components/results/ResultCard';
@@ -33,6 +35,28 @@ export function SearchResultsPage() {
   const [tempoAnimacao, setTempoAnimacao] = useState(true);
   const [soComVaga, setSoComVaga] = useState(false);
 
+  // BUSCA REAL sobre rotas publicadas. DEMO: lê o localStorage do próprio
+  // navegador. PROD: função server-side (service role, sem PII). Ambos usam o
+  // MESMO núcleo. Sem origem/destino confirmados, não classifica compatibilidade.
+  const [reais, setReais] = useState<{ itens: CartaoRotaRealDados[]; operacional: boolean } | null>(null);
+  useEffect(() => {
+    let vivo = true;
+    (async () => {
+      if (modoDemo) {
+        const itens = await buscarRotasReaisDemo(criterios).catch(() => [] as CartaoRotaRealDados[]);
+        // No demo, só "opera" quando há rotas reais do usuário; senão, vitrine de exemplo.
+        if (vivo) setReais({ itens, operacional: itens.length > 0 });
+      } else {
+        const r = await buscarRotasReais(criterios).catch(() => ({ estado: 'erro' as const, resultados: [] as CartaoRotaRealDados[] }));
+        // Em prod, o servidor é a fonte quando responde (ok); em 503/erro, mantém a busca atual.
+        if (vivo) setReais({ itens: r.resultados, operacional: r.estado === 'ok' });
+      }
+    })();
+    return () => { vivo = false; };
+  }, [criterios, modoDemo]);
+  const mostrarReais = !!reais?.operacional;
+  const base = elegiveis;
+
   // A tela de busca roda por ~3,8s; só revelamos quando a animação terminou E os
   // dados já chegaram. Em caso de erro, saímos da animação assim que ela termina.
   useEffect(() => {
@@ -43,7 +67,7 @@ export function SearchResultsPage() {
 
   const carregando = tempoAnimacao || status === 'carregando';
   const destino = criterios.destinoId ? destinosPorId[criterios.destinoId] : null;
-  const listaFiltrada = soComVaga ? elegiveis.filter((r) => r.motorista.vagasDisponiveis > 0) : elegiveis;
+  const listaFiltrada = soComVaga ? base.filter((r) => r.motorista.vagasDisponiveis > 0) : base;
   const dataAvulso = formatarData(criterios.dataAvulso);
 
   return (
@@ -91,7 +115,15 @@ export function SearchResultsPage() {
           <div className="min-h-[40vh]" aria-hidden="true" />
         ) : status === 'erro' ? (
           <ErroConexao onTentar={recarregar} />
-        ) : elegiveis.length === 0 ? (
+        ) : mostrarReais ? (
+          reais!.itens.length > 0 ? (
+            <SecaoRotasReais itens={reais!.itens} />
+          ) : (
+            <NenhumResultado>
+              <WaitlistForm criterios={criterios} />
+            </NenhumResultado>
+          )
+        ) : base.length === 0 ? (
           <NenhumResultado>
             <WaitlistForm criterios={criterios} />
           </NenhumResultado>
@@ -136,6 +168,27 @@ export function SearchResultsPage() {
         )}
       </div>
     </>
+  );
+}
+
+function SecaoRotasReais({ itens }: { itens: CartaoRotaRealDados[] }) {
+  return (
+    <div className="mt-6">
+      <p className="text-sm text-navy-600">
+        {plural(itens.length, 'rota compatível', 'rotas compatíveis')} com o seu endereço — horários calculados pelo motor.
+      </p>
+      <div className="mt-4 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+        {itens.map((r, i) => (
+          <Reveal as="div" key={r.rotaId + r.sentido} delay={Math.min(i * 0.08, 0.4)}>
+            <CartaoRotaReal r={r} />
+          </Reveal>
+        ))}
+      </div>
+      <p className="mt-6 text-center text-xs text-navy-400">
+        Horários são estimativas calculadas pelo motor de compatibilidade a partir da rota real — aproximados,
+        sujeitos à confirmação do motorista.
+      </p>
+    </div>
   );
 }
 

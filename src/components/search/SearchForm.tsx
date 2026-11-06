@@ -30,7 +30,9 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
   const [dataAvulso, setDataAvulso] = useState('');
   const [modalidade, setModalidade] = useState<ModalidadeTrajeto>('ida');
   const titulo = useRef<HTMLHeadingElement>(null);
-  function ir(n: number) { setPasso(n); requestAnimationFrame(() => titulo.current?.focus()); }
+  // preventScroll evita que o navegador role a página (inclusive na horizontal)
+  // ao focar o título programaticamente — causava a tela "deslocar para o lado".
+  function ir(n: number) { setPasso(n); requestAnimationFrame(() => titulo.current?.focus({ preventScroll: true })); }
   function enviar(e: React.FormEvent) {
     e.preventDefault();
     if (passo < 2) { ir(passo + 1); return; }

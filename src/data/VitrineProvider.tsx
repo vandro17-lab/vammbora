@@ -43,7 +43,15 @@ export function VitrineProvider({ children }: { children: ReactNode }) {
   const carregar = useCallback(async () => {
     setStatus('carregando');
     try {
-      const [d, m] = await Promise.all([listarDestinos(), listarMotoristas()]);
+      // Timeout defensivo: se o Supabase não responder (ex.: projeto pausado /
+      // cold start), NÃO ficamos girando para sempre — vira 'erro' com "tentar
+      // de novo". Sem isso, a busca e o seletor de escola ficam presos.
+      const comTimeout = <T,>(p: Promise<T>, ms: number): Promise<T> =>
+        Promise.race([
+          p,
+          new Promise<never>((_, rej) => setTimeout(() => rej(new Error('tempo esgotado')), ms)),
+        ]);
+      const [d, m] = await comTimeout(Promise.all([listarDestinos(), listarMotoristas()]), 12000);
       setDestinos(d);
       setMotoristas(m);
       setStatus('pronto');
