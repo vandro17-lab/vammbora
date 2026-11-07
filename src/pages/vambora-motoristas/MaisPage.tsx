@@ -26,13 +26,13 @@ import type { Icon as PhosphorIcon } from '@phosphor-icons/react';
 /** Atalhos do hub (grade de 2 colunas, fiel à referência). */
 interface Atalho { to: string; slot: string; label: string; descr: string; Icone: PhosphorIcon; cor: string }
 const ATALHOS: Atalho[] = [
-  { to: '/app/van', slot: 'icon.minhaVan', label: 'Minha Van', descr: 'Veículo, consumo e documentos', Icone: Van, cor: 'vm-ico-green' },
-  { to: '/app/mais/calendario', slot: 'icon.calendario', label: 'Calendário escolar', descr: 'Datas, eventos e planejamento', Icone: CalendarBlank, cor: 'vm-ico-purple' },
-  { to: '/app/mais/manutencao', slot: 'icon.manutencao', label: 'Manutenção', descr: 'Revisões, histórico e lembretes', Icone: Wrench, cor: 'vm-ico-slate' },
-  { to: '/app/mais/combustivel', slot: 'icon.combustivel', label: 'Combustível', descr: 'Consumo, preços e estimativas', Icone: GasPump, cor: 'vm-ico-rose' },
-  { to: '/app/mais/relatorios', slot: 'icon.relatorios', label: 'Relatórios', descr: 'Desempenho, rotas e resultados', Icone: ChartBar, cor: 'vm-ico-blue' },
-  { to: '/app/mais/documentacao', slot: 'icon.documentacao', label: 'Documentação', descr: 'Licenças e órgãos obrigatórios', Icone: FileDoc, cor: 'vm-ico-teal' },
-  { to: '/app/mais/ajuda', slot: 'icon.ajuda', label: 'Ajuda e Suporte', descr: 'Tire suas dúvidas e fale conosco', Icone: Headset, cor: 'vm-ico-amber' },
+  { to: '/app/van', slot: 'icon.minhaVan', label: 'Minha Van', descr: 'Dados do veículo e documentos', Icone: Van, cor: 'vm-ico-green' },
+  { to: '/app/mais/calendario', slot: 'icon.calendario', label: 'Calendário escolar', descr: 'Datas importantes e compromissos', Icone: CalendarBlank, cor: 'vm-ico-purple' },
+  { to: '/app/mais/manutencao', slot: 'icon.manutencao', label: 'Manutenção', descr: 'Revisões e próximas manutenções', Icone: Wrench, cor: 'vm-ico-slate' },
+  { to: '/app/mais/combustivel', slot: 'icon.combustivel', label: 'Combustível', descr: 'Controle de consumo e gastos', Icone: GasPump, cor: 'vm-ico-rose' },
+  { to: '/app/mais/relatorios', slot: 'icon.relatorios', label: 'Relatórios', descr: 'Resumo das rotas e custos', Icone: ChartBar, cor: 'vm-ico-blue' },
+  { to: '/app/mais/documentacao', slot: 'icon.documentacao', label: 'Documentação', descr: 'Documentos e vencimentos', Icone: FileDoc, cor: 'vm-ico-teal' },
+  { to: '/app/mais/ajuda', slot: 'icon.ajuda', label: 'Ajuda e Suporte', descr: 'Encontre respostas e entre em contato', Icone: Headset, cor: 'vm-ico-amber' },
   { to: '/app/mais/config', slot: 'icon.config', label: 'Configurações', descr: 'Preferências, conta e notificações', Icone: GearSix, cor: 'vm-ico-navy' },
 ];
 
@@ -59,7 +59,7 @@ export function MaisPage() {
       <VMSectionHeader
         icon={SquaresFour}
         titulo="Mais"
-        subtitulo="Recursos e serviços para o seu dia a dia como motorista escolar."
+        subtitulo="Gerencie sua van, documentos e serviços."
         tituloKey="mais.header.titulo"
         subtituloKey="mais.header.subtitulo"
       />
@@ -95,7 +95,7 @@ export function MaisPage() {
               <p className="inline-flex items-center gap-1.5 font-display text-lg font-extrabold">
                 <Crown size={22} weight="fill" className="text-amber-300" /> Clube do Motorista
               </p>
-              <p className="mt-0.5 text-[13px] leading-snug text-white/80">Descontos, benefícios e parcerias exclusivas.</p>
+              <p className="mt-0.5 text-[13px] leading-snug text-white/80">Conheça as vantagens do Clube do Motorista.</p>
               <span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-amber-300 px-4 py-2 text-sm font-bold text-navy-900">
                 Ver vantagens <CaretRight size={16} weight="bold" />
               </span>
@@ -181,7 +181,7 @@ function Documentacao() {
           <span className={cn('chip', cor(d.status))}>{txt(d.status)}</span>
         </Card>
       ))}
-      <p className="text-center text-[11px] text-navy-400">Você só aparece às famílias com os documentos aprovados e válidos.</p>
+      <p className="text-center text-[11px] text-navy-400">Seu perfil poderá aparecer nas buscas após a aprovação dos documentos exigidos.</p>
     </>
   );
 }
@@ -256,7 +256,7 @@ function Clube() {
           <p className="inline-flex items-center gap-1.5 font-display text-base font-extrabold">
             <Crown size={18} weight="fill" className="text-amber-300" /> Clube do Motorista
           </p>
-          <p className="mt-0.5 text-[12px] leading-snug text-white/80">Benefícios e parcerias para a sua operação escolar.</p>
+          <p className="mt-0.5 text-[12px] leading-snug text-white/80">Parcerias pensadas para quem trabalha com transporte escolar.</p>
         </div>
       </div>
 
@@ -277,7 +277,7 @@ function Clube() {
           <span className="chip bg-mint-50 text-mint-700">consultar</span>
         </Card>
       ))}
-      <p className="text-center text-[11px] text-navy-400">Ofertas ilustrativas — parcerias comerciais a confirmar. Estrutura pronta para ofertas reais.</p>
+      <p className="text-center text-[11px] text-navy-400">Benefícios em preparação. As parcerias ainda não estão disponíveis.</p>
     </>
   );
 }
