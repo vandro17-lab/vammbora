@@ -5,8 +5,10 @@ import { useVitrine } from '@/data/VitrineProvider';
 import './startup.css';
 
 const SESSION_KEY = 'vambora:opening:v1';
-const MIN_DURATION = 3200;
+const MIN_DURATION = 2200;
 const MAX_DURATION = 7000;
+/** A partir de quando um toque/clique pode pular a abertura (evita dispensar por engano no 1º instante). */
+const DISMISS_GRACE = 700;
 
 function primeiraEntrada(pathname: string) {
   if (pathname.startsWith('/admin')) return false;
@@ -22,6 +24,7 @@ export function StartupExperience({ children }: { children: ReactNode }) {
   const [aberto, setAberto] = useState(() => primeiraEntrada(pathname));
   const [tempoMinimo, setTempoMinimo] = useState(false);
   const [demorando, setDemorando] = useState(false);
+  const [podeDispensar, setPodeDispensar] = useState(false);
   const conteudo = useRef<HTMLDivElement>(null);
   const dialogo = useRef<HTMLDivElement>(null);
   const focoAnterior = useRef<HTMLElement | null>(null);
@@ -35,9 +38,18 @@ export function StartupExperience({ children }: { children: ReactNode }) {
     if (!aberto) return;
     const minimo = window.setTimeout(() => setTempoMinimo(true), reduzir ? 400 : MIN_DURATION);
     const aviso = window.setTimeout(() => setDemorando(true), MIN_DURATION);
+    const liberar = window.setTimeout(() => setPodeDispensar(true), reduzir ? 0 : DISMISS_GRACE);
     const limite = window.setTimeout(fechar, MAX_DURATION);
-    return () => { clearTimeout(minimo); clearTimeout(aviso); clearTimeout(limite); };
+    return () => { clearTimeout(minimo); clearTimeout(aviso); clearTimeout(liberar); clearTimeout(limite); };
   }, [aberto, reduzir, fechar]);
+
+  // Rede/aba estrangulada pode atrasar os timers: ao voltar o foco à aba, reavalia o fechamento.
+  useEffect(() => {
+    if (!aberto) return;
+    const aoVoltar = () => { if (document.visibilityState === 'visible' && tempoMinimo && !carregando) fechar(); };
+    document.addEventListener('visibilitychange', aoVoltar);
+    return () => document.removeEventListener('visibilitychange', aoVoltar);
+  }, [aberto, tempoMinimo, carregando, fechar]);
 
   useEffect(() => { if (aberto && tempoMinimo && !carregando) fechar(); }, [aberto, tempoMinimo, carregando, fechar]);
 
@@ -63,7 +75,9 @@ export function StartupExperience({ children }: { children: ReactNode }) {
       {aberto && <motion.div
         ref={dialogo} tabIndex={-1}
         key="vambora-opening" className="startup" role="dialog" aria-modal="true" aria-label="Boas-vindas ao Vambora"
+        style={{ cursor: podeDispensar ? 'pointer' : 'default' }}
         initial={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: reduzir ? 0 : 0.4, ease: [0.22, 1, 0.36, 1] }}
+        onPointerDown={() => { if (podeDispensar) fechar(); }}
         onKeyDown={e => { if (e.key === 'Escape') fechar(); if (e.key === 'Tab') { e.preventDefault(); dialogo.current?.focus(); } }}
       >
         <div className="startup-glow" aria-hidden="true" />
@@ -83,6 +97,7 @@ export function StartupExperience({ children }: { children: ReactNode }) {
             <span className="startup-loading-line" aria-hidden="true" />
             <span className="startup-status">{demorando && carregando ? 'Preparando suas opções…' : 'Escolar e universitário'}</span>
           </div>
+          <span className="startup-skip" aria-hidden="true" data-visivel={podeDispensar || undefined}>Toque para continuar</span>
         </div>
         <div className="startup-bottom"><span>ARAÇATUBA E REGIÃO</span></div>
       </motion.div>}
