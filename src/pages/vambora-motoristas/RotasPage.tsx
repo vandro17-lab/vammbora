@@ -201,6 +201,11 @@ export function RotaDetalhePage() {
             <span className="inline-flex items-center gap-1.5"><Navigation className="h-4 w-4 text-navy-400" /> {km.toFixed(1).replace('.', ',')} km</span>
             <span className="inline-flex items-center gap-1.5"><Clock className="h-4 w-4 text-navy-400" /> {tempoMin(km)} min</span>
           </div>
+          {!dados.demo && (
+            <Link to={`/painel/rota-real/${rota.id}`} className="btn btn-lg btn-primary mt-4 w-full">
+              <Navigation className="h-5 w-5" /> Iniciar rota
+            </Link>
+          )}
         </Card>
 
         {/* Publicar na busca pública (ação explícita do motorista) */}
@@ -238,11 +243,6 @@ export function RotaDetalhePage() {
             <MapaInterativoRota paradas={rota.paradas} bare />
           </div>
           <p className="mt-2 text-[11px] leading-snug text-navy-400">Fonte: OpenStreetMap / OSRM — tempos são estimativas. Endereços permanecem privados.</p>
-          {!dados.demo && (
-            <Link to={`/painel/rota-real/${rota.id}`} className="btn btn-md btn-primary mt-3 w-full">
-              <Navigation className="h-4 w-4" /> Abrir navegação real
-            </Link>
-          )}
         </Card>
 
         {/* Indicadores */}
