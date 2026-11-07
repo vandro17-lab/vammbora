@@ -1,36 +1,79 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, CheckCircle2, Loader2, MapPin, Navigation, Play, RotateCcw, Route as RouteIcon } from 'lucide-react';
+import {
+  ArrowLeft, Check, CheckCircle2, Clock3, Loader2, Navigation,
+  Play, RotateCcw, Route as RouteIcon, Users, XCircle,
+} from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
-import { ExigirMotorista, MotoristaShell } from './MotoristaShell';
-import { obterRota } from '@/data/motorista-store';
+import { ExigirMotorista } from './MotoristaShell';
+import { obterRota, listarVeiculos } from '@/data/motorista-store';
 import { trajetoOSRM, type TrajetoRota } from '@/lib/geocode';
-import type { Rota } from '@/types/motorista';
+import { capacidadeAlunos } from '@/lib/ocupacao-rota';
+import type { Rota, Veiculo, ParadaRota, PassageiroRota } from '@/types/motorista';
 import { MapaNavegacaoRotaReal } from '@/components/motorista/MapaNavegacaoRotaReal';
 import { cn, nomeDestinoParaExibicao } from '@/lib/utils';
+
+type EstadoViagem = 'pronta' | 'movendo' | 'chegou' | 'confirmada' | 'finalizada';
+type EventoViagem = { tipo: 'embarque' | 'desembarque' | 'parada'; texto: string };
+
+function pontoMaisProximo(geometria: [number, number][], parada: ParadaRota): number {
+  if (!Number.isFinite(parada.lat) || !Number.isFinite(parada.lng) || !geometria.length) return 0;
+  let melhor = 0;
+  let distancia = Number.POSITIVE_INFINITY;
+  geometria.forEach(([lat, lng], i) => {
+    const d = (lat - (parada.lat as number)) ** 2 + (lng - (parada.lng as number)) ** 2;
+    if (d < distancia) { distancia = d; melhor = i; }
+  });
+  return melhor;
+}
+
+function nomePassageiro(pax: PassageiroRota): string {
+  return pax.identificacao || 'Aluno';
+}
+
+function nomeParada(parada: ParadaRota | undefined): string {
+  if (!parada) return 'Próxima parada';
+  if (parada.tipo === 'escola') return nomeDestinoParaExibicao(parada.destinoNome || parada.rotulo || 'Escola');
+  if (parada.tipo === 'saida') return parada.rotulo || 'Saída';
+  return parada.rotulo || 'Casa do aluno';
+}
 
 function NavegacaoProtegida() {
   const { id } = useParams();
   const [rota, setRota] = useState<Rota | null>(null);
+  const [veiculo, setVeiculo] = useState<Veiculo | null>(null);
   const [trajeto, setTrajeto] = useState<TrajetoRota | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
-  const [seguindo, setSeguindo] = useState(false);
+  const [erroOperacao, setErroOperacao] = useState<string | null>(null);
+  const [estado, setEstado] = useState<EstadoViagem>('pronta');
+  const [indiceAtual, setIndiceAtual] = useState(0);
+  const [indiceAlvo, setIndiceAlvo] = useState(1);
   const [progresso, setProgresso] = useState(0);
+  const [aBordoIds, setABordoIds] = useState<string[]>([]);
+  const [entreguesIds, setEntreguesIds] = useState<string[]>([]);
+  const [eventos, setEventos] = useState<EventoViagem[]>([]);
   const frameRef = useRef<number | null>(null);
-  const inicioRef = useRef<number | null>(null);
+  const inicioAnimacaoRef = useRef<number | null>(null);
+  const inicioProgressoRef = useRef(0);
+  const fimProgressoRef = useRef(1);
 
   useEffect(() => {
     let vivo = true;
     (async () => {
       if (!id) { setErro('Rota não informada.'); setCarregando(false); return; }
       try {
-        const r = await obterRota(id);
+        const [r, veiculos] = await Promise.all([obterRota(id), listarVeiculos().catch(() => [] as Veiculo[])]);
         if (!r) throw new Error('Esta rota não está disponível para o motorista conectado.');
         const pontos = [...r.paradas].sort((a, b) => a.ordem - b.ordem).filter((p) => Number.isFinite(p.lat) && Number.isFinite(p.lng));
         if (pontos.length < 2) throw new Error('A rota precisa ter pelo menos duas paradas geolocalizadas.');
         const t = await trajetoOSRM(pontos.map((p) => ({ lat: p.lat as number, lng: p.lng as number })));
         if (!t?.geometria.length) throw new Error('Não foi possível carregar o trajeto pelas ruas.');
-        if (vivo) { setRota(r); setTrajeto(t); }
+        if (vivo) {
+          setRota(r);
+          setVeiculo(veiculos.find((v) => v.id === r.veiculoId) ?? null);
+          setTrajeto(t);
+          setProgresso(0);
+        }
       } catch (e) {
         if (vivo) setErro((e as Error).message || 'Não foi possível carregar a rota.');
       } finally { if (vivo) setCarregando(false); }
@@ -38,69 +81,145 @@ function NavegacaoProtegida() {
     return () => { vivo = false; if (frameRef.current != null) cancelAnimationFrame(frameRef.current); };
   }, [id]);
 
+  const paradas = useMemo(() => [...(rota?.paradas ?? [])].sort((a, b) => a.ordem - b.ordem), [rota]);
+  const progressosParadas = useMemo(() => {
+    if (!trajeto) return [];
+    const ultimo = Math.max(1, trajeto.geometria.length - 1);
+    return paradas.map((p) => pontoMaisProximo(trajeto.geometria, p) / ultimo);
+  }, [paradas, trajeto]);
+  const capacidade = rota ? capacidadeAlunos(rota, veiculo) : 0;
+  const aBordo = useMemo(() => rota?.passageiros.filter((p) => aBordoIds.includes(p.id)) ?? [], [rota, aBordoIds]);
+  const entregues = useMemo(() => rota?.passageiros.filter((p) => entreguesIds.includes(p.id)) ?? [], [rota, entreguesIds]);
+  const paradaAlvo = paradas[indiceAlvo];
+  const passageirosNaParada = useMemo(() => {
+    if (!rota || !paradaAlvo) return { entrando: [] as PassageiroRota[], saindo: [] as PassageiroRota[] };
+    return {
+      entrando: rota.passageiros.filter((p) => p.embarqueParadaId === paradaAlvo.id && !aBordoIds.includes(p.id) && !entreguesIds.includes(p.id)),
+      saindo: rota.passageiros.filter((p) => p.desembarqueParadaId === paradaAlvo.id),
+    };
+  }, [rota, paradaAlvo, aBordoIds, entreguesIds]);
+
   useEffect(() => {
-    if (!seguindo || !trajeto) return;
-    const duracao = Math.max(18000, Math.min(50000, trajeto.geometria.length * 90));
+    if (estado !== 'movendo' || !trajeto || progressosParadas.length < 2) return;
+    const duracao = Math.max(5000, Math.min(22000, (fimProgressoRef.current - inicioProgressoRef.current) * trajeto.geometria.length * 70));
     const tick = (agora: number) => {
-      if (inicioRef.current == null) inicioRef.current = agora - progresso * duracao;
-      const p = Math.min(1, (agora - inicioRef.current) / duracao);
-      setProgresso(p);
-      if (p < 1) frameRef.current = requestAnimationFrame(tick);
-      else setSeguindo(false);
+      if (inicioAnimacaoRef.current == null) inicioAnimacaoRef.current = agora;
+      const fracao = Math.min(1, (agora - inicioAnimacaoRef.current) / duracao);
+      setProgresso(inicioProgressoRef.current + (fimProgressoRef.current - inicioProgressoRef.current) * fracao);
+      if (fracao < 1) frameRef.current = requestAnimationFrame(tick);
+      else setEstado('chegou');
     };
     frameRef.current = requestAnimationFrame(tick);
     return () => { if (frameRef.current != null) cancelAnimationFrame(frameRef.current); };
-  }, [seguindo, trajeto]);
+  }, [estado, indiceAlvo, progressosParadas, trajeto]);
 
-  const paradas = useMemo(() => [...(rota?.paradas ?? [])].sort((a, b) => a.ordem - b.ordem), [rota]);
-  const paradaAtual = Math.min(paradas.length - 1, Math.floor(progresso * Math.max(1, paradas.length - 1)));
-  const proxima = paradas[Math.min(paradas.length - 1, paradaAtual + (progresso >= 1 ? 0 : 1))];
-  const chegou = progresso >= 1;
+  function iniciarTrecho() {
+    if (!trajeto || indiceAlvo >= paradas.length || !progressosParadas.length) return;
+    setErroOperacao(null);
+    inicioProgressoRef.current = progressosParadas[indiceAtual] ?? progresso;
+    fimProgressoRef.current = progressosParadas[indiceAlvo] ?? 1;
+    setProgresso(inicioProgressoRef.current);
+    inicioAnimacaoRef.current = null;
+    setEstado('movendo');
+  }
+
+  function iniciarRota() {
+    if (estado === 'pronta') iniciarTrecho();
+    else if (estado === 'confirmada') iniciarTrecho();
+  }
+
+  function confirmarParada() {
+    if (!rota || !paradaAlvo) return;
+    setErroOperacao(null);
+    const { entrando, saindo } = passageirosNaParada;
+    const faltandoDesembarque = saindo.filter((p) => !aBordoIds.includes(p.id));
+    if (faltandoDesembarque.length) {
+      setErroOperacao(`Não é possível confirmar: ${faltandoDesembarque.map(nomePassageiro).join(', ')} não está a bordo.`);
+      return;
+    }
+    const novaBordo = aBordoIds.filter((idPax) => !saindo.some((p) => p.id === idPax));
+    if (novaBordo.length + entrando.length > capacidade) {
+      setErroOperacao(`Capacidade excedida: a van comporta ${capacidade} aluno(s) e esta parada deixaria ${novaBordo.length + entrando.length} a bordo.`);
+      return;
+    }
+    const idsSaindo = saindo.map((p) => p.id);
+    const idsEntrando = entrando.map((p) => p.id);
+    setABordoIds([...novaBordo, ...idsEntrando]);
+    setEntreguesIds((anteriores) => [...new Set([...anteriores, ...idsSaindo])]);
+    setEventos((anteriores) => [
+      ...anteriores,
+      ...(saindo.length ? [{ tipo: 'desembarque' as const, texto: `Desembarque confirmado: ${saindo.map(nomePassageiro).join(', ')}` }] : []),
+      ...(entrando.length ? [{ tipo: 'embarque' as const, texto: `Embarque confirmado: ${entrando.map(nomePassageiro).join(', ')}` }] : []),
+      ...(!saindo.length && !entrando.length ? [{ tipo: 'parada' as const, texto: `Parada confirmada: ${nomeParada(paradaAlvo)}` }] : []),
+    ]);
+    setIndiceAtual(indiceAlvo);
+    if (indiceAlvo >= paradas.length - 1) setEstado('finalizada');
+    else {
+      setIndiceAlvo(indiceAlvo + 1);
+      setEstado('confirmada');
+    }
+  }
 
   function reiniciar() {
     if (frameRef.current != null) cancelAnimationFrame(frameRef.current);
-    inicioRef.current = null;
-    setProgresso(0);
-    setSeguindo(false);
+    setEstado('pronta'); setIndiceAtual(0); setIndiceAlvo(1); setProgresso(0);
+    setABordoIds([]); setEntreguesIds([]); setEventos([]); setErroOperacao(null);
   }
 
-  if (carregando) return <MotoristaShell titulo="Navegação real" voltarPara="/painel/rotas"><div className="flex justify-center py-20 text-navy-400"><Loader2 className="h-7 w-7 animate-spin" /></div></MotoristaShell>;
-  if (erro || !rota || !trajeto) return <MotoristaShell titulo="Navegação real" voltarPara="/painel/rotas"><div className="card p-7 text-center"><RouteIcon className="mx-auto h-10 w-10 text-navy-300" /><h1 className="mt-4 font-display text-xl font-bold text-navy-900">Não foi possível abrir a rota</h1><p className="mt-2 text-sm text-navy-600">{erro}</p><Link to="/painel/rotas" className="btn btn-lg btn-primary mt-6 w-full">Voltar para minhas rotas</Link></div></MotoristaShell>;
+  const percentual = Math.round(progresso * 100);
+  const textoAcao = estado === 'pronta' ? 'Iniciar rota' : estado === 'movendo' ? 'A caminho da próxima parada' : estado === 'chegou' ? (passageirosNaParada.saindo.length ? 'Confirmar desembarque' : passageirosNaParada.entrando.length ? 'Confirmar embarque' : 'Confirmar parada') : estado === 'confirmada' ? 'Ir para a próxima parada' : 'Rota concluída';
+  const alunosNaParada = [...passageirosNaParada.saindo.map((p) => ({ p, acao: 'desce' })), ...passageirosNaParada.entrando.map((p) => ({ p, acao: 'embarca' }))];
+
+  if (carregando) return <div className="flex min-h-dvh items-center justify-center bg-navy-950 text-white"><Loader2 className="h-7 w-7 animate-spin" /></div>;
+  if (erro || !rota || !trajeto) return <div className="flex min-h-dvh items-center justify-center bg-navy-950 p-4"><div className="card max-w-md p-7 text-center"><RouteIcon className="mx-auto h-10 w-10 text-navy-300" /><h1 className="mt-4 font-display text-xl font-bold text-navy-900">Não foi possível abrir a rota</h1><p className="mt-2 text-sm text-navy-600">{erro}</p><Link to="/app/rotas" className="btn btn-lg btn-primary mt-6 w-full">Voltar para minhas rotas</Link></div></div>;
 
   return (
     <div className="min-h-dvh bg-navy-950 text-white">
       <header className="relative z-20 border-b border-white/10 bg-navy-950/95 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-3 px-4 sm:px-6">
+        <div className="mx-auto flex min-h-16 max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <Link to={`/app/rotas/${rota.id}`} className="inline-flex items-center gap-2 text-sm font-semibold text-white/80 hover:text-white"><ArrowLeft className="h-4 w-4" /> Voltar</Link>
-          <div className="text-center"><p className="text-[10px] font-bold uppercase tracking-[0.2em] text-mint-300">Navegação real</p><p className="font-display text-sm font-extrabold">{rota.nome || 'Rota do motorista'}</p></div>
-          <span className="hidden rounded-full bg-mint-400/15 px-3 py-1 text-[11px] font-bold text-mint-200 sm:inline-flex">Mapa ao vivo</span>
+          <div className="text-center"><p className="text-[10px] font-bold uppercase tracking-[0.2em] text-mint-300">Navegação da rota</p><p className="font-display text-sm font-extrabold">{rota.nome || 'Rota do motorista'}</p></div>
+          <span className="hidden rounded-full bg-mint-400/15 px-3 py-1 text-[11px] font-bold text-mint-200 sm:inline-flex">{percentual}% concluído</span>
         </div>
       </header>
-      <main className="mx-auto grid min-h-[calc(100dvh-4rem)] max-w-6xl gap-4 p-3 sm:p-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
-        <section className="relative min-h-[62dvh] overflow-hidden rounded-[1.6rem] bg-navy-100 shadow-2xl ring-1 ring-white/10 lg:min-h-[calc(100dvh-7rem)]">
-          <MapaNavegacaoRotaReal paradas={paradas} trajeto={trajeto} progresso={progresso} seguindo={seguindo} />
+      <main className="mx-auto grid min-h-[calc(100dvh-4rem)] max-w-7xl gap-4 p-3 sm:p-5 lg:grid-cols-[minmax(0,1fr)_25rem]">
+        <section className="relative h-[46dvh] min-h-[20rem] overflow-hidden rounded-[1.6rem] bg-navy-100 shadow-2xl ring-1 ring-white/10 sm:h-[55dvh] lg:h-[calc(100dvh-7rem)]">
+          <MapaNavegacaoRotaReal paradas={paradas} trajeto={trajeto} progresso={progresso} seguindo={estado === 'movendo'} />
           <div className="pointer-events-none absolute left-3 right-3 top-3 flex items-start justify-between gap-3 sm:left-5 sm:right-5 sm:top-5">
-            <div className="rounded-2xl bg-navy-950/90 px-4 py-3 shadow-xl backdrop-blur"><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-mint-300">Rota pelas ruas</p><p className="mt-1 font-display text-base font-extrabold text-white">{chegou ? 'Rota concluída' : 'Seguindo o trajeto real'}</p></div>
-            <div className="rounded-2xl bg-white/95 px-3 py-2 text-right text-xs font-bold text-navy-900 shadow-lg"><span className="block text-[10px] uppercase tracking-widest text-navy-500">Progresso</span>{Math.round(progresso * 100)}%</div>
+            <div className="rounded-2xl bg-navy-950/90 px-4 py-3 shadow-xl backdrop-blur"><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-mint-300">{estado === 'finalizada' ? 'Rota concluída' : estado === 'chegou' ? 'Você chegou' : estado === 'movendo' ? 'Em deslocamento' : 'Rota pronta'}</p><p className="mt-1 max-w-[14rem] font-display text-base font-extrabold text-white">{estado === 'finalizada' ? 'Todos os eventos registrados' : nomeParada(paradaAlvo)}</p></div>
+            <div className="rounded-2xl bg-white/95 px-3 py-2 text-right text-xs font-bold text-navy-900 shadow-lg"><span className="block text-[10px] uppercase tracking-widest text-navy-500">Paradas</span>{Math.min(indiceAtual, paradas.length - 1)} / {Math.max(0, paradas.length - 1)}</div>
           </div>
         </section>
-        <aside className="flex flex-col gap-3">
+        <aside className="flex min-w-0 flex-col gap-3">
           <section className="rounded-[1.6rem] bg-navy-900 p-5 shadow-xl ring-1 ring-white/10">
-            <div className="flex items-center justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-[0.2em] text-mint-300">VanBora Motoristas</p><h1 className="mt-1 font-display text-2xl font-extrabold">{chegou ? 'Você chegou' : 'Em deslocamento'}</h1></div><Navigation className="h-7 w-7 text-mint-300" /></div>
-            <p className="mt-3 text-sm leading-relaxed text-white/65">A van acompanha a linha azul pelas ruas reais, sem animação aérea ou caminho artificial.</p>
-            <button className="btn btn-lg btn-primary mt-5 w-full" onClick={() => { if (chegou) reiniciar(); else setSeguindo((v) => !v); }}>
-              {chegou ? <><RotateCcw className="h-5 w-5" /> Recomeçar rota</> : seguindo ? <><MapPin className="h-5 w-5" /> Pausar deslocamento</> : <><Play className="h-5 w-5" /> Iniciar rota</>}
+            <div className="flex items-start justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-[0.2em] text-mint-300">Operação da van</p><h1 className="mt-1 font-display text-2xl font-extrabold">{estado === 'finalizada' ? 'Viagem finalizada' : estado === 'chegou' ? 'Confirme a parada' : estado === 'movendo' ? 'Em deslocamento' : 'Pronta para sair'}</h1></div><Navigation className="h-7 w-7 shrink-0 text-mint-300" /></div>
+            <p className="mt-3 text-sm leading-relaxed text-white/65">O mapa mostra o trajeto real. A viagem só avança depois que você confirma quem embarcou e quem desembarcou.</p>
+            <button className="btn btn-lg btn-primary mt-5 w-full" disabled={estado === 'movendo' || estado === 'finalizada'} onClick={estado === 'chegou' ? confirmarParada : estado === 'pronta' || estado === 'confirmada' ? iniciarRota : undefined}>
+              {estado === 'movendo' ? <><Clock3 className="h-5 w-5 animate-pulse" /> {textoAcao}</> : estado === 'finalizada' ? <><CheckCircle2 className="h-5 w-5" /> {textoAcao}</> : estado === 'chegou' ? <><Check className="h-5 w-5" /> {textoAcao}</> : <><Play className="h-5 w-5" /> {textoAcao}</>}
             </button>
+            {estado === 'finalizada' && <button className="btn btn-md btn-ghost mt-2 w-full border border-white/15 bg-white/5 text-white hover:bg-white/10" onClick={reiniciar}><RotateCcw className="h-4 w-4" /> Reiniciar rota</button>}
+            {erroOperacao && <p role="alert" className="mt-3 flex items-start gap-2 rounded-xl bg-red-500/15 p-3 text-sm text-red-100"><XCircle className="mt-0.5 h-4 w-4 shrink-0" />{erroOperacao}</p>}
+          </section>
+          <section className="grid grid-cols-3 gap-2 rounded-[1.6rem] bg-white p-3 text-center text-navy-900 shadow-xl ring-1 ring-white/10">
+            <div><Users className="mx-auto h-5 w-5 text-blue-600" /><strong className="mt-1 block font-display text-lg">{aBordo.length}</strong><span className="text-[11px] text-navy-500">a bordo</span></div>
+            <div><CheckCircle2 className="mx-auto h-5 w-5 text-mint-600" /><strong className="mt-1 block font-display text-lg">{entregues.length}</strong><span className="text-[11px] text-navy-500">entregues</span></div>
+            <div><Users className="mx-auto h-5 w-5 text-amber-600" /><strong className="mt-1 block font-display text-lg">{Math.max(0, capacidade - aBordo.length)}</strong><span className="text-[11px] text-navy-500">livres</span></div>
           </section>
           <section className="rounded-[1.6rem] bg-white p-5 text-navy-900 shadow-xl ring-1 ring-white/10">
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-navy-400">Próxima parada</p>
-            <h2 className="mt-1 font-display text-lg font-extrabold">{proxima?.tipo === 'escola' ? nomeDestinoParaExibicao(proxima.destinoNome || proxima.rotulo || 'Escola') : (proxima?.rotulo || 'Parada')}</h2>
-            <p className="mt-1 text-xs text-navy-500">{proxima?.tipo === 'escola' ? 'Destino escolar' : proxima?.tipo === 'saida' ? 'Ponto de saída' : 'Embarque de passageiro'}</p>
-            <div className="mt-4 h-2 overflow-hidden rounded-full bg-navy-100"><div className="h-full rounded-full bg-mint-500 transition-[width] duration-300" style={{ width: `${Math.round(progresso * 100)}%` }} /></div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-navy-400">{estado === 'chegou' ? 'Operação desta parada' : 'Próxima parada'}</p>
+            <h2 className="mt-1 font-display text-lg font-extrabold">{estado === 'finalizada' ? 'Todos chegaram' : nomeParada(paradaAlvo)}</h2>
+            {estado === 'chegou' && <p className="mt-1 text-xs text-navy-500">Confirme a operação para registrar a viagem e liberar a próxima etapa.</p>}
+            {alunosNaParada.length > 0 && <div className="mt-3 space-y-2">{alunosNaParada.map(({ p, acao }) => <div key={`${acao}-${p.id}`} className="flex items-center justify-between gap-2 rounded-xl bg-navy-50 px-3 py-2 text-sm"><span className="min-w-0 truncate font-semibold">{nomePassageiro(p)}</span><span className={cn('shrink-0 rounded-full px-2 py-1 text-[10px] font-bold uppercase', acao === 'embarca' ? 'bg-mint-100 text-mint-700' : 'bg-blue-100 text-blue-700')}>{acao}</span></div>)}</div>}
+            {estado === 'chegou' && alunosNaParada.length === 0 && <p className="mt-3 rounded-xl bg-navy-50 p-3 text-sm text-navy-600">Nenhum aluno associado a esta parada. Confirme para continuar.</p>}
+            <div className="mt-4 h-2 overflow-hidden rounded-full bg-navy-100"><div className="h-full rounded-full bg-mint-500 transition-[width] duration-300" style={{ width: `${percentual}%` }} /></div>
           </section>
           <section className="rounded-[1.6rem] bg-white p-5 text-navy-900 shadow-xl ring-1 ring-white/10">
-            <div className="flex items-center justify-between"><h2 className="font-display font-extrabold">Paradas da rota</h2><span className="text-xs font-semibold text-navy-400">{paradas.length} pontos</span></div>
-            <div className="mt-3 space-y-2">{paradas.map((p, i) => <div key={p.id} className={cn('flex items-center gap-3 rounded-xl px-3 py-2 text-sm transition', i <= paradaAtual ? 'bg-mint-50 text-navy-900' : 'text-navy-500')}><span className={cn('grid h-7 w-7 shrink-0 place-items-center rounded-full text-xs font-bold', i < paradaAtual ? 'bg-mint-500 text-white' : i === paradaAtual ? 'bg-navy-900 text-white' : 'bg-navy-100 text-navy-500')}>{i < paradaAtual ? <CheckCircle2 className="h-4 w-4" /> : i + 1}</span><span className="min-w-0 flex-1 truncate">{p.tipo === 'escola' ? (p.destinoNome || p.rotulo || 'Escola') : (p.rotulo || (p.tipo === 'saida' ? 'Saída' : 'Casa'))}</span></div>)}</div>
+            <div className="flex items-center justify-between"><h2 className="font-display font-extrabold">Passageiros a bordo</h2><span className="text-xs font-semibold text-navy-400">{aBordo.length}/{capacidade}</span></div>
+            <div className="mt-3 space-y-2">{aBordo.length ? aBordo.map((p) => <div key={p.id} className="flex items-center gap-3 rounded-xl bg-mint-50 px-3 py-2 text-sm"><span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-mint-500 text-xs font-bold text-white">{nomePassageiro(p).slice(0, 1).toUpperCase()}</span><span className="min-w-0 flex-1 truncate font-semibold">{nomePassageiro(p)}</span><span className="text-[10px] font-bold uppercase text-mint-700">a bordo</span></div>) : <p className="rounded-xl bg-navy-50 p-3 text-sm text-navy-500">Nenhum aluno a bordo ainda.</p>}</div>
+          </section>
+          <section className="rounded-[1.6rem] bg-white p-5 text-navy-900 shadow-xl ring-1 ring-white/10">
+            <div className="flex items-center justify-between"><h2 className="font-display font-extrabold">Histórico da viagem</h2><span className="text-xs font-semibold text-navy-400">{eventos.length}</span></div>
+            <div className="mt-3 space-y-2">{eventos.length ? eventos.map((evento, i) => <div key={i} className="flex gap-2 text-sm text-navy-600"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-mint-600" />{evento.texto}</div>) : <p className="text-sm text-navy-500">As confirmações aparecerão aqui.</p>}</div>
           </section>
         </aside>
       </main>
