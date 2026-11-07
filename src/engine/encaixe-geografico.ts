@@ -57,6 +57,27 @@ export interface OpcaoEncaixe {
   alteracoes: { id: string; antesMin: number; depoisMin: number; diferencaMin: number }[];
   eventos: EventoCalculado[];
 }
+/**
+ * Critério de ordenação entre encaixes VÁLIDOS (aplicado só após as restrições):
+ *  - 'desvio' (legado): menor alteração para o motorista primeiro (desvio de
+ *    tempo, depois distância, depois tempo a bordo). Mantido para o simulador
+ *    do motorista e a vitrine (não muda comportamento existente).
+ *  - 'tempoABordo': menor TEMPO DO NOVO ALUNO a bordo primeiro, depois menor
+ *    impacto/desvio. É a regra da busca da família (§3/§4): o critério é a
+ *    experiência do aluno, nunca compensar atraso com distância.
+ */
+export type OrdenarEncaixePor = 'desvio' | 'tempoABordo';
+
+export function compararOpcoes(a: OpcaoEncaixe, b: OpcaoEncaixe, por: OrdenarEncaixePor = 'desvio'): number {
+  if (por === 'tempoABordo') {
+    return a.minutosABordo - b.minutosABordo
+      || a.desvioMin - b.desvioMin
+      || a.desvioMetros - b.desvioMetros
+      || a.distanciaABordoMetros - b.distanciaABordoMetros;
+  }
+  return a.desvioMin - b.desvioMin || a.desvioMetros - b.desvioMetros || a.minutosABordo - b.minutosABordo;
+}
+
 const inteiro = (v: number) => Number.isFinite(v) && v >= 0;
 const validoPonto = (p: PontoGeo) => !!p && Number.isFinite(p.lat) && Number.isFinite(p.lng) && Math.abs(p.lat) <= 90 && Math.abs(p.lng) <= 180;
 
@@ -86,7 +107,7 @@ export function simularRota(rota: RotaOperacional, matriz: MatrizViaria, comprom
 }
 
 /** Examina todas as posições possíveis para embarque e desembarque, sem mudar a ordem dos antigos. */
-export function encontrarEncaixes(rota: RotaOperacional, pedido: PedidoEncaixe, matriz: MatrizViaria): OpcaoEncaixe[] {
+export function encontrarEncaixes(rota: RotaOperacional, pedido: PedidoEncaixe, matriz: MatrizViaria, opts: { ordenarPor?: OrdenarEncaixePor } = {}): OpcaoEncaixe[] {
   if (!validoPonto(pedido.casa) || !validoPonto(pedido.escola) || !inteiro(pedido.horarioEscolaMin) || !pedido.alunoId || !Number.isInteger(rota.versao)) return [];
   if (!inteiro(pedido.atendimentoMin ?? 1) || !inteiro(rota.toleranciaMin ?? 10) || rota.compromissos.some(p => p.alunoId === pedido.alunoId) || new Set(rota.compromissos.map(p => p.id)).size !== rota.compromissos.length) return [];
   const base = simularRota(rota, matriz);
@@ -146,7 +167,7 @@ export function encontrarEncaixes(rota: RotaOperacional, pedido: PedidoEncaixe, 
       });
     }
   }
-  return opcoes.sort((a, b) => a.desvioMin - b.desvioMin || a.desvioMetros - b.desvioMetros || a.minutosABordo - b.minutosABordo);
+  return opcoes.sort((a, b) => compararOpcoes(a, b, opts.ordenarPor));
 }
 export interface ResultadoIdaVolta { ida: OpcaoEncaixe | null; volta: OpcaoEncaixe | null; completo: boolean }
 export function encontrarIdaVolta(ida: RotaOperacional, volta: RotaOperacional, pedido: PedidoEncaixe, matrizIda: MatrizViaria, matrizVolta: MatrizViaria, saidaEscolaMin: number): ResultadoIdaVolta {
@@ -191,6 +212,8 @@ export interface OpcoesEncaixeProgressivo {
    * está na rota. Default false (comportamento legado: partida fixa).
    */
   anteciparPartida?: boolean;
+  /** Critério de ordenação entre encaixes válidos. Default 'desvio' (legado). */
+  ordenarPor?: OrdenarEncaixePor;
 }
 
 /**
@@ -435,9 +458,7 @@ export function encontrarEncaixesProgressivo(
     }
   }
 
-  const ordenadas = opcoesValidas.sort(
-    (a, b) => a.desvioMin - b.desvioMin || a.desvioMetros - b.desvioMetros || a.minutosABordo - b.minutosABordo,
-  );
+  const ordenadas = opcoesValidas.sort((a, b) => compararOpcoes(a, b, opcoes.ordenarPor));
 
   let classificacao: ClassificacaoEncaixe;
   if (ordenadas.length > 0) classificacao = 'compativel';

@@ -125,6 +125,10 @@ export interface CriteriosBusca {
    *  autocomplete (geocodificado). Quando ausentes, estima-se pela região. */
   origemLat?: number;
   origemLng?: number;
+  /** Horário MÁXIMO de chegada à escola (minuto do dia 0..1439), informado pela
+   *  família (§3). É um LIMITE, não o horário exato; rotas que chegam depois dele
+   *  são descartadas na ida. Opcional — ausente mantém o comportamento anterior. */
+  horarioMaxChegadaMin?: number | null;
 }
 
 /** Resultado de uma avaliação de compatibilidade para um motorista. */

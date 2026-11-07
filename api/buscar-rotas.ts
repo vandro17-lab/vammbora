@@ -88,7 +88,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     raw += (chunk as Buffer).toString();
     if (raw.length > 8000) return reply(res, 413, { erro: 'Solicitação muito grande.' });
   }
-  let body: { origem?: { lat?: number; lng?: number }; destinoId?: string; escolaPonto?: { lat?: number; lng?: number } | null; sentido?: string; turno?: string | null; contratacao?: string | null };
+  let body: { origem?: { lat?: number; lng?: number }; destinoId?: string; escolaPonto?: { lat?: number; lng?: number } | null; sentido?: string; turno?: string | null; contratacao?: string | null; horarioMaxChegadaMin?: number | null };
   try { body = JSON.parse(raw || '{}'); } catch { return reply(res, 400, { erro: 'JSON inválido.' }); }
 
   if (!body.origem || !coordOk(body.origem.lat) || !coordOk(body.origem.lng)) return reply(res, 400, { erro: 'Origem (lat/lng) é obrigatória.' });
@@ -112,6 +112,12 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       if (dest && coordOk(dest.lat) && coordOk(dest.lng)) escolaPonto = { lat: dest.lat, lng: dest.lng };
     }
 
+    // §3 — horário máximo de chegada (minuto do dia 0..1439), opcional e validado.
+    const maxChegada = typeof body.horarioMaxChegadaMin === 'number'
+      && Number.isInteger(body.horarioMaxChegadaMin)
+      && body.horarioMaxChegadaMin >= 0 && body.horarioMaxChegadaMin < 1440
+      ? body.horarioMaxChegadaMin : null;
+
     const pedido: PedidoFamilia = {
       origem: { lat: body.origem.lat, lng: body.origem.lng },
       destinoId: body.destinoId,
@@ -119,6 +125,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       sentido: body.sentido,
       turno: body.turno ?? null,
       contratacao: body.contratacao === 'avulso' ? 'avulso' : 'mensal',
+      horarioMaxChegadaMin: maxChegada,
     };
 
     // Rotas ELEGÍVEIS: concluídas, do sentido pedido. NÃO exige publicação

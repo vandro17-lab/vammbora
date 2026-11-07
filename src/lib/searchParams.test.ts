@@ -12,6 +12,7 @@ describe('searchParams (ida e volta)', () => {
       contratacao: 'avulso',
       dataAvulso: '2026-11-10',
       modalidade: 'ambos',
+      horarioMaxChegadaMin: 7 * 60, // 07:00 (horário máximo de chegada)
     };
     const voltou = paramsParaCriterios(new URLSearchParams(criteriosParaParams(c)));
     expect(voltou).toEqual(c);

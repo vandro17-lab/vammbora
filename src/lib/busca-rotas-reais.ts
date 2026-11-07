@@ -52,6 +52,10 @@ export interface PedidoFamilia {
   contratacao?: 'mensal' | 'avulso' | null;
   /** Override opcional do horário-limite de escola (minuto do dia). */
   horarioEscolaMin?: number | null;
+  /** Horário MÁXIMO de chegada à escola informado pela família (minuto do dia).
+   *  É um LIMITE (§3): na IDA, rotas que chegam DEPOIS dele são incompatíveis.
+   *  Null/ausente = sem limite da família (comportamento anterior). */
+  horarioMaxChegadaMin?: number | null;
 }
 
 export type FonteHorario = 'rota' | 'turno' | 'nenhuma';
@@ -165,6 +169,7 @@ const MOTIVO_AVULSO = 'Encaixe calculado; como é avulso, confirme a data direto
 const MOTIVO_SEM_ORIGEM = 'Confirme um endereço de origem válido no mapa para calcularmos a compatibilidade.';
 const MOTIVO_SEM_DESTINO = 'Escolha a escola de destino para avaliarmos esta rota.';
 const MOTIVO_SEM_HORARIO = 'Esta rota ainda não tem horário suficiente para estimar — horário sob confirmação.';
+const MOTIVO_APOS_LIMITE = 'Esta rota chega à escola depois do horário máximo que você informou.';
 
 /**
  * Avalia UMA rota real contra o pedido da família. `matriz` deve vir de um
@@ -176,7 +181,9 @@ export function avaliarRotaReal(
   veiculo: Veiculo | null,
   pedido: PedidoFamilia,
   matriz: MatrizViaria = criarMatrizDemo(),
+  opts: { ordenarPor?: 'desvio' | 'tempoABordo' } = {},
 ): ResultadoRotaReal {
+  const ordenarPor = opts.ordenarPor ?? 'tempoABordo';
   const vagas = vagasParaNovos(rota, veiculo);
   const atendeEscola = rotaAtendeDestino(rota, pedido.destinoId);
   const vazio = (status: StatusBuscaReal, motivo: string, codigos: CodigoMotivo[] = []): ResultadoRotaReal => ({
@@ -214,6 +221,15 @@ export function avaliarRotaReal(
     return vazio('indeterminado', MOTIVO_SEM_HORARIO, ['dados']);
   }
 
+  // §3 — Limite de chegada informado pela família (só IDA): a van chega à escola
+  // em ~horarioEscola; se isso ultrapassa o máximo pedido, a rota é incompatível.
+  if (
+    rota.sentido === 'ida' && pedido.horarioMaxChegadaMin != null
+    && Number.isFinite(pedido.horarioMaxChegadaMin) && horarioEscola > pedido.horarioMaxChegadaMin
+  ) {
+    return vazio('incompativel', MOTIVO_APOS_LIMITE, ['atraso']);
+  }
+
   const aluno: AlunoNovo = {
     alunoId: 'familia',
     nome: 'Família',
@@ -226,7 +242,10 @@ export function avaliarRotaReal(
       : {}),
   };
 
-  const sim = simularEncaixeProgressivo(rota, veiculo, aluno, matriz, { horarioEscolaMin: horarioEscola });
+  // §3/§4: entre os encaixes VÁLIDOS, a busca da família prioriza o MENOR TEMPO
+  // DO ALUNO a bordo (não o menor desvio do motorista) — é o que corrige o
+  // "embarque excessivamente antecipado" quando a casa é perto da escola.
+  const sim = simularEncaixeProgressivo(rota, veiculo, aluno, matriz, { horarioEscolaMin: horarioEscola, ordenarPor });
 
   if (!sim.elegivel || !sim.opcao) {
     return {
@@ -293,33 +312,37 @@ export function buscarEmRotasReais(
   entradas: EntradaBuscaReal[],
   pedido: PedidoFamilia,
   matriz: MatrizViaria = criarMatrizDemo(),
+  opts: { ordenarPor?: 'desvio' | 'tempoABordo' } = {},
 ): ResultadoBuscaReal {
+  const ordenarPor = opts.ordenarPor ?? 'tempoABordo';
   const candidatas = entradas.filter((e) => {
     if (e.rota.sentido !== pedido.sentido) return false;
     if (vagasParaNovos(e.rota, e.veiculo) < 1) return false; // 1º filtro: vaga
     return rotaAtendeDestino(e.rota, pedido.destinoId) || rotaPassaPertoDaEscola(e.rota, pedido.escolaPonto);
   });
   const resultados = candidatas
-    .map((e) => avaliarRotaReal(e.rota, e.veiculo, pedido, matriz))
+    .map((e) => avaliarRotaReal(e.rota, e.veiculo, pedido, matriz, { ordenarPor }))
     .sort((a, b) => {
-      // §6.3 — ordenação pela MELHOR EXPERIÊNCIA DO NOVO ALUNO, nesta ordem:
-      // 1) status (compatível antes de "sob confirmação");
-      // 2) MENOR TEMPO A BORDO do novo aluno (experiência de deslocamento do
-      //    aluno) — NÃO confundir com o desvio do motorista;
-      // 3) MENOR DESVIO/impacto necessário para o encaixe (desempate);
-      // 4) rota que já ATENDE a escola (Tier A) antes de proximidade (Tier B);
-      // 5) coleta mais cedo em casa.
+      // Status sempre primeiro (compatível antes de "sob confirmação").
       if (pesoStatus(a.status) !== pesoStatus(b.status)) return pesoStatus(a.status) - pesoStatus(b.status);
-      const ba = a.minutosABordo ?? Number.POSITIVE_INFINITY;
-      const bb = b.minutosABordo ?? Number.POSITIVE_INFINITY;
-      if (ba !== bb) return ba - bb; // 2) menor permanência do aluno na van
       const da = a.desvioMin ?? Number.POSITIVE_INFINITY;
       const db = b.desvioMin ?? Number.POSITIVE_INFINITY;
-      if (da !== db) return da - db; // 3) menor desvio/impacto (desempate)
-      if (a.atendeEscola !== b.atendeEscola) return a.atendeEscola ? -1 : 1; // 4) Tier A antes de Tier B
+      const ba = a.minutosABordo ?? Number.POSITIVE_INFINITY;
+      const bb = b.minutosABordo ?? Number.POSITIVE_INFINITY;
+      if (ordenarPor === 'tempoABordo') {
+        // §6.3 — MELHOR EXPERIÊNCIA DO NOVO ALUNO:
+        // 1) menor TEMPO A BORDO; 2) menor desvio/impacto; 3) Tier A; 4) coleta cedo.
+        if (ba !== bb) return ba - bb;
+        if (da !== db) return da - db;
+      } else {
+        // Legado ('desvio'): menor alteração para o motorista primeiro.
+        if (a.atendeEscola !== b.atendeEscola) return a.atendeEscola ? -1 : 1;
+        if (da !== db) return da - db;
+      }
+      if (a.atendeEscola !== b.atendeEscola) return a.atendeEscola ? -1 : 1;
       const pa = a.passagemCasaMin ?? Number.POSITIVE_INFINITY;
       const pb = b.passagemCasaMin ?? Number.POSITIVE_INFINITY;
-      return pa - pb; // 5) coleta mais cedo
+      return pa - pb;
     });
   return { resultados, totalRotasAvaliadas: candidatas.length };
 }

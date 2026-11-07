@@ -66,6 +66,7 @@ export async function buscarRotasReais(
           sentido,
           turno: criterios.turno,
           contratacao: criterios.contratacao,
+          horarioMaxChegadaMin: criterios.horarioMaxChegadaMin ?? null,
         }),
       });
       if (r.status === 503) return { estado: 'nao_configurado', resultados: [] };
@@ -105,6 +106,7 @@ export async function buscarRotasReaisDemo(
       sentido,
       turno: criterios.turno,
       contratacao: criterios.contratacao,
+      horarioMaxChegadaMin: criterios.horarioMaxChegadaMin ?? null,
     });
     for (const r of resultados) {
       if (!mostravel(r.status)) continue; // nunca mostrar falso encaixe

@@ -12,6 +12,7 @@ import {
   type PedidoEncaixe,
   type PlanoCalculado,
   type OpcaoEncaixe,
+  type OrdenarEncaixePor,
 } from '@/engine/encaixe-geografico';
 import { capacidadeAlunos } from '@/lib/ocupacao-rota';
 
@@ -56,6 +57,8 @@ export interface ParametrosSimulacao {
   margemMin?: number;
   toleranciaMin?: number;
   atendimentoMin?: number;
+  /** Critério de ordenação entre encaixes válidos. Default 'desvio' (legado). */
+  ordenarPor?: OrdenarEncaixePor;
 }
 
 export type CodigoMotivo =
@@ -373,7 +376,7 @@ export function simularEncaixeRota(
     atendimentoMin: atendimento,
   };
 
-  const opcoes = encontrarEncaixes(rotaOp, pedido, matriz);
+  const opcoes = encontrarEncaixes(rotaOp, pedido, matriz, { ordenarPor: params.ordenarPor });
   if (opcoes.length > 0) {
     return {
       sentido, elegivel: true, opcao: opcoes[0], motivos: [], codigos: [],
@@ -523,6 +526,7 @@ export function simularEncaixeProgressivo(
     anteciparPartida: true,
     inserirEscolaNova: !existente,
     limiteEscolaNovaMin: params.horarioEscolaMin,
+    ordenarPor: params.ordenarPor,
   });
 
   if (res.opcoes.length > 0) {

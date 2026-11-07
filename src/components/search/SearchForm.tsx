@@ -30,6 +30,7 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
   const [contratacao, setContratacao] = useState<Contratacao>('mensal');
   const [dataAvulso, setDataAvulso] = useState('');
   const [modalidade, setModalidade] = useState<ModalidadeTrajeto>('ida');
+  const [horaMax, setHoraMax] = useState(''); // "HH:MM" — horário máximo de chegada (opcional)
   const [localizando, setLocalizando] = useState(false);
   const titulo = useRef<HTMLHeadingElement>(null);
   // preventScroll evita que o navegador role a página (inclusive na horizontal)
@@ -62,7 +63,7 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
       finally { clearTimeout(limite); setLocalizando(false); }
     }
 
-    const params = criteriosParaParams({ cidadeId: CIDADE_PADRAO.id, endereco: texto, destinoId: destinoId || null, turno: turno || null, contratacao, dataAvulso: contratacao === 'avulso' ? dataAvulso : undefined, modalidade, origemLat: coord?.lat, origemLng: coord?.lng });
+    const params = criteriosParaParams({ cidadeId: CIDADE_PADRAO.id, endereco: texto, destinoId: destinoId || null, turno: turno || null, contratacao, dataAvulso: contratacao === 'avulso' ? dataAvulso : undefined, modalidade, origemLat: coord?.lat, origemLng: coord?.lng, horarioMaxChegadaMin: hhmmParaMin(horaMax) });
     navigate(`/resultados?${params}`);
   }
   return (
@@ -98,6 +99,7 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
             {contratacao === 'avulso' && <div className="mt-3"><label htmlFor="data-avulso" className="field-label">Data da viagem</label><input id="data-avulso" type="date" required className="field-input" value={dataAvulso} onChange={e => setDataAvulso(e.target.value)} /></div>}
           </fieldset>
           <fieldset><legend className="field-label">Trajeto</legend><div className="flex flex-wrap gap-2">{([['ida', 'Só ida'], ['volta', 'Só volta'], ['ambos', 'Ida e volta']] as const).map(([v, label]) => <Segment key={v} ativo={modalidade === v} onClick={() => setModalidade(v)}>{label}</Segment>)}</div></fieldset>
+          <div><label htmlFor="hora-max" className="field-label">Horário máximo de chegada à escola <span className="font-normal text-navy-400">(opcional)</span></label><input id="hora-max" type="time" inputMode="numeric" className="field-input" value={horaMax} onChange={e => setHoraMax(e.target.value)} /><p className="mt-2 text-xs text-navy-500">Ex.: 07:00. Mostramos as vans que chegam até esse horário — priorizando o menor tempo do aluno dentro da van.</p></div>
         </div>}
       </div>
       <div className="mt-7 flex gap-3">{passo > 0 && <button type="button" onClick={() => ir(passo - 1)} className="btn btn-lg btn-ghost px-4" aria-label="Voltar à etapa anterior"><ArrowLeft className="h-5 w-5" /></button>}
@@ -107,6 +109,15 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
     </form>
   );
 }
+/** "HH:MM" → minuto do dia (0..1439) ou null se vazio/inválido. */
+function hhmmParaMin(v: string): number | null {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(v.trim());
+  if (!m) return null;
+  const h = Number(m[1]); const min = Number(m[2]);
+  if (!Number.isInteger(h) || !Number.isInteger(min) || h > 23 || min > 59) return null;
+  return h * 60 + min;
+}
+
 function Segment({ ativo, onClick, children }: { ativo: boolean; onClick: () => void; children: React.ReactNode }) {
   return <button type="button" onClick={onClick} aria-pressed={ativo} className={cn('rounded-xl px-3 py-2.5 text-sm font-medium transition-colors', ativo ? 'bg-navy-900 text-white' : 'bg-navy-50 text-navy-600 hover:bg-navy-100')}>{children}</button>;
 }

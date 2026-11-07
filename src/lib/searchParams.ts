@@ -13,6 +13,7 @@ export function criteriosParaParams(c: CriteriosBusca): string {
   if (c.turno) p.set('turno', c.turno);
   p.set('contratacao', c.contratacao);
   if (c.dataAvulso) p.set('data', c.dataAvulso);
+  if (c.horarioMaxChegadaMin != null && Number.isFinite(c.horarioMaxChegadaMin)) p.set('maxchegada', String(c.horarioMaxChegadaMin));
   p.set('modalidade', c.modalidade);
   if (Number.isFinite(c.origemLat) && Number.isFinite(c.origemLng)) {
     p.set('olat', String(c.origemLat));
@@ -40,7 +41,14 @@ export function paramsParaCriterios(sp: URLSearchParams): CriteriosBusca {
         : 'ida',
     origemLat: numeroOuUndef(sp.get('olat')),
     origemLng: numeroOuUndef(sp.get('olng')),
+    horarioMaxChegadaMin: minutoValidoOuNull(sp.get('maxchegada')),
   };
+}
+
+function minutoValidoOuNull(v: string | null): number | null {
+  if (v == null) return null;
+  const n = Number(v);
+  return Number.isInteger(n) && n >= 0 && n < 1440 ? n : null;
 }
 
 function numeroOuUndef(v: string | null): number | undefined {
