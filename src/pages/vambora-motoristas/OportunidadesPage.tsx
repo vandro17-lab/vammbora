@@ -46,8 +46,8 @@ export function OportunidadesPage() {
               <EstadoVazio
                 icon={Zap}
                 ilustracao={<SlotIlustracao slot="oportunidades.vazio" alt="" fallback={<Zap className="h-8 w-8" />} />}
-                titulo="Nenhuma oportunidade compatível"
-                texto="Quando houver famílias que encaixam na sua rota sem atrasar os outros alunos, elas aparecem aqui. Veja também as novas da região."
+                titulo="Nenhum pedido disponível para sua rota no momento"
+                texto="Novos pedidos que atendam aos critérios da sua rota aparecerão aqui. Confira também outros pedidos da região."
               />
             )}
             {compativeis.map(({ op, r }) => (
@@ -100,8 +100,8 @@ export function SimularEncaixePage() {
     { label: 'Alunos', antes: c.alunosAntes, depois: c.alunosDepois },
     { label: 'Ocupação', antes: `${c.ocupAntesPct}%`, depois: `${c.ocupDepoisPct}%` },
     { label: 'Distância diária', antes: `${c.kmDiaAntes.toFixed(1).replace('.', ',')} km`, depois: `${c.kmDiaDepois.toFixed(1).replace('.', ',')} km` },
-    { label: 'Diesel por dia', antes: `${c.dieselDiaAntes.toFixed(1).replace('.', ',')} L`, depois: `${c.dieselDiaDepois.toFixed(1).replace('.', ',')} L` },
-    { label: 'Custo por dia', antes: formatBRL(c.custoDiaAntes), depois: formatBRL(c.custoDiaDepois) },
+    { label: 'Consumo diário estimado', antes: `${c.dieselDiaAntes.toFixed(1).replace('.', ',')} L`, depois: `${c.dieselDiaDepois.toFixed(1).replace('.', ',')} L` },
+    { label: 'Custo diário estimado', antes: formatBRL(c.custoDiaAntes), depois: formatBRL(c.custoDiaDepois) },
   ];
 
   return (
@@ -117,11 +117,11 @@ export function SimularEncaixePage() {
         </Card>
 
         <Card className="p-0 overflow-hidden">
-          <p className="px-4 pt-4 font-display font-bold text-navy-900">Comparativo da rota</p>
+          <p className="px-4 pt-4 font-display font-bold text-navy-900">O que muda na sua rota</p>
           <div className="mt-2 grid grid-cols-[1fr_auto_auto] items-center">
             <div className="px-4 py-2" />
             <div className="px-3 py-2 text-center text-[11px] font-semibold text-navy-500">Rota atual</div>
-            <div className="rounded-t-lg bg-mint-50 px-3 py-2 text-center text-[11px] font-semibold text-mint-700">Com novo aluno</div>
+            <div className="rounded-t-lg bg-mint-50 px-3 py-2 text-center text-[11px] font-semibold text-mint-700">Incluindo o aluno</div>
             {linhas.map((l) => (
               <div key={l.label} className="contents">
                 <div className="border-t border-navy-50 px-4 py-2.5 text-sm text-navy-600">{l.label}</div>
@@ -138,11 +138,11 @@ export function SimularEncaixePage() {
               {r.cabe ? <CheckCircle2 className="h-5 w-5" /> : <AlertTriangle className="h-5 w-5" />}
             </span>
             <div>
-              <p className="font-display font-bold text-navy-900">Análise da oportunidade</p>
+              <p className="font-display font-bold text-navy-900">Resultado da simulação</p>
               <p className="mt-0.5 text-sm text-navy-600">
                 {r.cabe
-                  ? `O novo aluno acrescenta cerca de ${formatBRL(c.custoExtraDia)} por dia em combustível e mantém os horários da escola.`
-                  : 'Esse aluno não cabe sem atrasar os outros além da tolerância ou passar do horário da escola.'}
+                  ? `O atendimento aumentaria o custo diário de combustível em aproximadamente ${formatBRL(c.custoExtraDia)}, sem comprometer os horários previstos.`
+                  : 'O pedido não atende aos limites de horário definidos para esta rota.'}
               </p>
             </div>
           </div>
