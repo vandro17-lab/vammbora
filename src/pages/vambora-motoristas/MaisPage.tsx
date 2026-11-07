@@ -265,17 +265,26 @@ function Clube() {
         <DemoChip />
       </div>
       {CLUBE.map((c) => (
-        <Card key={c.nome} className="flex items-center gap-3 p-3.5">
-          <span className={cn('vm-chip-ico overflow-hidden', c.cor)}>
-            <SlotIcone slot={c.slot} fallback={<c.Icone className="h-5 w-5" />} />
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-navy-400">{c.cat}</p>
-            <p className="truncate text-sm font-semibold text-navy-900">{c.nome}</p>
-            <p className="truncate text-xs text-navy-500">{c.oferta}</p>
-          </div>
-          <span className="chip bg-mint-50 text-mint-700">consultar</span>
-        </Card>
+        <div key={c.nome} className="relative aspect-[30/7] w-full overflow-hidden rounded-[1.25rem] bg-white shadow-card ring-1 ring-navy-100">
+          <SlotIlustracao
+            slot={c.slot + '.banner'}
+            alt={`Banner de benefício: ${c.cat}`}
+            className="object-contain"
+            fallback={
+              <div className="flex h-full w-full items-center gap-3 px-3.5">
+                <span className={cn('vm-chip-ico shrink-0 overflow-hidden', c.cor)}>
+                  <SlotIcone slot={c.slot} fallback={<c.Icone className="h-5 w-5" />} />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] font-semibold uppercase tracking-wide text-navy-400">{c.cat}</p>
+                  <p className="truncate text-sm font-semibold text-navy-900">{c.nome}</p>
+                  <p className="truncate text-xs text-navy-500">{c.oferta}</p>
+                </div>
+                <span className="chip shrink-0 bg-mint-50 text-mint-700">consultar</span>
+              </div>
+            }
+          />
+        </div>
       ))}
       <p className="text-center text-[11px] text-navy-400">Ofertas ilustrativas — parcerias comerciais a confirmar. Estrutura pronta para ofertas reais.</p>
     </>
