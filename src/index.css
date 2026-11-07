@@ -13,6 +13,10 @@
   html {
     -webkit-text-size-adjust: 100%;
     scroll-behavior: smooth;
+    /* Impede o deslize/"recuo para o lado" horizontal no celular ao focar um
+       campo. `clip` não cria contêiner de rolagem, então o cabeçalho sticky
+       continua funcionando. */
+    overflow-x: clip;
   }
 
   body {
@@ -204,6 +208,15 @@
 .field-input::placeholder { color: #66778c; }
 section[id] { scroll-margin-top: 90px; }
 @media (max-width: 639px) { .container-page { padding-left: 20px; padding-right: 20px; } }
+
+/* Celular: campos com fonte >= 16px evitam o auto-zoom do iOS ao focar — era o
+   que "ampliava" a página e a deslocava ao digitar o endereço. */
+@media (max-width: 639px) {
+  .field-input,
+  input:not([type='checkbox']):not([type='radio']):not([type='range']),
+  select,
+  textarea { font-size: 16px; }
+}
 
 /* ===================== Vambora Motoristas (app) ===================== */
 /* Identidade verde/teal unificada (um só "verde" em todo o app). */
