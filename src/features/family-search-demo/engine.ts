@@ -46,7 +46,7 @@ export async function buscarOfertasDemo({criterios,destino,horario}:PesquisaDemo
   const distancia=km(origem,escola);
   if(distancia>38 || distancia<0.02) return [];
   const seed=hash([destino.id,Math.round(origem.lat*200),Math.round(origem.lng*200),criterios.turno,criterios.modalidade].join('|'));
-  const candidates=catalogoDemo().filter((m,i)=>{
+  const candidates=catalogoDemo().filter((m)=>{
     if(criterios.turno&&!m.turnos.includes(criterios.turno)) return false;
     // Cobertura estável por corredores: candidatos variam com origem e destino.
     return hash(m.id+'|'+(seed%17))%100<77;
@@ -54,7 +54,7 @@ export async function buscarOfertasDemo({criterios,destino,horario}:PesquisaDemo
   const isVolta=criterios.modalidade==='volta';
   const inicio=isVolta?escola:origem;
   const fim=isVolta?origem:escola;
-  const ofertas=await Promise.all(candidates.map(async(m,i)=>{
+  const ofertas=await Promise.all(candidates.map(async(m)=>{
     if(signal?.aborted) return null;
     const count=1+(hash(m.id+'stops'+seed)%3);
     const intermediarios:Ponto[]=Array.from({length:count},(_,j)=>{
@@ -83,7 +83,7 @@ export async function buscarOfertasDemo({criterios,destino,horario}:PesquisaDemo
     relogio+=rota.temposMin[rota.temposMin.length-1];
     paradas.push({titulo:isVolta?'Seu desembarque':destino.nome,ponto:fim,horario:hora(relogio),tipo:'escola'});
     return {...m,embarque:hora(partida),chegada:hora(chegada),duracaoMin:deslocamento,
-      desvioMin:count,escola:destino.nome,modalidade:criterios.modalidade,origem,inicio,destino:escola,
+      desvioMin:count,escola:destino.nome,modalidade:criterios.modalidade,origem,destino:escola,
       paradas,geometria:rota.geometria,distanciaAproximadaKm:distancia,rotaConfirmada:true} as OfertaDemo;
   }));
   return ofertas.filter((x):x is OfertaDemo=>x!==null).sort((a,b)=>a.duracaoMin-b.duracaoMin);
