@@ -13,6 +13,14 @@
  *
  * Elegibilidade (decisão de produto A): rota `concluida`, não-demo, cujo
  * motorista tem anúncio ATIVO (drivers.anuncio_ativo, is_published, não suspenso).
+ *
+ * MODO DEMONSTRAÇÃO (§6.1): por padrão a busca IGNORA rotas de demonstração
+ * (`is_demo = true`), preservando o comportamento de produção. O modo demo é
+ * ligado APENAS por configuração do SERVIDOR (variável de ambiente
+ * `BUSCAR_ROTAS_DEMO = '1' | 'true'`), nunca por um parâmetro arbitrário vindo
+ * do navegador. Quando ligado, as rotas demonstrativas passam a ser avaliadas
+ * pelo MESMO motor (sem baixar `is_demo` para false e sem expor PII), e cada
+ * resultado carrega `demo: true` para o frontend manter a identificação visível.
  */
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { createClient } from '@supabase/supabase-js';
@@ -35,7 +43,8 @@ interface LinhaPax { id: string; identificacao: string; board_stop_id: string | 
 interface LinhaRota {
   id: string; name: string | null; owner_id: string; vehicle_id: string | null; direction: string; turno: string | null;
   monitor: boolean; monitor_ocupa_lugar: boolean; reserved_seats: number; last_dropoff_min: number | null;
-  status: string; is_demo: boolean; is_published: boolean; route_stops: LinhaStop[]; route_passengers: LinhaPax[];
+  status: string; is_demo: boolean; is_published: boolean; price_month: number | null; price_type: string | null;
+  route_stops: LinhaStop[]; route_passengers: LinhaPax[];
 }
 
 function mapRota(r: LinhaRota): Rota {
@@ -86,6 +95,9 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
   if (!body.destinoId || typeof body.destinoId !== 'string') return reply(res, 400, { erro: 'destinoId é obrigatório.' });
   if (!sentidoValido(body.sentido)) return reply(res, 400, { erro: 'sentido deve ser ida ou volta.' });
 
+  // §6.1: modo demonstração ligado SÓ por configuração do servidor (nunca pelo cliente).
+  const demoLigado = process.env.BUSCAR_ROTAS_DEMO === '1' || process.env.BUSCAR_ROTAS_DEMO === 'true';
+
   try {
     const db = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
 
@@ -109,18 +121,23 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       contratacao: body.contratacao === 'avulso' ? 'avulso' : 'mensal',
     };
 
-    // Rotas ELEGÍVEIS: concluídas, não-demo, do sentido pedido. NÃO exige
-    // publicação manual (decisão de produto: qualquer rota concluída é avaliada).
-    const { data: rotas, error: errR } = await db
+    // Rotas ELEGÍVEIS: concluídas, do sentido pedido. NÃO exige publicação
+    // manual (decisão de produto: qualquer rota concluída é avaliada).
+    // §6.1: em produção excluímos demos (`is_demo = false`); só o modo demo do
+    // servidor passa a INCLUIR as rotas demonstrativas (sem alterar `is_demo`).
+    // §10: `limit` alto e explícito evita o truncamento silencioso do PostgREST
+    // (default 1000 linhas) com ~300 rotas na demonstração.
+    let consulta = db
       .from('routes')
       .select(
-        'id,name,owner_id,vehicle_id,direction,turno,monitor,monitor_ocupa_lugar,reserved_seats,last_dropoff_min,status,is_demo,is_published,' +
+        'id,name,owner_id,vehicle_id,direction,turno,monitor,monitor_ocupa_lugar,reserved_seats,last_dropoff_min,status,is_demo,is_published,price_month,price_type,' +
           'route_stops(id,ordem,type,label,lat,lng,confirmed,destination_id,leg_time_min,habitual_arrival_min),' +
           'route_passengers(id,identificacao,board_stop_id,alight_stop_id,destination_id,horario_habitual_min)',
       )
       .eq('status', 'concluida')
-      .eq('is_demo', false)
       .eq('direction', pedido.sentido);
+    if (!demoLigado) consulta = consulta.eq('is_demo', false);
+    const { data: rotas, error: errR } = await consulta.limit(5000);
     if (errR) return reply(res, 500, { erro: 'Falha ao consultar rotas.' });
 
     const linhas = (rotas ?? []) as unknown as LinhaRota[];
@@ -148,6 +165,10 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       return {
         rotaId: res0.rotaId,
         rotaNome: linha?.name ?? 'Rota',
+        demo: !!linha?.is_demo,
+        // Mensalidade por ALUNO (valor fixo por aluno da van, não por trecho).
+        precoMensal: linha?.price_month ?? null,
+        precoTipo: linha?.price_type ?? null,
         vanLugares: van?.seats_passenger ?? null,
         vagas: res0.vagas,
         atendeEscola: res0.atendeEscola,

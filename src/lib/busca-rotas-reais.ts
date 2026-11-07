@@ -302,14 +302,24 @@ export function buscarEmRotasReais(
   const resultados = candidatas
     .map((e) => avaliarRotaReal(e.rota, e.veiculo, pedido, matriz))
     .sort((a, b) => {
+      // §6.3 — ordenação pela MELHOR EXPERIÊNCIA DO NOVO ALUNO, nesta ordem:
+      // 1) status (compatível antes de "sob confirmação");
+      // 2) MENOR TEMPO A BORDO do novo aluno (experiência de deslocamento do
+      //    aluno) — NÃO confundir com o desvio do motorista;
+      // 3) MENOR DESVIO/impacto necessário para o encaixe (desempate);
+      // 4) rota que já ATENDE a escola (Tier A) antes de proximidade (Tier B);
+      // 5) coleta mais cedo em casa.
       if (pesoStatus(a.status) !== pesoStatus(b.status)) return pesoStatus(a.status) - pesoStatus(b.status);
-      if (a.atendeEscola !== b.atendeEscola) return a.atendeEscola ? -1 : 1; // Tier A antes de Tier B
+      const ba = a.minutosABordo ?? Number.POSITIVE_INFINITY;
+      const bb = b.minutosABordo ?? Number.POSITIVE_INFINITY;
+      if (ba !== bb) return ba - bb; // 2) menor permanência do aluno na van
       const da = a.desvioMin ?? Number.POSITIVE_INFINITY;
       const db = b.desvioMin ?? Number.POSITIVE_INFINITY;
-      if (da !== db) return da - db; // menor alteração de rota
+      if (da !== db) return da - db; // 3) menor desvio/impacto (desempate)
+      if (a.atendeEscola !== b.atendeEscola) return a.atendeEscola ? -1 : 1; // 4) Tier A antes de Tier B
       const pa = a.passagemCasaMin ?? Number.POSITIVE_INFINITY;
       const pb = b.passagemCasaMin ?? Number.POSITIVE_INFINITY;
-      return pa - pb;
+      return pa - pb; // 5) coleta mais cedo
     });
   return { resultados, totalRotasAvaliadas: candidatas.length };
 }

@@ -1,4 +1,4 @@
-import { Clock, Home, School, Users, CheckCircle2, HelpCircle } from 'lucide-react';
+import { Clock, Home, School, Users, CheckCircle2, HelpCircle, Wallet } from 'lucide-react';
 import { minutosParaTextoHora, cn } from '@/lib/utils';
 import type { CartaoRotaRealDados } from '@/lib/busca-rotas-reais-cliente';
 
@@ -26,7 +26,14 @@ export function CartaoRotaReal({ r }: { r: CartaoRotaRealDados }) {
         </span>
       </div>
 
-      <h3 className="font-display text-lg font-bold leading-tight text-navy-900">{r.rotaNome}</h3>
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 className="font-display text-lg font-bold leading-tight text-navy-900">{r.rotaNome}</h3>
+        {r.demo && (
+          <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-700 ring-1 ring-amber-200">
+            Demonstração
+          </span>
+        )}
+      </div>
 
       <div className="grid grid-cols-2 gap-2">
         <div className="rounded-xl bg-navy-50 p-3">
@@ -55,6 +62,17 @@ export function CartaoRotaReal({ r }: { r: CartaoRotaRealDados }) {
             <Clock className="h-4 w-4 text-navy-400" /> ~{r.minutosABordo} min a bordo
           </span>
         )}
+      </div>
+
+      <div className="flex items-center justify-between border-t border-navy-50 pt-3">
+        <span className="inline-flex items-center gap-1.5 text-sm font-medium text-navy-600">
+          <Wallet className="h-4 w-4 text-navy-400" /> Mensalidade por aluno
+        </span>
+        <span className="font-display text-base font-extrabold tabular-nums text-navy-900">
+          {r.precoMensal != null
+            ? `R$ ${Number(r.precoMensal).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}/mês`
+            : 'A combinar'}
+        </span>
       </div>
 
       <p className="text-xs leading-snug text-navy-400">{r.motivo}</p>
