@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Heart, MapPin, Star, Clock, BusFront, SlidersHorizontal, Route, X, Play, Pause, RotateCcw } from 'lucide-react';
+import { ArrowLeft, Heart, MapPin, Star, SlidersHorizontal, X, Play, Pause, RotateCcw } from 'lucide-react';
 import type { OfertaDemo } from './engine';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
