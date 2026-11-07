@@ -74,7 +74,7 @@ function Gerenciador() {
       <div className="space-y-5 px-4 pb-10 pt-4">
         <button onClick={editarNasTelas}
           className="vm-press flex w-full items-center gap-3 rounded-2xl bg-navy-900 p-3.5 text-left text-white shadow-card">
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-mint-500"><PencilSimpleLine size={20} weight="bold" /></span>
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-mint-400 text-navy-950"><PencilSimpleLine size={20} weight="bold" /></span>
           <div className="min-w-0 flex-1">
             <p className="font-display text-sm font-bold">Editar direto nas telas</p>
             <p className="text-[11px] text-white/70">Ative o modo de edição e personalize cada arte no próprio lugar.</p>
@@ -151,7 +151,7 @@ function SlotCard({ slot, atual, onEditar, onMudou }: {
         </div>
       </div>
       <div className="mt-3 flex gap-2">
-        <button onClick={onEditar} className="flex flex-1 items-center justify-center gap-1.5 rounded-full bg-mint-500 py-2.5 text-sm font-semibold text-white active:scale-[0.99]">
+        <button onClick={onEditar} className="flex flex-1 items-center justify-center gap-1.5 rounded-full bg-mint-400 py-2.5 text-sm font-bold text-navy-950 active:scale-[0.99]">
           <UploadSimple size={16} weight="bold" /> {publicado ? 'Trocar arte' : 'Enviar arte'}
         </button>
         {publicado && (
