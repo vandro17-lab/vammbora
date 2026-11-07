@@ -348,7 +348,7 @@ export function LinhaPercurso({ rota, setRota }: { rota: Rota; setRota: (r: Rota
                     value={p.horarioChegadaMin == null ? '' : `${String(Math.floor(p.horarioChegadaMin / 60)).padStart(2, '0')}:${String(p.horarioChegadaMin % 60).padStart(2, '0')}`}
                     onChange={(e) => {
                       const valor = e.target.value;
-                      const minutos = /^([01]\\d|2[0-3]):[0-5]\\d$/.test(valor) ? horaParaMinutos(valor) : null;
+                      const minutos = /^([01]\d|2[0-3]):[0-5]\d$/.test(valor) ? horaParaMinutos(valor) : null;
                       setRota({ ...rota,
                         paradas: rota.paradas.map((s) => s.id === p.id ? { ...s, horarioChegadaMin: minutos } : s),
                         passageiros: rota.passageiros.map((aluno) =>
