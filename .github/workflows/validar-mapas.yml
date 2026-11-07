@@ -1,9 +1,9 @@
 name: Validar cadastro com mapas
 on:
   push:
-    branches: [feat/mapas-reais-cadastro-motorista]
+    branches: [feat/mapas-reais-cadastro-motorista, feat/motor-encaixe-prazo-final]
   pull_request:
-    branches: [feat/ideathon-finalizacao]
+    branches: [feat/ideathon-finalizacao, feat/mapas-reais-cadastro-motorista]
 jobs:
   build:
     runs-on: ubuntu-latest
