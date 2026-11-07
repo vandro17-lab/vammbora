@@ -70,11 +70,11 @@ L.push(``);
 // ---- ROUTES ----
 L.push(`-- ROTAS (${b.routesDb.length}) — status=concluida, is_demo=true, dono = admin (ou 1º profile).`);
 L.push(`with o as (select coalesce((select user_id from public.user_roles where role='admin' limit 1),(select id from public.profiles limit 1)) as oid)`);
-L.push(`insert into public.routes (id,owner_id,vehicle_id,city_id,name,direction,turno,days,monitor,monitor_ocupa_lugar,reserved_seats,last_dropoff_min,early_leave_limit_min,status,is_demo,is_published)`);
-L.push(`select r.id,o.oid,r.vehicle_id,${CID},r.name,r.direction,r.turno::public.turno,'{"segunda","terca","quarta","quinta","sexta"}',r.monitor,r.mol,r.reserved,r.ldm,r.elm,'concluida',true,true from o cross join (values`);
-L.push(b.routesDb.map((r) => `(${q(r.id)}::uuid,${q(r.vehicle_id)}::uuid,${q(r.name)},${q(r.direction)},${q(r.turno)},${bool(r.monitor)},${bool(r.monitor_ocupa_lugar)},${n(r.reserved_seats)},${n(r.last_dropoff_min)},${n(r.early_leave_limit_min)})`).join(',\n'));
-L.push(`) as r(id,vehicle_id,name,direction,turno,monitor,mol,reserved,ldm,elm)`);
-L.push(`on conflict (id) do update set owner_id=excluded.owner_id,vehicle_id=excluded.vehicle_id,city_id=excluded.city_id,name=excluded.name,direction=excluded.direction,turno=excluded.turno,days=excluded.days,monitor=excluded.monitor,monitor_ocupa_lugar=excluded.monitor_ocupa_lugar,reserved_seats=excluded.reserved_seats,last_dropoff_min=excluded.last_dropoff_min,early_leave_limit_min=excluded.early_leave_limit_min,status='concluida',is_demo=true,is_published=true;`);
+L.push(`insert into public.routes (id,owner_id,vehicle_id,city_id,name,direction,turno,days,monitor,monitor_ocupa_lugar,reserved_seats,last_dropoff_min,early_leave_limit_min,status,is_demo,is_published,price_type,price_month)`);
+L.push(`select r.id,o.oid,r.vehicle_id,${CID},r.name,r.direction,r.turno::public.turno,'{"segunda","terca","quarta","quinta","sexta"}',r.monitor,r.mol,r.reserved,r.ldm,r.elm,'concluida',true,true,r.ptype::public.price_type,r.pmonth from o cross join (values`);
+L.push(b.routesDb.map((r) => `(${q(r.id)}::uuid,${q(r.vehicle_id)}::uuid,${q(r.name)},${q(r.direction)},${q(r.turno)},${bool(r.monitor)},${bool(r.monitor_ocupa_lugar)},${n(r.reserved_seats)},${n(r.last_dropoff_min)},${n(r.early_leave_limit_min)},${q(r.price_type)},${n(r.price_month)})`).join(',\n'));
+L.push(`) as r(id,vehicle_id,name,direction,turno,monitor,mol,reserved,ldm,elm,ptype,pmonth)`);
+L.push(`on conflict (id) do update set owner_id=excluded.owner_id,vehicle_id=excluded.vehicle_id,city_id=excluded.city_id,name=excluded.name,direction=excluded.direction,turno=excluded.turno,days=excluded.days,monitor=excluded.monitor,monitor_ocupa_lugar=excluded.monitor_ocupa_lugar,reserved_seats=excluded.reserved_seats,last_dropoff_min=excluded.last_dropoff_min,early_leave_limit_min=excluded.early_leave_limit_min,status='concluida',is_demo=true,is_published=true,price_type=excluded.price_type,price_month=excluded.price_month;`);
 L.push(``);
 
 // ---- limpeza idempotente dos filhos do pacote (antes de reinserir) ----

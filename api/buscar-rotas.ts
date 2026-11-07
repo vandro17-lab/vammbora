@@ -43,7 +43,8 @@ interface LinhaPax { id: string; identificacao: string; board_stop_id: string | 
 interface LinhaRota {
   id: string; name: string | null; owner_id: string; vehicle_id: string | null; direction: string; turno: string | null;
   monitor: boolean; monitor_ocupa_lugar: boolean; reserved_seats: number; last_dropoff_min: number | null;
-  status: string; is_demo: boolean; is_published: boolean; route_stops: LinhaStop[]; route_passengers: LinhaPax[];
+  status: string; is_demo: boolean; is_published: boolean; price_month: number | null; price_type: string | null;
+  route_stops: LinhaStop[]; route_passengers: LinhaPax[];
 }
 
 function mapRota(r: LinhaRota): Rota {
@@ -129,7 +130,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     let consulta = db
       .from('routes')
       .select(
-        'id,name,owner_id,vehicle_id,direction,turno,monitor,monitor_ocupa_lugar,reserved_seats,last_dropoff_min,status,is_demo,is_published,' +
+        'id,name,owner_id,vehicle_id,direction,turno,monitor,monitor_ocupa_lugar,reserved_seats,last_dropoff_min,status,is_demo,is_published,price_month,price_type,' +
           'route_stops(id,ordem,type,label,lat,lng,confirmed,destination_id,leg_time_min,habitual_arrival_min),' +
           'route_passengers(id,identificacao,board_stop_id,alight_stop_id,destination_id,horario_habitual_min)',
       )
@@ -165,6 +166,9 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
         rotaId: res0.rotaId,
         rotaNome: linha?.name ?? 'Rota',
         demo: !!linha?.is_demo,
+        // Mensalidade por ALUNO (valor fixo por aluno da van, não por trecho).
+        precoMensal: linha?.price_month ?? null,
+        precoTipo: linha?.price_type ?? null,
         vanLugares: van?.seats_passenger ?? null,
         vagas: res0.vagas,
         atendeEscola: res0.atendeEscola,

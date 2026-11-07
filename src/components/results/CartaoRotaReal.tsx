@@ -1,4 +1,4 @@
-import { Clock, Home, School, Users, CheckCircle2, HelpCircle } from 'lucide-react';
+import { Clock, Home, School, Users, CheckCircle2, HelpCircle, Wallet } from 'lucide-react';
 import { minutosParaTextoHora, cn } from '@/lib/utils';
 import type { CartaoRotaRealDados } from '@/lib/busca-rotas-reais-cliente';
 
@@ -62,6 +62,17 @@ export function CartaoRotaReal({ r }: { r: CartaoRotaRealDados }) {
             <Clock className="h-4 w-4 text-navy-400" /> ~{r.minutosABordo} min a bordo
           </span>
         )}
+      </div>
+
+      <div className="flex items-center justify-between border-t border-navy-50 pt-3">
+        <span className="inline-flex items-center gap-1.5 text-sm font-medium text-navy-600">
+          <Wallet className="h-4 w-4 text-navy-400" /> Mensalidade por aluno
+        </span>
+        <span className="font-display text-base font-extrabold tabular-nums text-navy-900">
+          {r.precoMensal != null
+            ? `R$ ${Number(r.precoMensal).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}/mês`
+            : 'A combinar'}
+        </span>
       </div>
 
       <p className="text-xs leading-snug text-navy-400">{r.motivo}</p>

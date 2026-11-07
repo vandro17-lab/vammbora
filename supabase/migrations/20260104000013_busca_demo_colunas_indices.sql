@@ -21,8 +21,17 @@
 alter table public.routes      add column if not exists is_published boolean not null default false;
 alter table public.route_stops add column if not exists habitual_arrival_min int;
 
+-- Preço por ALUNO da van (valor fixo por aluno, NUNCA por trecho). Opcional por
+-- rota: quando preenchido, a busca pode exibi-lo no cartão; NULL = "a combinar".
+alter table public.routes add column if not exists price_type  public.price_type;
+alter table public.routes add column if not exists price_month numeric(10,2);
+
 comment on column public.routes.is_published is
   'Rota publicada na busca pública pela família (ação explícita do motorista). "concluida" NÃO implica publicada. Default false.';
+comment on column public.routes.price_month is
+  'Mensalidade por ALUNO desta van (valor fixo por aluno, não por trecho). NULL = a combinar.';
+comment on column public.routes.price_type is
+  'Tipo de preço da rota: fixo | dinamico | a_combinar. Espelha o preço do motorista para a busca por rota.';
 comment on column public.route_stops.habitual_arrival_min is
   'Horário habitual de chegada declarado pelo motorista nesta parada (minuto do dia 0..1439). Âncora de horário da busca inteligente; NULL = não informado.';
 

@@ -42,7 +42,7 @@ const C = { familia: { lat: -21.2010, lng: -50.4388 }, casaA: { lat: -21.1995, l
 function rotaRealCanon() {
   return {
     id: 'rota-1', name: 'Rota do Teste', owner_id: 'owner-1', vehicle_id: 'veic-1', direction: 'ida', turno: 'manha',
-    monitor: false, monitor_ocupa_lugar: false, reserved_seats: 0, last_dropoff_min: 7 * 60, status: 'concluida', is_demo: false, is_published: true,
+    monitor: false, monitor_ocupa_lugar: false, reserved_seats: 0, last_dropoff_min: 7 * 60, status: 'concluida', is_demo: false, is_published: true, price_month: 450, price_type: 'fixo',
     route_stops: [
       { id: 's', ordem: 0, type: 'saida', label: 'Garagem', lat: C.garagem.lat, lng: C.garagem.lng, confirmed: true, destination_id: null, leg_time_min: null, habitual_arrival_min: null },
       { id: 'a', ordem: 1, type: 'casa', label: 'Rua Secreta A, 123', lat: C.casaA.lat, lng: C.casaA.lng, confirmed: true, destination_id: null, leg_time_min: null, habitual_arrival_min: null },
@@ -85,6 +85,9 @@ describe('api/buscar-rotas (handler, mock Supabase)', () => {
     expect(out.resultados[0].rotaNome).toBe('Rota do Teste');
     expect(out.resultados[0].vanLugares).toBe(6);
     expect(out.resultados[0].status).toBe('compativel');
+    // Preço por aluno (valor fixo por aluno da van) é devolvido para o cartão.
+    expect(out.resultados[0].precoMensal).toBe(450);
+    expect(out.resultados[0].precoTipo).toBe('fixo');
     // SEM PII: nenhum nome de aluno nem endereço de casa na resposta.
     expect(res.body).not.toContain('Segredo');
     expect(res.body).not.toContain('Secreta');

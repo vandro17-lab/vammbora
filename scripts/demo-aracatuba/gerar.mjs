@@ -173,7 +173,9 @@ export function gerarBaseDemo() {
     }
 
     const bairros = [escola.bairro, escola2?.bairro].filter(Boolean);
-    const precoMensal = 280 + (i % 25) * 7;
+    // Mensalidade por ALUNO desta van: valor FIXO por aluno (não por trecho),
+    // diferente de van para van. É o valor que o cartão de busca exibe.
+    const precoMensal = 280 + (i % 25) * 7; // 280..448
     const boardingMin = horarios.idaEscolaMin - 70 - (i % 15);
 
     drivers.push({
@@ -188,9 +190,10 @@ export function gerarBaseDemo() {
       feature_monitor: monitor,
       feature_seatbelt: true,
       feature_accessible: i % 8 === 0,
-      price_type: i % 3 === 0 ? 'a_combinar' : 'fixo',
-      price_month: i % 3 === 0 ? null : precoMensal,
-      price_daily: i % 3 === 0 ? 25 + (i % 5) : null,
+      // Demo: todas as vans com mensalidade FIXA por aluno (valor visível na busca).
+      price_type: 'fixo',
+      price_month: precoMensal,
+      price_daily: null,
       boarding_time: minToHHMM(boardingMin),
       turno,
     });
@@ -221,14 +224,14 @@ export function gerarBaseDemo() {
     // --------- ROTA DE IDA: base -> casas (longe->perto) -> escola(s) ---------
     const ida = construirIda({
       driverId, vehicleId, num, escola, escola2, turno, horarios,
-      seats, monitor, monitorOcupa, reserved, escolhidos, distr,
+      seats, monitor, monitorOcupa, reserved, escolhidos, distr, precoMensal,
       nextStop: () => uuid(CAT.stop, ++seqStop),
       nextPax: () => uuid(CAT.pax, ++seqPax),
     });
     // --------- ROTA DE VOLTA: base -> escola -> casas (perto->longe) ---------
     const volta = construirVolta({
       driverId, vehicleId, num, escola, turno, horarios,
-      seats, monitor, monitorOcupa, reserved, escolhidos, distr,
+      seats, monitor, monitorOcupa, reserved, escolhidos, distr, precoMensal,
       nextStop: () => uuid(CAT.stop, ++seqStop),
       nextPax: () => uuid(CAT.pax, ++seqPax),
     });
@@ -251,7 +254,7 @@ function minToHHMM(m) {
 /* ----------------------- construção das rotas ----------------------- */
 function construirIda(o) {
   const { driverId, vehicleId, num, escola, escola2, turno, horarios, seats,
-    monitor, monitorOcupa, reserved, escolhidos, distr, nextStop, nextPax } = o;
+    monitor, monitorOcupa, reserved, escolhidos, distr, precoMensal, nextStop, nextPax } = o;
 
   // escolhidos[0] = mais próximo da escola ... último = mais distante.
   // Ida: base (mais distante) -> casas (distante->perto) -> escola.
@@ -323,14 +326,14 @@ function construirIda(o) {
   });
 
   const lastDropoff = escola2StopId ? escolaChegada + 4 : escolaChegada;
-  const db = montarDb({ routeId, driverId, vehicleId, num, escola, turno, direction: 'ida', monitor, monitorOcupa, reserved, lastDropoff, stops, passengers });
+  const db = montarDb({ routeId, driverId, vehicleId, num, escola, turno, direction: 'ida', monitor, monitorOcupa, reserved, lastDropoff, precoMensal, stops, passengers });
   const rota = montarDominio({ routeId, vehicleId, turno, direction: 'ida', monitor, monitorOcupa, reserved, lastDropoff, stops, passengers });
   return { db, rota };
 }
 
 function construirVolta(o) {
   const { driverId, vehicleId, num, escola, turno, horarios, seats,
-    monitor, monitorOcupa, reserved, escolhidos, distr, nextStop, nextPax } = o;
+    monitor, monitorOcupa, reserved, escolhidos, distr, precoMensal, nextStop, nextPax } = o;
 
   // Volta: base (perto da escola) -> escola (embarque) -> casas (perto->longe, desembarque).
   const ordenadosPerto = [...escolhidos]; // perto -> longe
@@ -381,7 +384,7 @@ function construirVolta(o) {
   });
 
   const lastDropoff = chegadas[chegadas.length - 1];
-  const db = montarDb({ routeId, driverId, vehicleId, num, escola, turno, direction: 'volta', monitor, monitorOcupa, reserved, lastDropoff, stops, passengers });
+  const db = montarDb({ routeId, driverId, vehicleId, num, escola, turno, direction: 'volta', monitor, monitorOcupa, reserved, lastDropoff, precoMensal, stops, passengers });
   const rota = montarDominio({ routeId, vehicleId, turno, direction: 'volta', monitor, monitorOcupa, reserved, lastDropoff, stops, passengers });
   return { db, rota };
 }
@@ -422,13 +425,14 @@ function chegadasForward(seqGeo, paxPorParada, escolaSaidaMin) {
 }
 
 function montarDb(o) {
-  const { routeId, driverId, vehicleId, num, escola, turno, direction, monitor, monitorOcupa, reserved, lastDropoff, stops, passengers } = o;
+  const { routeId, driverId, vehicleId, num, escola, turno, direction, monitor, monitorOcupa, reserved, lastDropoff, precoMensal, stops, passengers } = o;
   const nome = `Transporte Escolar Demo ${String(num).padStart(3, '0')} — ${escola.nome} — ${turno} — ${direction}`;
   return {
     id: routeId, owner_placeholder: true, driver_id: driverId, vehicle_id: vehicleId,
     name: nome, direction, turno, monitor, monitor_ocupa_lugar: monitorOcupa,
     reserved_seats: reserved, last_dropoff_min: lastDropoff, early_leave_limit_min: lastDropoff - 60,
     status: 'concluida', is_demo: true,
+    price_type: 'fixo', price_month: precoMensal,
     stops, passengers,
   };
 }

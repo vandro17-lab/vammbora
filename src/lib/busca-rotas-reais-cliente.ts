@@ -21,6 +21,10 @@ export interface CartaoRotaRealDados {
   rotaNome: string;
   /** Rota de DEMONSTRAÇÃO (§6.1): o frontend mantém a identificação visível. */
   demo?: boolean;
+  /** Mensalidade por ALUNO desta van (valor fixo por aluno, não por trecho). */
+  precoMensal?: number | null;
+  /** Tipo de preço: 'fixo' | 'dinamico' | 'a_combinar'. */
+  precoTipo?: string | null;
   vanLugares: number | null;
   /** Vagas livres para novos passageiros (capacidade − ocupação). */
   vagas: number | null;
