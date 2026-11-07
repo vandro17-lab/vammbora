@@ -68,11 +68,11 @@ export function DashboardPage() {
             <span className="mx-auto grid h-14 w-14 place-items-center overflow-hidden rounded-2xl bg-mint-50 text-mint-600">
               <SlotIlustracao slot="dash.primeirosPassos" alt="" fallback={<Sparkles className="h-7 w-7" />} />
             </span>
-            <p className="mt-3 font-display text-lg font-bold text-navy-900">Vamos preparar o seu app</p>
+            <p className="mt-3 font-display text-lg font-bold text-navy-900">Vamos começar seu cadastro</p>
             <p className="mx-auto mt-1 max-w-xs text-sm text-navy-500">
               {!dados.veiculo
-                ? 'Cadastre a sua van para calcularmos ocupação, custos e oportunidades.'
-                : 'Monte a sua primeira rota para ver alunos, vagas e horários aqui.'}
+                ? 'Cadastre sua van para começar a organizar suas rotas.'
+                : 'Cadastre sua primeira rota para acompanhar alunos, horários e vagas.'}
             </p>
             <Link
               to={!dados.veiculo ? '/app/van/cadastro' : '/app/rotas/nova'}
@@ -104,13 +104,13 @@ export function DashboardPage() {
             <div className="grid grid-cols-2 gap-3">
               <Card className="p-4">
                 <span className="vm-chip-ico vm-ico-rose"><Fuel className="h-5 w-5" /></span>
-                <p className="mt-2 text-xs text-navy-500">Diesel por dia</p>
+                <p className="mt-2 text-xs text-navy-500">Consumo diário estimado</p>
                 <p className="font-display text-2xl font-extrabold tabular-nums text-navy-900">{ind.dieselDiaL.toFixed(1).replace('.', ',')} L</p>
                 <p className="text-[11px] text-navy-400">(= {kmDia} km)</p>
               </Card>
               <Card className="p-4">
                 <span className="vm-chip-ico vm-ico-amber"><Coins className="h-5 w-5" /></span>
-                <p className="mt-2 text-xs text-navy-500">Custo por dia</p>
+                <p className="mt-2 text-xs text-navy-500">Custo diário estimado</p>
                 <p className="font-display text-2xl font-extrabold tabular-nums text-navy-900">{formatBRL(ind.custoDiaBRL)}</p>
                 <p className="text-[11px] text-navy-400">(estimado)</p>
               </Card>
@@ -121,8 +121,8 @@ export function DashboardPage() {
               <Card className="vm-press flex items-center gap-3 p-4">
                 <span className="vm-chip-ico vm-ico-green"><Sparkles className="h-5 w-5" /></span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-bold text-navy-900">Oportunidades para a sua rota</p>
-                  <p className="truncate text-xs text-navy-500">Veja famílias compatíveis e simule o encaixe sem alterar a rota.</p>
+                  <p className="text-sm font-bold text-navy-900">Novos pedidos para sua rota</p>
+                  <p className="truncate text-xs text-navy-500">Confira pedidos que podem atender à sua rota.</p>
                 </div>
                 <ChevronRight className="h-5 w-5 shrink-0 text-navy-300" />
               </Card>
