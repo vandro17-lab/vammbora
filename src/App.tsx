@@ -29,6 +29,7 @@ import { PainelMotoristaPage } from '@/pages/motorista/PainelMotoristaPage';
 import { VeiculosPage } from '@/pages/motorista/VeiculosPage';
 import { RotasListPage } from '@/pages/motorista/RotasListPage';
 import { RotaBuilderPage } from '@/pages/motorista/RotaBuilderPage';
+import { NavegacaoRotaRealPage } from '@/pages/motorista/NavegacaoRotaRealPage';
 import { SimuladorEncaixePage } from '@/pages/motorista/SimuladorEncaixePage';
 import { PerfilMotoristaPage, DocumentosMotoristaPage, ProcuraMotoristaPage } from '@/pages/motorista/PaginasSimples';
 import { VamboraProPage } from '@/pages/vambora-pro/VamboraProPage';
@@ -65,6 +66,7 @@ export default function App() {
             <Route path="/painel/procura" element={<ProcuraMotoristaPage />} />
             <Route path="/painel/rotas" element={<RotasListPage />} />
             <Route path="/painel/rota/:id" element={<RotaBuilderPage />} />
+            <Route path="/painel/rota-real/:id" element={<NavegacaoRotaRealPage />} />
             <Route path="/painel/simulador" element={<SimuladorEncaixePage />} />
             {/* Vambora Motoristas — app visual (dados reais + cenário demo) */}
             <Route path="/app" element={<ExigirMotorista><Outlet /></ExigirMotorista>}>

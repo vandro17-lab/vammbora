@@ -238,6 +238,11 @@ export function RotaDetalhePage() {
             <MapaInterativoRota paradas={rota.paradas} bare />
           </div>
           <p className="mt-2 text-[11px] leading-snug text-navy-400">Fonte: OpenStreetMap / OSRM — tempos são estimativas. Endereços permanecem privados.</p>
+          {!dados.demo && (
+            <Link to={`/painel/rota-real/${rota.id}`} className="btn btn-md btn-primary mt-3 w-full">
+              <Navigation className="h-4 w-4" /> Abrir navegação real
+            </Link>
+          )}
         </Card>
 
         {/* Indicadores */}
