@@ -31,7 +31,7 @@ export function MinhaVanPage() {
             icon={Bus}
             ilustracao={<SlotIlustracao slot="van.vazio" alt="" fallback={<Bus className="h-8 w-8" />} />}
             titulo="Cadastre sua van"
-            texto="Informe modelo, lugares, consumo e preço do diesel para calcularmos custos, rotas e oportunidades."
+            texto="Cadastre sua van para organizar suas rotas e acompanhar os custos."
             acao={
               <button onClick={() => navigate('/app/van/cadastro')} className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-mint-500 font-semibold text-white shadow-float active:scale-[0.98]">
                 <Plus className="h-5 w-5" /> Cadastrar van
@@ -125,7 +125,7 @@ export function CadastroVanPage() {
     } catch (e) {
       setSalvando(false);
       // Com banco conectado, uma falha real precisa aparecer (não some em silêncio).
-      if (USE_SUPABASE) { setErro('Não foi possível salvar a van: ' + (e as Error).message); return; }
+      if (USE_SUPABASE) { setErro('Não conseguimos salvar os dados da van. Confira as informações e tente novamente.'); return; }
       // Modo demonstração (sem backend): segue mesmo assim.
     }
     salvarPrefs({ consumoKmL: consumo, precoDiesel: preco, mensalidade });
@@ -161,7 +161,7 @@ export function CadastroVanPage() {
               <div className="w-24 shrink-0"><SlotIlustracao slot="van.ilustracao" alt="Van escolar" fallback={<VanEscolar className="w-full" />} /></div>
               <div>
                 <p className="font-display text-lg font-bold text-navy-900">Adicionar van</p>
-                <p className="text-xs text-navy-500">Cadastre os dados da sua van escolar.</p>
+                <p className="text-xs text-navy-500">Informe os dados do veículo.</p>
               </div>
             </div>
 
@@ -180,11 +180,11 @@ export function CadastroVanPage() {
               <input className="field-input" placeholder="Ex.: ABC0D12" maxLength={8}
                 value={placa} onChange={(e) => setPlaca(e.target.value.toUpperCase())}
                 style={{ textTransform: placa ? 'uppercase' : 'none' }} />
-              <p className="mt-1 inline-flex items-center gap-1 text-[11px] text-navy-400"><Lock className="h-3 w-3" /> Só a equipe vê. Não aparece às famílias.</p>
+              <p className="mt-1 inline-flex items-center gap-1 text-[11px] text-navy-400"><Lock className="h-3 w-3" /> Informação visível apenas para a equipe do VanBora.</p>
             </CampoVan>
 
             <div className="mt-4">
-              <p className="field-label inline-flex items-center gap-1.5"><Users className="h-4 w-4 text-navy-400" /> Quantos lugares para alunos?</p>
+              <p className="field-label inline-flex items-center gap-1.5"><Users className="h-4 w-4 text-navy-400" /> Quantos passageiros sua van comporta?</p>
               <div className="mt-2 flex items-center gap-4">
                 <button type="button" onClick={() => setLugares(Math.max(1, lugares - 1))} aria-label="Menos um lugar"
                   className="grid h-11 w-11 place-items-center rounded-full bg-navy-50 text-navy-700 ring-1 ring-navy-100 active:scale-95"><Minus className="h-5 w-5" /></button>
@@ -192,7 +192,7 @@ export function CadastroVanPage() {
                 <button type="button" onClick={() => setLugares(lugares + 1)} aria-label="Mais um lugar"
                   className="grid h-11 w-11 place-items-center rounded-full bg-mint-500 text-white active:scale-95"><Plus className="h-5 w-5" /></button>
               </div>
-              <p className="mt-1.5 text-[11px] text-navy-400">Sem contar você, o motorista.</p>
+              <p className="mt-1.5 text-[11px] text-navy-400">Não inclua o assento do motorista.</p>
             </div>
 
             <div className="mt-4">
@@ -209,7 +209,7 @@ export function CadastroVanPage() {
         {passo === 2 && (
           <Card className="p-5">
             <p className="font-display font-bold text-navy-900">Operação</p>
-            <p className="text-xs text-navy-500">Consumo e valores para calcular custos, rotas e oportunidades.</p>
+            <p className="text-xs text-navy-500">Informe o consumo da van e o preço do combustível para estimar os custos.</p>
             <CampoVan icon={Gauge} label="Rendimento (km/l)">
               <input className="field-input" inputMode="decimal" value={String(consumo).replace('.', ',')}
                 onChange={(e) => setConsumo(Number(e.target.value.replace(',', '.').replace(/[^\d.]/g, '')) || 0)} />
@@ -231,12 +231,12 @@ export function CadastroVanPage() {
               <>
                 <span className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-mint-100 text-mint-600"><Check className="h-8 w-8" /></span>
                 <p className="mt-3 font-display text-lg font-bold">Van salva!</p>
-                <p className="text-sm text-navy-500">Abrindo seu aplicativo…</p>
+                <p className="text-sm text-navy-500">Preparando seu painel…</p>
               </>
             ) : (
               <>
                 <VanEscolar className="mx-auto w-32" />
-                <p className="mt-2 font-display text-lg font-bold">Confira e conclua</p>
+                <p className="mt-2 font-display text-lg font-bold">Revise os dados da van</p>
                 <div className="mt-3 space-y-1.5 text-left text-sm">
                   {[['Modelo', modelo], ['Ano', ano], ['Lugares', lugares], ['Rendimento', `${String(consumo).replace('.', ',')} km/l`], ['Diesel', `${formatBRL(preco)}/l`], ['Mensalidade', formatBRL(mensalidade)]].map(([k, val]) => (
                     <div key={k as string} className="flex justify-between border-b border-navy-50 pb-1.5"><span className="text-navy-500">{k}</span><span className="font-semibold text-navy-800">{String(val)}</span></div>
