@@ -82,13 +82,13 @@ export function MaisPage() {
         {/* Banner — Clube do Motorista */}
         <button onClick={() => navigate('/app/mais/clube')} className="w-full text-left">
           <div className="vm-press relative overflow-hidden rounded-[1.25rem] p-4 text-white shadow-card"
-            style={{ background: 'linear-gradient(135deg,#17306b 0%,#0b1f3a 62%)' }}>
+            style={{ background: 'linear-gradient(135deg,#171717 0%,#292524 62%)' }}>
             {/* Arte do Clube — slot editável (fallback: presente vetorial) */}
             <div className="pointer-events-none absolute -right-2 -top-1 h-28 w-28">
               <SlotIlustracao slot="clube.art" alt="Clube do Motorista"
                 fallback={<Gift size={96} weight="duotone" className="absolute right-1 top-1 text-amber-300/80" />} />
             </div>
-            <span className="pointer-events-none absolute right-5 top-[4.5rem] grid h-8 w-8 place-items-center rounded-full bg-mint-500 text-white shadow-md ring-4 ring-[#0b1f3a]">
+            <span className="pointer-events-none absolute right-5 top-[4.5rem] grid h-8 w-8 place-items-center rounded-full bg-mint-400 text-navy-950 shadow-md ring-4 ring-[#171717]">
               <Percent size={16} weight="bold" />
             </span>
             <div className="relative max-w-[70%]">
@@ -247,7 +247,7 @@ function Clube() {
     <>
       {/* Topo do Clube — ilustração/banner editável (fallback: coroa vetorial). */}
       <div className="relative overflow-hidden rounded-[1.25rem] p-4 text-white shadow-card"
-        style={{ background: 'linear-gradient(135deg,#17306b 0%,#0b1f3a 62%)' }}>
+        style={{ background: 'linear-gradient(135deg,#171717 0%,#292524 62%)' }}>
         <div className="pointer-events-none absolute -right-2 -top-1 h-24 w-32">
           <SlotIlustracao slot="clube.hero" alt="Clube do Motorista"
             fallback={<Crown size={84} weight="duotone" className="absolute right-2 top-2 text-amber-300/80" />} />
