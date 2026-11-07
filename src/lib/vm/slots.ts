@@ -165,6 +165,16 @@ export const SLOTS: SlotDef[] = [
   },
   ...CARTOES_CLUBE.map(([id, nome]) =>
     slotIcone(id, 'Clube do Motorista — cartões', `Logo · ${nome}`, `Ícone/logo do cartão de parceria "${nome}".`)),
+  ...CARTOES_CLUBE.map(([id, nome]): SlotDef => ({
+    id: id + '.banner',
+    grupo: 'Clube do Motorista — banners completos',
+    titulo: `Banner completo · ${nome}`,
+    descricao: `Substitui todo o cartão de "${nome}" por uma imagem horizontal, incluindo textos e arte.`,
+    kind: 'ilustracao',
+    largura: 1200, altura: 280,
+    formatos: FORMATOS_FOTO, transparencia: false,
+    areaSegura: 'Crie a arte inteira em 1200 × 280 px (proporção 30:7). Inclua textos e logotipo na própria imagem; mantenha 40 px de margem lateral. O banner é exibido inteiro, sem cortes.',
+  })),
 ];
 
 export function slotPorId(id: string): SlotDef | undefined {
