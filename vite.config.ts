@@ -14,7 +14,11 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'prompt',
+      // autoUpdate: cada novo deploy assume sozinho (o service worker novo ativa
+      // e recarrega), evitando que o navegador fique preso num bundle antigo em
+      // cache depois de um merge/deploy. Sem isso, o usuário tinha de clicar
+      // "Atualizar" e, até lá, via a versão anterior.
+      registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'robots.txt', 'icons/apple-touch-icon.png'],
       manifest: {
         name: 'Vambora — transporte escolar e universitário',
