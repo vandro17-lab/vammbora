@@ -138,17 +138,18 @@ describe('Busca real com o motor do endpoint (§6.2/§9.1)', () => {
     });
   }
 
-  it('ordena pela MELHOR experiência do aluno: menor tempo a bordo primeiro (§6.3)', () => {
+  it('IDA ordena pela MELHOR experiência: sair de casa o mais tarde possível (embarque DESC)', () => {
     const esc = destino('geo-20261105-004');
     const origem = pontoPertoDe(esc, 300, 1400);
     const { resultados } = buscarEmRotasReais(ENTRADAS, {
       origem: { lat: origem.lat, lng: origem.lng }, destinoId: 'geo-20261105-004',
       escolaPonto: { lat: esc.lat, lng: esc.lng }, sentido: 'ida', turno: null, contratacao: 'mensal',
+      horarioMaxChegadaMin: 7 * 60,
     });
-    const comp = resultados.filter((r) => r.status === 'compativel' && r.minutosABordo != null);
-    // dentro do mesmo status, minutosABordo deve ser não-decrescente.
+    const comp = resultados.filter((r) => r.status === 'compativel' && r.passagemCasaMin != null);
+    // IDA: o embarque (passagemCasaMin) deve ser NÃO-CRESCENTE (mais tarde primeiro).
     for (let i = 1; i < comp.length; i++) {
-      expect(comp[i].minutosABordo!).toBeGreaterThanOrEqual(comp[i - 1].minutosABordo!);
+      expect(comp[i].passagemCasaMin!).toBeLessThanOrEqual(comp[i - 1].passagemCasaMin!);
     }
   });
 

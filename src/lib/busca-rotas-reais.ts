@@ -150,7 +150,13 @@ function ancoraHorarioEscola(rota: Rota, pedido: PedidoFamilia): { min: number |
   if (esc && esc.ehUltimaEscola && rota.ultimoDesembarqueMin != null && Number.isFinite(rota.ultimoDesembarqueMin)) {
     return { min: rota.ultimoDesembarqueMin, fonte: 'rota' };
   }
-  // 4) Último recurso: padrão do turno — resultado NUNCA confirmado.
+  // 4) Horário de entrada INFORMADO pela família (Tier B — a escola não faz parte
+  //    do itinerário desta rota). É um dado REAL do pedido (não um palpite de
+  //    turno): vira a meta de planejamento da inserção, com âncora forte.
+  if (pedido.horarioMaxChegadaMin != null && Number.isFinite(pedido.horarioMaxChegadaMin)) {
+    return { min: pedido.horarioMaxChegadaMin, fonte: 'rota' };
+  }
+  // 5) Último recurso: padrão do turno — resultado NUNCA confirmado.
   const padrao = limitePadraoDoTurno(pedido.turno ?? rota.turno ?? null);
   if (padrao != null) return { min: padrao, fonte: 'turno' };
   return { min: null, fonte: 'nenhuma' };
@@ -170,6 +176,11 @@ const MOTIVO_SEM_ORIGEM = 'Confirme um endereço de origem válido no mapa para 
 const MOTIVO_SEM_DESTINO = 'Escolha a escola de destino para avaliarmos esta rota.';
 const MOTIVO_SEM_HORARIO = 'Esta rota ainda não tem horário suficiente para estimar — horário sob confirmação.';
 const MOTIVO_APOS_LIMITE = 'Esta rota chega à escola depois do horário máximo que você informou.';
+const MOTIVO_OUTRO_PERIODO = 'Esta rota é de outro período do dia — não serve para esse horário de entrada.';
+/** Quão antes do horário de entrada uma rota ainda é "do mesmo período". Os
+ *  períodos (manhã 07h, tarde 12h30, noite 19h) estão a >2h de distância, então
+ *  120 min separa períodos sem recortar rotas do mesmo turno. */
+const JANELA_PERIODO_MIN = 120;
 
 /**
  * Avalia UMA rota real contra o pedido da família. `matriz` deve vir de um
@@ -221,13 +232,21 @@ export function avaliarRotaReal(
     return vazio('indeterminado', MOTIVO_SEM_HORARIO, ['dados']);
   }
 
-  // §3 — Limite de chegada informado pela família (só IDA): a van chega à escola
-  // em ~horarioEscola; se isso ultrapassa o máximo pedido, a rota é incompatível.
-  if (
-    rota.sentido === 'ida' && pedido.horarioMaxChegadaMin != null
-    && Number.isFinite(pedido.horarioMaxChegadaMin) && horarioEscola > pedido.horarioMaxChegadaMin
-  ) {
-    return vazio('incompativel', MOTIVO_APOS_LIMITE, ['atraso']);
+  // §3 — COERÊNCIA TEMPORAL (só IDA). O horário de entrada da família (explícito,
+  // senão o padrão do turno escolhido) é o LIMITE de chegada. A rota é avaliada
+  // pelo horário em que a van chega à escola (`horarioEscola`):
+  //   - chega DEPOIS do limite  => não dá tempo (incompatível);
+  //   - chega MUITO antes (fora da janela do período, ex.: rota da tarde/noite
+  //     numa busca da manhã) => é de outro período, não é um encaixe para esta
+  //     entrada. A separação usa o HORÁRIO (não o rótulo do turno).
+  // Só filtra quando a família INFORMOU o horário (dado explícito). Não usamos o
+  // padrão do turno como exclusão rígida: o rótulo do turno não pode descartar
+  // uma rota cujo horário PRÓPRIO é compatível (regra do produto).
+  const limiteChegada = pedido.horarioMaxChegadaMin != null && Number.isFinite(pedido.horarioMaxChegadaMin)
+    ? pedido.horarioMaxChegadaMin : null;
+  if (rota.sentido === 'ida' && limiteChegada != null) {
+    if (horarioEscola > limiteChegada) return vazio('incompativel', MOTIVO_APOS_LIMITE, ['atraso']);
+    if (horarioEscola < limiteChegada - JANELA_PERIODO_MIN) return vazio('incompativel', MOTIVO_OUTRO_PERIODO, ['atraso']);
   }
 
   const aluno: AlunoNovo = {
@@ -320,6 +339,7 @@ export function buscarEmRotasReais(
     if (vagasParaNovos(e.rota, e.veiculo) < 1) return false; // 1º filtro: vaga
     return rotaAtendeDestino(e.rota, pedido.destinoId) || rotaPassaPertoDaEscola(e.rota, pedido.escolaPonto);
   });
+  const ehIda = pedido.sentido === 'ida';
   const resultados = candidatas
     .map((e) => avaliarRotaReal(e.rota, e.veiculo, pedido, matriz, { ordenarPor }))
     .sort((a, b) => {
@@ -329,17 +349,29 @@ export function buscarEmRotasReais(
       const db = b.desvioMin ?? Number.POSITIVE_INFINITY;
       const ba = a.minutosABordo ?? Number.POSITIVE_INFINITY;
       const bb = b.minutosABordo ?? Number.POSITIVE_INFINITY;
-      if (ordenarPor === 'tempoABordo') {
-        // §6.3 — MELHOR EXPERIÊNCIA DO NOVO ALUNO:
-        // 1) menor TEMPO A BORDO; 2) menor desvio/impacto; 3) Tier A; 4) coleta cedo.
-        if (ba !== bb) return ba - bb;
-        if (da !== db) return da - db;
-      } else {
-        // Legado ('desvio'): menor alteração para o motorista primeiro.
+
+      if (ordenarPor === 'desvio') {
+        // Legado (usado só em comparação/regressão): menor desvio do motorista.
         if (a.atendeEscola !== b.atendeEscola) return a.atendeEscola ? -1 : 1;
         if (da !== db) return da - db;
+        const pa = a.passagemCasaMin ?? Number.POSITIVE_INFINITY;
+        const pb = b.passagemCasaMin ?? Number.POSITIVE_INFINITY;
+        return pa - pb;
       }
-      if (a.atendeEscola !== b.atendeEscola) return a.atendeEscola ? -1 : 1;
+
+      // EFICIÊNCIA (padrão da busca):
+      if (ehIda) {
+        // IDA — o aluno deve SAIR DE CASA O MAIS TARDE possível ainda chegando no
+        // horário: embarque (passagemCasaMin) MAIS TARDE primeiro. Penaliza tanto
+        // "sair 1h antes" quanto "chegar cedo demais e esperar na escola".
+        const pa = a.passagemCasaMin ?? Number.NEGATIVE_INFINITY;
+        const pb = b.passagemCasaMin ?? Number.NEGATIVE_INFINITY;
+        if (pa !== pb) return pb - pa; // mais tarde primeiro (DESC)
+      }
+      // VOLTA (e desempate da IDA) — menos tempo do aluno dentro da van.
+      if (ba !== bb) return ba - bb;
+      if (da !== db) return da - db; // menor impacto/desvio
+      if (a.atendeEscola !== b.atendeEscola) return a.atendeEscola ? -1 : 1; // Tier A antes de Tier B
       const pa = a.passagemCasaMin ?? Number.POSITIVE_INFINITY;
       const pb = b.passagemCasaMin ?? Number.POSITIVE_INFINITY;
       return pa - pb;

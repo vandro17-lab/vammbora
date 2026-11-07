@@ -59,6 +59,29 @@ describe('Busca: ordenação por tempo a bordo vs legado', () => {
   });
 });
 
+describe('Coerência temporal da busca (Fatec manhã, entrada 07:00)', () => {
+  it('exclui rotas de outro período e prioriza embarque perto da entrada', () => {
+    const esc = destino('geo-20261105-037'); // Fatec
+    const origem = pontoPertoDe(esc, 1500, 3000) ?? pontoPertoDe(esc, 300, 1500); // origem a alguns km
+    const { resultados } = buscarEmRotasReais(ENTRADAS, {
+      origem: { lat: origem.lat, lng: origem.lng }, destinoId: esc.id,
+      escolaPonto: { lat: esc.lat, lng: esc.lng }, sentido: 'ida', turno: null,
+      contratacao: 'mensal', horarioMaxChegadaMin: 7 * 60,
+    });
+    const viaveis = resultados.filter((r) => r.status === 'compativel' || r.status === 'sob_confirmacao');
+    expect(viaveis.length).toBeGreaterThan(0);
+    for (const r of viaveis) {
+      // nenhuma chega depois das 07:00 e nenhuma é de outro período (manhã só).
+      expect(r.horarioEscolaMin!).toBeLessThanOrEqual(7 * 60);
+      expect(r.horarioEscolaMin!).toBeGreaterThanOrEqual(7 * 60 - 120);
+    }
+    // o topo deixa o aluno sair de casa o mais tarde possível (não de madrugada).
+    const topo = viaveis[0];
+    expect(topo.passagemCasaMin!).toBeGreaterThanOrEqual(6 * 60); // >= 06:00
+    expect(topo.horarioEscolaMin!).toBeLessThanOrEqual(7 * 60);
+  });
+});
+
 describe('Horário máximo de chegada (§3)', () => {
   it('exclui rota que chega à escola DEPOIS do limite e aceita quando o limite comporta', () => {
     // pega uma rota de ida com horário de chegada conhecido na escola.

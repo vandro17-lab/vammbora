@@ -63,7 +63,10 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
       finally { clearTimeout(limite); setLocalizando(false); }
     }
 
-    const params = criteriosParaParams({ cidadeId: CIDADE_PADRAO.id, endereco: texto, destinoId: destinoId || null, turno: turno || null, contratacao, dataAvulso: contratacao === 'avulso' ? dataAvulso : undefined, modalidade, origemLat: coord?.lat, origemLng: coord?.lng, horarioMaxChegadaMin: hhmmParaMin(horaMax) });
+    // Horário de entrada: a hora digitada prevalece; na falta dela, usa a
+    // referência do turno escolhido (manhã 07h, tarde 12h30, noite 19h).
+    const maxChegada = hhmmParaMin(horaMax) ?? referenciaTurno(turno);
+    const params = criteriosParaParams({ cidadeId: CIDADE_PADRAO.id, endereco: texto, destinoId: destinoId || null, turno: turno || null, contratacao, dataAvulso: contratacao === 'avulso' ? dataAvulso : undefined, modalidade, origemLat: coord?.lat, origemLng: coord?.lng, horarioMaxChegadaMin: maxChegada });
     navigate(`/resultados?${params}`);
   }
   return (
@@ -109,6 +112,15 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
     </form>
   );
 }
+/** Referência de horário de ENTRADA por turno (minuto do dia), usada quando a
+ *  família não digita uma hora: manhã 07h00, tarde 12h30, noite 19h00. */
+function referenciaTurno(t: Turno | ''): number | null {
+  if (t === 'manha') return 7 * 60;
+  if (t === 'tarde') return 12 * 60 + 30;
+  if (t === 'noite') return 19 * 60;
+  return null; // 'integral' ou 'Qualquer' → sem limite automático
+}
+
 /** "HH:MM" → minuto do dia (0..1439) ou null se vazio/inválido. */
 function hhmmParaMin(v: string): number | null {
   const m = /^(\d{1,2}):(\d{2})$/.exec(v.trim());
