@@ -13,7 +13,7 @@ vi.mock('@supabase/supabase-js', () => ({
     from: (table: string) => {
       const b: Record<string, unknown> = {};
       const self = () => b;
-      b.select = self; b.eq = self; b.in = self;
+      b.select = self; b.eq = self; b.in = self; b.limit = self; b.order = self; b.range = self;
       b.then = (resolve: (v: { data: unknown[]; error: null }) => void) =>
         resolve({ data: estado.canned[table] ?? [], error: null });
       return b;

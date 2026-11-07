@@ -19,6 +19,8 @@ import {
 export interface CartaoRotaRealDados {
   rotaId: string;
   rotaNome: string;
+  /** Rota de DEMONSTRAÇÃO (§6.1): o frontend mantém a identificação visível. */
+  demo?: boolean;
   vanLugares: number | null;
   /** Vagas livres para novos passageiros (capacidade − ocupação). */
   vagas: number | null;

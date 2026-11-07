@@ -26,7 +26,14 @@ export function CartaoRotaReal({ r }: { r: CartaoRotaRealDados }) {
         </span>
       </div>
 
-      <h3 className="font-display text-lg font-bold leading-tight text-navy-900">{r.rotaNome}</h3>
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 className="font-display text-lg font-bold leading-tight text-navy-900">{r.rotaNome}</h3>
+        {r.demo && (
+          <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-700 ring-1 ring-amber-200">
+            Demonstração
+          </span>
+        )}
+      </div>
 
       <div className="grid grid-cols-2 gap-2">
         <div className="rounded-xl bg-navy-50 p-3">
