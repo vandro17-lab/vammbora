@@ -1,94 +1,61 @@
-# Arquitetura — Vambora
+# Arquitetura do VanBora
 
-## Visão geral
+## 1. Como organizamos o sistema
 
-Aplicação **SPA (Single Page Application)** em React + TypeScript, servida como site estático e
-instalável como **PWA**. Na Etapa 1 todos os dados vêm de uma camada local de demonstração; a
-camada real (Supabase) entra na Etapa 2 **sem reescrever as telas**, graças ao isolamento abaixo.
+O VanBora foi dividido em duas partes: uma para famílias que procuram transporte e outra para motoristas que precisam organizar seu trabalho.
 
-```
-┌─────────────────────────────────────────────┐
-│                    Telas (pages)             │
-│  Home · Resultados · Perfil · Motorista · 404│
-└───────────────┬─────────────────────────────┘
-                │ usa
-┌───────────────▼─────────────────────────────┐
-│        Componentes de UI (design system)     │
-│  marca · layout · home · busca · resultados  │
-└───────────────┬─────────────────────────────┘
-                │ chama
-┌───────────────▼─────────────────────────────┐
-│                  lib/ (lógica)               │
-│  matching(simulado) · whatsapp · searchParams│
-└───────────────┬─────────────────────────────┘
-                │ lê
-┌───────────────▼─────────────────────────────┐
-│   Fonte de dados  (hoje: data/ local)        │
-│   amanhã: adaptador Supabase (mesma forma)   │
-└─────────────────────────────────────────────┘
-```
+**VanBora Famílias**
 
-## Princípios de isolamento (chave para evoluir sem refazer)
+A família informa seu endereço, a escola ou faculdade, o horário e o tipo de viagem que precisa.
 
-1. **Tipos de domínio** (`src/types/`) descrevem as entidades de forma independente da fonte.
-   As telas dependem dos tipos, não do Supabase nem do array local.
-2. **Motor de compatibilidade** vive atrás de `buscarMotoristas()` / `avaliarCompatibilidade()`
-   em `src/lib/matching.ts`. Trocar a implementação (simulada → motor real) não afeta a UI.
-3. **Fonte de dados** hoje é `src/data/*`. Na Etapa 2 criaremos `src/data/supabase/*` com a mesma
-   assinatura, e a flag `VITE_USE_SUPABASE` decide qual usar.
-4. **WhatsApp** é montado por funções puras e testadas (`src/lib/whatsapp.ts`), sem efeitos
-   colaterais até o clique.
+Para demonstrar a pesquisa, usamos motoristas fictícios e serviços de mapas. O sistema utiliza essas informações para apresentar possíveis trajetos e opções de transporte.
 
-## Design System
+Os resultados são demonstrativos e não representam vagas reais.
 
-Tokens centrais em `tailwind.config.ts` e `src/index.css`:
+**VanBora Motoristas**
 
-- **Cores:** `navy` (azul-marinho, marca), `mint` (verde-menta, avançar/confiança), `amber`
-  (avisos/demo), além de branco e cinzas neutros.
-- **Tipografia:** Plus Jakarta Sans (títulos) + Inter (texto).
-- **Componentes utilitários:** `.btn`, `.card`, `.chip`, `.field-input`, `.demo-ribbon`.
-- **Motion:** Framer Motion, sempre respeitando `prefers-reduced-motion`.
-- **Acessibilidade:** foco visível global, "pular para conteúdo", `aria-live` no loader, contraste.
+É a parte destinada aos profissionais. Nela, o motorista pode cadastrar veículos, organizar rotas, paradas e passageiros e utilizar ferramentas para planejar seu trabalho.
 
-## PWA
+Algumas funcionalidades já estão desenvolvidas e outras ainda precisam de ajustes e testes.
 
-- `vite-plugin-pwa` gera o **service worker versionado** (Workbox) com `cleanupOutdatedCaches`.
-- Apenas o app-shell (JS/CSS/HTML/ícones) é pré-cacheado. **Nenhum dado privado** é cacheado.
-- Atualização de versão é **oferecida ao usuário** (`ReloadPrompt`), nunca forçada em silêncio.
-- Ícones 192/512 **any** + **maskable**, gerados por `scripts/generate-icons.mjs` (sharp).
+## 2. Como as informações funcionam
 
-## Rotas
+Na pesquisa das famílias, o sistema recebe os dados informados e utiliza regras de programação para comparar as opções demonstrativas.
 
-| Caminho | Tela |
-|---|---|
-| `/` | Home (landing + busca) |
-| `/resultados` | Resultados (critérios na URL, compartilhável) |
-| `/van/:slug` | Perfil do motorista |
-| `/motorista` | Entrada + prévia do painel do motorista |
-| `*` | 404 |
+Os serviços de mapas ajudam a encontrar os endereços e calcular os caminhos pelas ruas.
 
-## Decisões técnicas relevantes
+No ambiente dos motoristas, utilizamos o Supabase, um serviço que permite guardar e consultar informações em um banco de dados.
 
-Registradas em [`DECISOES.md`](DECISOES.md). Destaques:
+Mantemos os dados fictícios da pesquisa separados dos cadastros operacionais para que uma demonstração não altere informações dos motoristas.
 
-- SPA estática + PWA (sem servidor próprio na Etapa 1): funciona no navegador/celular **sem
-  instalação** e sem serviço pago — requisito do Ideathon.
-- Dados de busca na **URL** (não só em memória): busca recarregável e compartilhável.
-- Componentes acessíveis escritos à mão com Tailwind, em vez de arrastar uma biblioteca grande,
-  para manter o bundle enxuto ("biblioteca premium não significa paga/pesada").
+## 3. Ferramentas que utilizamos
 
-## Atualização (revisão 04/11/2026)
+- **React e TypeScript:** para criar as telas e programar as funcionalidades.
+- **Vite:** para desenvolver e preparar o aplicativo.
+- **Tailwind CSS:** para organizar a aparência das páginas.
+- **Supabase:** para armazenar dados e gerenciar contas.
+- **Serviços de mapas:** para localizar endereços e calcular trajetos.
+- **GitHub:** para guardar o código e registrar as alterações.
+- **Vercel:** para publicar o aplicativo na internet.
 
-- **Erros sem esconder o problema:** com o Supabase ativo, as leituras em `src/data/source.ts`
-  **lançam erro** em caso de falha (não devolvem demonstração). O `VitrineProvider` expõe
-  `status` (`carregando` | `pronto` | `erro`) e `recarregar()`; as telas mostram carregando, vazio,
-  erro-com-"tentar-de-novo" e marcam o modo demonstração. O admin confere o resultado de cada
-  gravação e informa falhas.
-- **Permissões no banco (não só na UI):** o gatilho `trg_proteger_driver` (migração 0006) fixa os
-  campos reservados (`doc_verified`, `rating_*`, `is_suspended`, `is_demo`, `owner_id`, `slug`) para
-  quem não é admin, no INSERT e no UPDATE. RLS cuida de QUAIS linhas; o gatilho cuida de QUAIS colunas.
-- **Privacidade no WhatsApp:** `montarMensagemWhatsApp` inclui os critérios da busca, mas **nunca**
-  envia o endereço livre digitado (que pode ser completo). A família combina o ponto de embarque na
-  conversa. A mensagem é uma sugestão: a família revisa e envia por conta própria.
-- **Continuidade da busca:** os critérios viajam pela URL (resultados → perfil → voltar), então o
-  perfil usa os mesmos critérios na mensagem e o "voltar" recompõe a mesma busca.
+Também utilizamos **ferramentas de inteligência artificial** para ajudar na programação, na criação das telas, na correção de erros e na utilização dessas tecnologias.
+
+Como estamos no primeiro semestre de ADS, a IA foi um apoio importante para desenvolver funcionalidades que ainda não conseguiríamos construir sozinhos com os conhecimentos adquiridos até agora.
+
+## 4. Aplicativo para celular
+
+O VanBora foi criado como um PWA, que é um tipo de aplicativo que funciona pelo navegador e também pode ser instalado na tela inicial do celular, quando o aparelho permite.
+
+Assim, conseguimos oferecer uma experiência parecida com a de um aplicativo sem precisar publicá-lo inicialmente nas lojas.
+
+## 5. Cuidados durante o desenvolvimento
+
+Procuramos organizar o código para facilitar futuras melhorias e correções.
+
+Também tomamos cuidado para separar informações fictícias dos dados operacionais, não utilizar dados reais de crianças na demonstração e identificar o que ainda está em desenvolvimento.
+
+## 6. O que ainda precisamos melhorar
+
+Precisamos concluir e testar a nova pesquisa das famílias, verificar os cálculos de trajeto e revisar o funcionamento das telas em computadores e celulares.
+
+Nosso objetivo é apresentar um protótipo que mostre como o VanBora poderia funcionar, sem dar a entender que já existe um serviço comercial de transporte disponível.

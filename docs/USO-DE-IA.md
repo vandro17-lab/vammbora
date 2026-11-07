@@ -1,44 +1,35 @@
-# Declaração de Uso de IA — Vambora
+# Como utilizamos inteligência artificial — VanBora
 
-_Exigência do regulamento do Ideathon Fatec 2026: declarar uso de IA, bibliotecas, templates e fontes._
+## Por que usamos IA
 
-## Ferramenta de IA utilizada
+Somos estudantes do primeiro semestre de Análise e Desenvolvimento de Sistemas da Fatec Araçatuba.
 
-- **Assistente:** Claude (Anthropic), via Claude Code, atuando como engenheiro/arquiteto assistente.
-- **Como foi usado:** scaffold do projeto, implementação do design system e das telas, escrita de
-  testes, geração de ícones do PWA, redação da documentação e organização do repositório, seguindo
-  as **instruções mestras** definidas pela equipe.
+Ainda estamos aprendendo a programar e a utilizar várias ferramentas. Por isso, usamos inteligência artificial como apoio para transformar nossa ideia em um protótipo.
 
-## O que é humano e o que é assistido
+## Em que a IA ajudou
 
-- A **visão de produto**, as regras de negócio, as decisões de escopo e a direção do projeto são da
-  **equipe Van Bora** (documento mestre e instruções).
-- A IA **ajudou na implementação** segundo essas instruções. Nenhuma decisão de produto foi tomada
-  pela IA sem estar prevista nas instruções da equipe.
+As ferramentas de IA foram utilizadas para:
 
-## Honestidade dos dados
+- Criar e ajustar partes do código.
+- Desenvolver telas e melhorar a aparência do aplicativo.
+- Encontrar e corrigir erros.
+- Ajudar a utilizar GitHub, Supabase, Vercel e outras ferramentas.
+- Organizar a documentação e apoiar a realização de testes.
 
-- Os motoristas, escolas e telefones exibidos são **dados de demonstração**, claramente marcados.
-- Nenhum dado real de menores foi usado.
-- Nenhuma métrica, avaliação, pesquisa ou verificação foi inventada como se fosse real.
+Entre as ferramentas utilizadas está o **Claude**, com apoio de outros assistentes de IA durante o desenvolvimento.
 
-## Autoria e commits (Ideathon)
+## Qual foi a nossa participação
 
-- O Ideathon exige **commits autênticos de pelo menos 3 integrantes reais**, cada um com sua conta.
-- Os commits de assistência de IA são atribuídos ao **coordenador** como autor, com a IA como
-  **co-autora** declarada.
-- **Ação necessária da equipe:** cada integrante deve contribuir com sua própria conta Git
-  (código, pesquisa, documentação, testes) para que a entrega reflita o trabalho real do grupo.
-  Ver `docs/GUIA-PARA-INICIANTES.md`.
+A ideia surgiu a partir das dificuldades que identificamos na procura por transporte escolar e na organização do trabalho dos motoristas.
 
-## Bibliotecas e licenças
+Nós discutimos a proposta, escolhemos funcionalidades, orientamos mudanças e avaliamos os resultados.
 
-Todas de código aberto e licença permissiva (MIT/ISC). Lista em `docs/DECISOES.md` (ADR-001) e
-`package.json`.
+A IA ajudou principalmente na parte técnica, inclusive em tarefas que ainda não saberíamos realizar sozinhos.
 
-## Fontes de dados externas (quando forem usadas)
+## O que o protótipo representa
 
-- **Escolas:** Censo Escolar / INEP (a importar, guardando fonte, data e código). Ver
-  `docs/pesquisas/escolas-inep/`.
-- **Mapas/endereços:** OpenStreetMap e serviços compatíveis, respeitando licença e atribuição
-  (a integrar). Até lá, confirmação manual de ponto.
+O VanBora não é um serviço comercial pronto. A pesquisa das famílias utiliza dados fictícios e algumas funcionalidades ainda precisam de testes.
+
+Acreditamos que é importante mostrar tanto o que conseguimos construir quanto as ferramentas que nos ajudaram nesse processo.
+
+O histórico do GitHub registra as alterações do projeto. Cada integrante deve identificar suas próprias contribuições de forma verdadeira.

@@ -1,72 +1,73 @@
-# Plano Mestre — Vambora
+# Plano Mestre — VanBora
 
-> Este documento **organiza a execução**. Ele **não substitui** a visão de produto original
-> `van-bora-completo.md` (1.729 linhas) nem resume as regras a ponto de perdê-las.
->
-> ⚠️ **Registro de ausência (auditoria 03–04/11/2026):** no momento da Etapa 1, os seguintes
-> documentos **não estavam presentes** no repositório nem foram anexados:
-> `van-bora-completo.md`, `Ideathon - Fatec 2026.pdf`, `motor-van-bora.md`, `pesquisa-motores.md`
-> e a pasta `motor/`. A única fonte recebida foi `CLAUDE-VAMBORA-INSTRUCOES-MESTRAS.md`.
-> Por isso, **o motor de encaixe real não foi reimplementado** — ver seção "Motor".
-> Assim que esses arquivos forem adicionados, este plano deve ser revisto.
+## 1. Sobre o projeto
 
-## 1. Visão em uma frase
+O VanBora surgiu para facilitar a procura por transporte escolar e ajudar motoristas a organizar melhor suas rotas.
 
-Conectar famílias e estudantes de Araçatuba a vans com **rota compatível**, horário e vaga,
-com contato direto e transparente — preparando o terreno para pagamentos, verificação e
-operação SaaS no futuro, sem prometer o que ainda não existe.
+Nossa proposta é aproximar famílias e profissionais por meio de uma plataforma que considere endereços, escolas, horários e trajetos.
 
-## 2. Prioridade de implementação
+O projeto foi desenvolvido para o Ideathon 2026 da Fatec Araçatuba, como parte do nosso aprendizado no primeiro semestre de Análise e Desenvolvimento de Sistemas.
 
-| Ordem | Bloco | Status |
-|---|---|---|
-| A | Marketplace da família | ✅ Etapa 1 entregue |
-| B | Painel inicial do motorista | 🟡 prévia/estrutura entregue; completo na Etapa 3 |
-| C | Administração básica | ⬜ Etapa 2 |
-| D | Infraestrutura Supabase | ⬜ Etapa 2 (SQL preparado) |
-| E | PWA instalável | ✅ Etapa 1 entregue |
+## 2. Como dividimos o VanBora
 
-**Fora de escopo agora** (documentar, não construir): GPS em segundo plano, cobrança financeira
-real, compartilhamento de dados de crianças, clube de parceiros, AlugaVan, substituição
-emergencial de vans.
+**VanBora Famílias**
 
-## 3. Etapas
+É o espaço onde famílias e estudantes podem pesquisar opções de transporte.
 
-- **Etapa 0 — Auditoria** ✅ — inspeção do repositório (vazio), registro de ausências, escolha de
-  stack e arquitetura. Ver `docs/DIARIO-DE-DESENVOLVIMENTO.md`.
-- **Etapa 1 — Fundação e UI premium** ✅ — scaffold, design system, PWA, home, busca, resultados,
-  perfil, WhatsApp, estados, animação da van, dados de exemplo, testes.
-- **Etapa 2 — Supabase** ⬜ — migrações do núcleo, RLS, buckets, seed, integração real, CRUD/admin,
-  autenticação por papel (busca pública continua sem login).
-- **Etapa 3 — Motorista** ⬜ — onboarding, veículo, escolas, rota visual, vagas, oportunidades,
-  simulador usando o **motor real** (quando disponível).
-- **Etapa 4 — Validação** ⬜ — integração, testes, acessibilidade, segurança, responsividade,
-  fluxo de demo, deploy, material de apresentação.
+Para demonstrar essa ideia, utilizamos motoristas fictícios e serviços de mapas. Assim, mostramos como o sistema pode comparar trajetos e horários sem depender de motoristas reais cadastrados.
 
-## 4. Motor de encaixe
+Os preços, as vagas e os perfis apresentados são exemplos, não ofertas reais de transporte.
 
-O motor real do Van Bora (`motor/` + `motor-van-bora.md`) **não pode ser reimplementado às cegas**.
-Nesta fase usamos um **adaptador simulado** (`src/lib/matching.ts`), isolado atrás de uma interface
-estável. Quando o motor real chegar, trocamos apenas a implementação de `avaliarCompatibilidade`,
-sem mexer nas telas.
+**VanBora Motoristas**
 
-Regras documentadas a respeitar quando o motor for integrado (lista em
-`docs/PENDENCIAS.md`): chegada antes da aula com margem; janela contratada (ref. −3/+7); capacidade
-por trecho; sequência de embarque/desembarque; pior caso de trânsito; limite de tempo a bordo
-(60 min é **parâmetro pendente de validação legal**); horário original protegido; revalidação antes
-de confirmar vaga; avulso usando folga; demanda incompatível não aparece; oportunidade que depende
-de renegociação visível ao motorista.
+É o espaço destinado aos profissionais que precisam organizar seu trabalho.
 
-## 5. Divergências conhecidas (preservar histórico, aplicar decisão mais recente)
+Nele, desenvolvemos recursos para cadastrar veículos, planejar rotas, organizar paradas e passageiros e consultar informações do serviço.
 
-1. **Marca:** `EncontraVan` (histórico) → **Vambora** (experiência pública) / **Van Bora** (acadêmico).
-2. **Prioridade:** orientação ao motorista (set/2025) → **marketplace da família primeiro** (nov/2025).
-3. **Selo de exemplo vs. regulamento:** o regulamento exige dados **explicitamente simulados**;
-   cumprimos com identificação discreta e profissional ("Demonstração").
-4. **Cronograma:** prevalece o PDF oficial do Ideathon; divergências do documento mestre devem ser
-   destacadas ao usuário quando o PDF estiver disponível.
+Parte dessas funcionalidades já está desenvolvida, mas ainda existem recursos que precisam de melhorias e testes.
 
-## 6. Princípio final
+## 3. Como pensamos o funcionamento
 
-Confiabilidade acima do efeito visual. Um protótipo **honesto**, testado e compreensível vale mais
-que telas ficticiamente funcionais.
+A ideia do VanBora vai além de mostrar uma lista de motoristas.
+
+Uma van pode passar perto de uma casa e, mesmo assim, não conseguir atender àquela família. Por isso, precisamos considerar o caminho, o sentido da viagem, o horário e o destino.
+
+Na pesquisa demonstrativa, usamos regras de programação e serviços de mapas para apresentar opções fictícias que façam sentido para as informações pesquisadas.
+
+Já no ambiente dos motoristas, trabalhamos com cadastros, rotas e ferramentas de planejamento.
+
+As duas partes fazem parte do mesmo projeto, mas a demonstração das famílias não deve alterar os cadastros operacionais dos motoristas.
+
+## 4. Como desenvolvemos
+
+Começamos identificando as dificuldades enfrentadas por famílias e motoristas. A partir disso, discutimos ideias, definimos funcionalidades e construímos o protótipo.
+
+Utilizamos ferramentas de inteligência artificial para nos ajudar a programar, criar interfaces, corrigir erros e trabalhar com tecnologias que ainda estamos aprendendo.
+
+Esse apoio foi importante para transformar nossas ideias em algo que pudesse ser apresentado e testado.
+
+As decisões sobre o projeto foram orientadas por nós, enquanto a IA ajudou principalmente na implementação técnica.
+
+## 5. Etapas do projeto
+
+**Pesquisa e planejamento:** identificamos o problema, discutimos soluções e definimos a proposta.
+
+**Construção das telas:** criamos as primeiras páginas e organizamos a navegação.
+
+**Desenvolvimento das funcionalidades:** trabalhamos nos cadastros, nas rotas, no banco de dados e nas regras do sistema.
+
+**Nova pesquisa demonstrativa:** estamos adaptando a busca das famílias para utilizar motoristas fictícios e cálculos de trajeto com apoio de mapas.
+
+**Testes e apresentação:** precisamos verificar as alterações, corrigir erros e preparar a demonstração.
+
+## 6. O que ainda falta
+
+O VanBora continua em desenvolvimento. Entre os próximos passos estão concluir a nova pesquisa, testar os trajetos, revisar as funcionalidades dos motoristas e melhorar a experiência em celulares.
+
+Também precisamos deixar claro quais informações são demonstrativas e quais funcionalidades realmente estão funcionando.
+
+## 7. Nosso objetivo
+
+Queremos apresentar uma ideia que possa ajudar a resolver um problema real, mostrando como usamos a lógica de programação, os conhecimentos do curso e as ferramentas disponíveis para construir uma solução.
+
+O VanBora ainda não é um serviço comercial. É um protótipo que representa nossa proposta e o que conseguimos desenvolver até aqui.
