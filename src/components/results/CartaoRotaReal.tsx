@@ -45,7 +45,10 @@ export function CartaoRotaReal({ r }: { r: CartaoRotaRealDados }) {
 
       <div className="flex items-center justify-between border-t border-navy-50 pt-3 text-sm text-navy-600">
         <span className="inline-flex items-center gap-1.5">
-          <Users className="h-4 w-4 text-navy-400" /> {r.vanLugares != null ? `${r.vanLugares} lugares` : 'Van'}
+          <Users className="h-4 w-4 text-navy-400" />
+          {r.vagas != null && r.vagas > 0
+            ? `${r.vagas} ${r.vagas === 1 ? 'vaga' : 'vagas'}${r.vanLugares != null ? ` de ${r.vanLugares}` : ''}`
+            : r.vanLugares != null ? `${r.vanLugares} lugares` : 'Van'}
         </span>
         {r.minutosABordo != null && (
           <span className="inline-flex items-center gap-1.5">

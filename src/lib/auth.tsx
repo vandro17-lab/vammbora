@@ -7,10 +7,13 @@ interface AuthState {
   session: Session | null;
   /** Se o usuário logado tem papel de admin. */
   isAdmin: boolean;
+  /** Verificação de admin em andamento (evita "sem permissão" piscando). */
+  verificandoAdmin: boolean;
   /** Carregando o estado inicial de autenticação. */
   carregando: boolean;
   entrar: (email: string, senha: string) => Promise<{ ok: boolean; erro?: string }>;
-  cadastrar: (email: string, senha: string) => Promise<{ ok: boolean; erro?: string }>;
+  /** Cadastro. `sessao` indica se já ficou logado (confirmação de e-mail desligada). */
+  cadastrar: (email: string, senha: string, nome?: string) => Promise<{ ok: boolean; erro?: string; sessao?: boolean }>;
   /** Login social (OAuth). Redireciona o navegador para o provedor e volta. */
   entrarComProvedor: (provedor: ProvedorOAuth) => Promise<{ ok: boolean; erro?: string }>;
   sair: () => Promise<void>;
@@ -22,6 +25,7 @@ export type ProvedorOAuth = 'google' | 'apple';
 const Ctx = createContext<AuthState>({
   session: null,
   isAdmin: false,
+  verificandoAdmin: false,
   carregando: true,
   entrar: async () => ({ ok: false, erro: 'Auth indisponível' }),
   cadastrar: async () => ({ ok: false, erro: 'Auth indisponível' }),
@@ -29,18 +33,40 @@ const Ctx = createContext<AuthState>({
   sair: async () => {},
 });
 
+/** Resolve a promessa com um valor de fallback se estourar o tempo (evita UI presa). */
+function comTimeout<T>(p: PromiseLike<T>, ms: number, aoEstourar: () => T): Promise<T> {
+  return Promise.race([
+    Promise.resolve(p),
+    new Promise<T>((resolve) => setTimeout(() => resolve(aoEstourar()), ms)),
+  ]);
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [verificandoAdmin, setVerificandoAdmin] = useState(USE_SUPABASE);
   const [carregando, setCarregando] = useState(true);
 
+  // Verifica o papel de admin SEM nunca travar a UI: tem timeout e engole erros.
   async function checarAdmin(s: Session | null) {
     if (!s || !supabase) {
       setIsAdmin(false);
+      setVerificandoAdmin(false);
       return;
     }
-    const { data, error } = await supabase.rpc('is_admin');
-    setIsAdmin(!error && data === true);
+    setVerificandoAdmin(true);
+    try {
+      const { data, error } = await comTimeout(
+        supabase.rpc('is_admin'),
+        8000,
+        () => ({ data: false, error: null } as { data: unknown; error: unknown }),
+      );
+      setIsAdmin(!error && data === true);
+    } catch {
+      setIsAdmin(false);
+    } finally {
+      setVerificandoAdmin(false);
+    }
   }
 
   useEffect(() => {
@@ -49,15 +75,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     let vivo = true;
-    supabase.auth.getSession().then(async ({ data }) => {
+    // O carregamento inicial NÃO espera o check de admin (ele roda em segundo
+    // plano). Assim o app libera assim que a sessão é conhecida, mesmo que o
+    // banco esteja "frio" e a RPC demore.
+    supabase.auth.getSession().then(({ data }) => {
       if (!vivo) return;
       setSession(data.session);
-      await checarAdmin(data.session);
       setCarregando(false);
+      void checarAdmin(data.session);
     });
-    const { data: sub } = supabase.auth.onAuthStateChange(async (_evt, s) => {
+    const { data: sub } = supabase.auth.onAuthStateChange((_evt, s) => {
+      // IMPORTANTE: não chamar funções do Supabase (ex.: rpc) de forma
+      // síncrona/awaited aqui dentro — isso trava o cliente de auth (deadlock),
+      // deixando o login "pensando". Atualizamos a sessão na hora e adiamos
+      // qualquer chamada ao banco para fora do callback.
       setSession(s);
-      await checarAdmin(s);
+      setCarregando(false);
+      setTimeout(() => { if (vivo) void checarAdmin(s); }, 0);
     });
     return () => {
       vivo = false;
@@ -68,14 +102,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const entrar = async (email: string, senha: string) => {
     if (!supabase) return { ok: false, erro: 'Banco não configurado neste ambiente.' };
-    const { error } = await supabase.auth.signInWithPassword({ email, password: senha });
-    return error ? { ok: false, erro: traduzErro(error.message) } : { ok: true };
+    try {
+      type RespEntrar = Awaited<ReturnType<NonNullable<typeof supabase>['auth']['signInWithPassword']>>;
+      const { error } = await comTimeout(
+        supabase.auth.signInWithPassword({ email: email.trim(), password: senha }),
+        20000,
+        () => ({ data: { user: null, session: null }, error: { message: 'timeout' } } as unknown as RespEntrar),
+      );
+      return error ? { ok: false, erro: traduzErro(error.message) } : { ok: true };
+    } catch {
+      return { ok: false, erro: 'Falha de conexão. Tente novamente.' };
+    }
   };
 
-  const cadastrar = async (email: string, senha: string) => {
+  const cadastrar = async (email: string, senha: string, nome?: string) => {
     if (!supabase) return { ok: false, erro: 'Banco não configurado neste ambiente.' };
-    const { error } = await supabase.auth.signUp({ email, password: senha });
-    return error ? { ok: false, erro: traduzErro(error.message) } : { ok: true };
+    try {
+      type RespCadastro = Awaited<ReturnType<NonNullable<typeof supabase>['auth']['signUp']>>;
+      const { data, error } = await comTimeout(
+        supabase.auth.signUp({
+          email: email.trim(),
+          password: senha,
+          // Guarda o nome já no cadastro: o gatilho handle_new_user cria o
+          // perfil com esse full_name, independe de a tela conseguir atualizar.
+          options: { data: { full_name: nome ?? '' }, emailRedirectTo: `${window.location.origin}/painel` },
+        }),
+        20000,
+        () => ({ data: { user: null, session: null }, error: { message: 'timeout' } } as unknown as RespCadastro),
+      );
+      if (error) return { ok: false, erro: traduzErro(error.message) };
+      return { ok: true, sessao: !!data.session };
+    } catch {
+      return { ok: false, erro: 'Falha de conexão. Tente novamente.' };
+    }
   };
 
   const entrarComProvedor = async (provedor: ProvedorOAuth) => {
@@ -97,7 +156,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <Ctx.Provider value={{ session, isAdmin, carregando, entrar, cadastrar, entrarComProvedor, sair }}>
+    <Ctx.Provider value={{ session, isAdmin, verificandoAdmin, carregando, entrar, cadastrar, entrarComProvedor, sair }}>
       {children}
     </Ctx.Provider>
   );
@@ -107,6 +166,8 @@ export const useAuth = () => useContext(Ctx);
 
 function traduzErro(msg: string): string {
   const m = msg.toLowerCase();
+  if (m === 'timeout' || m.includes('timeout'))
+    return 'O servidor demorou a responder. Verifique a conexão e tente novamente.';
   if (m.includes('invalid login')) return 'E-mail ou senha incorretos.';
   if (m.includes('email not confirmed')) return 'Confirme seu e-mail antes de entrar.';
   if (m.includes('already registered')) return 'Este e-mail já tem cadastro. Faça login.';

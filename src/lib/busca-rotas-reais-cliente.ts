@@ -20,6 +20,10 @@ export interface CartaoRotaRealDados {
   rotaId: string;
   rotaNome: string;
   vanLugares: number | null;
+  /** Vagas livres para novos passageiros (capacidade − ocupação). */
+  vagas: number | null;
+  /** A rota já atende a escola pedida (Tier A) ou foi avaliada por proximidade (Tier B). */
+  atendeEscola: boolean;
   sentido: 'ida' | 'volta';
   status: StatusBuscaReal;
   /** Ida: hora que passa na CASA (coleta). Volta: hora que deixa em CASA. */
@@ -38,6 +42,7 @@ const mostravel = (s: StatusBuscaReal) => s === 'compativel' || s === 'sob_confi
 /** PROD: consulta a função server-side. Só mostra compatível/sob confirmação. */
 export async function buscarRotasReais(
   criterios: CriteriosBusca,
+  escolaPonto?: { lat: number; lng: number } | null,
 ): Promise<{ estado: EstadoBuscaReal; resultados: CartaoRotaRealDados[] }> {
   if (!Number.isFinite(criterios.origemLat) || !Number.isFinite(criterios.origemLng) || !criterios.destinoId) {
     return { estado: 'ok', resultados: [] };
@@ -51,6 +56,7 @@ export async function buscarRotasReais(
         body: JSON.stringify({
           origem: { lat: criterios.origemLat, lng: criterios.origemLng },
           destinoId: criterios.destinoId,
+          escolaPonto: escolaPonto ?? null,
           sentido,
           turno: criterios.turno,
           contratacao: criterios.contratacao,
@@ -71,7 +77,10 @@ export async function buscarRotasReais(
  * Sem backend, as rotas reais vivem no navegador do próprio usuário. Rodamos o
  * MESMO núcleo (buscarEmRotasReais) sobre as rotas ELEGÍVEIS (concluídas e
  * PUBLICADAS), provando o fluxo ponta a ponta sem infra. */
-export async function buscarRotasReaisDemo(criterios: CriteriosBusca): Promise<CartaoRotaRealDados[]> {
+export async function buscarRotasReaisDemo(
+  criterios: CriteriosBusca,
+  escolaPonto?: { lat: number; lng: number } | null,
+): Promise<CartaoRotaRealDados[]> {
   if (!Number.isFinite(criterios.origemLat) || !Number.isFinite(criterios.origemLng) || !criterios.destinoId) return [];
   const [rotas, veiculos] = await Promise.all([listarRotas(), listarVeiculos()]);
   const veicPorId = new Map(veiculos.map((v) => [v.id, v]));
@@ -86,6 +95,7 @@ export async function buscarRotasReaisDemo(criterios: CriteriosBusca): Promise<C
     const { resultados } = buscarEmRotasReais(entradas, {
       origem: { lat: criterios.origemLat!, lng: criterios.origemLng! },
       destinoId: criterios.destinoId,
+      escolaPonto: escolaPonto ?? null,
       sentido,
       turno: criterios.turno,
       contratacao: criterios.contratacao,
@@ -98,6 +108,8 @@ export async function buscarRotasReaisDemo(criterios: CriteriosBusca): Promise<C
         rotaId: r.rotaId,
         rotaNome: rota?.nome || 'Rota',
         vanLugares: van?.lugaresPassageiro ?? null,
+        vagas: r.vagas,
+        atendeEscola: r.atendeEscola,
         sentido: r.sentido,
         status: r.status,
         passagemCasaMin: r.passagemCasaMin,

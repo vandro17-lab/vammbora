@@ -42,18 +42,23 @@ export function SearchResultsPage() {
   useEffect(() => {
     let vivo = true;
     (async () => {
+      // Coordenadas da escola escolhida (catálogo): permitem avaliar rotas que
+      // só passam perto da escola (Tier B).
+      const dest = criterios.destinoId ? destinosPorId[criterios.destinoId] : null;
+      const escolaPonto = dest && Number.isFinite(dest.lat) && Number.isFinite(dest.lng)
+        ? { lat: dest.lat as number, lng: dest.lng as number } : null;
       if (modoDemo) {
-        const itens = await buscarRotasReaisDemo(criterios).catch(() => [] as CartaoRotaRealDados[]);
+        const itens = await buscarRotasReaisDemo(criterios, escolaPonto).catch(() => [] as CartaoRotaRealDados[]);
         // No demo, só "opera" quando há rotas reais do usuário; senão, vitrine de exemplo.
         if (vivo) setReais({ itens, operacional: itens.length > 0 });
       } else {
-        const r = await buscarRotasReais(criterios).catch(() => ({ estado: 'erro' as const, resultados: [] as CartaoRotaRealDados[] }));
+        const r = await buscarRotasReais(criterios, escolaPonto).catch(() => ({ estado: 'erro' as const, resultados: [] as CartaoRotaRealDados[] }));
         // Em prod, o servidor é a fonte quando responde (ok); em 503/erro, mantém a busca atual.
         if (vivo) setReais({ itens: r.resultados, operacional: r.estado === 'ok' });
       }
     })();
     return () => { vivo = false; };
-  }, [criterios, modoDemo]);
+  }, [criterios, modoDemo, destinosPorId]);
   const mostrarReais = !!reais?.operacional;
   const base = elegiveis;
 

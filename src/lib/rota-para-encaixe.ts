@@ -1,6 +1,8 @@
 import type { Rota, Veiculo, ParadaRota } from '@/types/motorista';
 import {
   encontrarEncaixes,
+  encontrarEncaixesProgressivo,
+  partidaParaSequencia,
   simularRota,
   type Sentido,
   type PontoGeo,
@@ -43,6 +45,9 @@ export interface AlunoNovo {
   casa: PontoGeo;
   /** Id do destino (escola) que o novo aluno frequenta. */
   escolaId: string;
+  /** Coordenadas da escola (catálogo). Usadas para INSERIR a escola quando ela
+   *  ainda não faz parte do itinerário da rota (Tier B — "passa perto"). */
+  escolaPonto?: PontoGeo;
 }
 
 export interface ParametrosSimulacao {
@@ -63,6 +68,7 @@ export type CodigoMotivo =
   | 'trecho'
   | 'rota_base'
   | 'aluno_duplicado'
+  | 'sem_encaixe'
   | 'dados';
 
 export interface ResultadoSimulacao {
@@ -198,6 +204,7 @@ const MAP_MOTIVO: Record<CodigoMotivo, string> = {
   trecho: 'Não foi possível calcular um trecho rodoviário entre dois endereços.',
   rota_base: 'A rota atual apresenta inconsistências e precisa ser revista.',
   aluno_duplicado: 'Este aluno já faz parte desta rota.',
+  sem_encaixe: 'Não há como encaixar sem quebrar os compromissos atuais (capacidade, horários ou tolerância).',
   dados: 'Faltam informações para calcular com segurança.',
 };
 
@@ -376,6 +383,159 @@ export function simularEncaixeRota(
 
   const codigos = diagnosticar(rotaOp, pedido, matriz, base, tolerancia);
   return { sentido, elegivel: false, opcao: null, motivos: motivosDe(codigos), codigos, base, partidaMin, nomePorCompromisso, escolaNoItinerario: true };
+}
+
+/* =============================================================================
+ * ADAPTADOR PROGRESSIVO (regra definitiva da busca inteligente)
+ * -----------------------------------------------------------------------------
+ * Liga a busca das famílias ao MESMO motor `encontrarEncaixesProgressivo`:
+ *  - respeita os limites INDIVIDUAIS de cada escola (horário declarado pelo
+ *    motorista por parada; fallback: último desembarque; fallback: turno);
+ *  - permite ANTECIPAR a saída (sair mais cedo, limitado pela tolerância dos
+ *    passageiros atuais);
+ *  - INSERE a escola do novo aluno quando a rota só passa perto (Tier B).
+ * Não cria motor paralelo e não altera o `simularEncaixeRota` do simulador.
+ * ========================================================================== */
+
+/** Limite de chegada de UMA parada de escola, HONESTO: horário declarado da
+ *  própria escola; e só a ÚLTIMA escola da rota herda o `ultimoDesembarqueMin`
+ *  (senão seria o horário de OUTRA escola). Escola intermediária sem horário
+ *  fica SEM limite rígido — o motor não inventa o que não sabe. */
+function limiteDaEscola(parada: ParadaRota, rota: Rota, ehUltimaEscola: boolean): number | undefined {
+  if (parada.horarioChegadaMin != null && Number.isFinite(parada.horarioChegadaMin)) return parada.horarioChegadaMin;
+  if (ehUltimaEscola && rota.ultimoDesembarqueMin != null && Number.isFinite(rota.ultimoDesembarqueMin)) return rota.ultimoDesembarqueMin;
+  return undefined;
+}
+
+/** Monta a RotaOperacional do motor a partir do cadastro, com limite por escola
+ *  e partida ancorada de trás pra frente (menor saída que cumpre os limites). */
+function montarOperacional(
+  rota: Rota, veiculo: Veiculo | null, matriz: MatrizViaria, tolerancia: number,
+): RotaOperacional | null {
+  const ordenadas = [...rota.paradas].sort((a, b) => a.ordem - b.ordem);
+  const saida = ordenadas.find((p) => p.tipo === 'saida') ?? ordenadas[0];
+  if (!saida) return null;
+  const inicio = pontoDeParada(saida);
+  if (!inicio) return null;
+  const sequencia = ordenadas.filter((p) => p.id !== saida.id);
+  const atendimentoDe = (pax: { atendimentoMin?: number | null }) => pax.atendimentoMin ?? ATENDIMENTO_PADRAO_MIN;
+  const ultimaEscolaOrdem = ordenadas
+    .filter((p) => p.tipo === 'escola')
+    .reduce((m, p) => Math.max(m, p.ordem), Number.NEGATIVE_INFINITY);
+
+  const compromissos: Compromisso[] = [];
+  for (const parada of sequencia) {
+    const ponto = pontoDeParada(parada);
+    if (!ponto) return null;
+    const ehEscola = parada.tipo === 'escola';
+    const limiteEscola = ehEscola ? limiteDaEscola(parada, rota, parada.ordem === ultimaEscolaOrdem) : undefined;
+    // Desembarques primeiro (liberam lugar antes de novos embarques no ponto).
+    for (const pax of rota.passageiros.filter((x) => x.desembarqueParadaId === parada.id)) {
+      compromissos.push({
+        id: 'des:' + pax.id, ponto, tipo: 'desembarque', alunoId: pax.id,
+        atendimentoMin: ehEscola && rota.sentido === 'ida' ? 0 : atendimentoDe(pax),
+        ...(ehEscola && limiteEscola != null ? { limiteEscolaMin: limiteEscola } : {}),
+      });
+    }
+    // Marcador de escola carrega o limite mesmo sem passageiro descendo nela.
+    if (ehEscola) {
+      compromissos.push({ id: 'escola:' + parada.id, ponto, tipo: 'escola', atendimentoMin: 0, ...(limiteEscola != null ? { limiteEscolaMin: limiteEscola } : {}) });
+    }
+    for (const pax of rota.passageiros.filter((x) => x.embarqueParadaId === parada.id)) {
+      compromissos.push({ id: 'emb:' + pax.id, ponto, tipo: 'embarque', alunoId: pax.id, atendimentoMin: atendimentoDe(pax) });
+    }
+  }
+
+  const capacidade = Math.max(1, capacidadeAlunos(rota, veiculo) || veiculo?.lugaresPassageiro || 1);
+  const partida = partidaParaSequencia(inicio, compromissos, matriz);
+  return {
+    id: rota.id || 'rota', versao: 1, sentido: rota.sentido, inicio,
+    partidaMin: Math.max(0, partida ?? 0), capacidade, ocupacaoInicial: 0,
+    compromissos, toleranciaMin: tolerancia,
+  };
+}
+
+/** Converte os motivos crus do motor progressivo em códigos amigáveis. */
+function codigosDoProgressivo(motivos: string[], faltaDado: boolean, limite: boolean): CodigoMotivo[] {
+  const set = new Set<CodigoMotivo>();
+  for (const m of motivos) {
+    if (m.includes('tempo/distância')) set.add('trecho');
+    else if (m.includes('Capacidade')) set.add('capacidade');
+    else if (m.includes('Horário-limite')) set.add('atraso');
+    else if (m.includes('Tolerância')) set.add('tolerancia');
+    else if (m.includes('antes do horário')) set.add('saida_cedo');
+    else if (m.includes('localização')) set.add('localizacao');
+  }
+  if (set.size === 0) {
+    if (faltaDado) set.add('trecho');
+    else if (limite) set.add('dados');
+    else set.add('sem_encaixe');
+  }
+  return [...set];
+}
+
+/**
+ * Simula o encaixe de um novo aluno usando o motor PROGRESSIVO (insere escola
+ * nova, reorganiza casas intercaladas, antecipa a saída). Mesma saída
+ * (`ResultadoSimulacao`) do adaptador simples, sem PII.
+ */
+export function simularEncaixeProgressivo(
+  rota: Rota, veiculo: Veiculo | null, aluno: AlunoNovo, matriz: MatrizViaria, params: ParametrosSimulacao,
+): ResultadoSimulacao {
+  const sentido = rota.sentido;
+  const tolerancia = Math.min(TOLERANCIA_MAX_MIN, Math.max(0, params.toleranciaMin ?? TOLERANCIA_MAX_MIN));
+  const vazio = (codigos: CodigoMotivo[], extra?: Partial<ResultadoSimulacao>): ResultadoSimulacao => ({
+    sentido, elegivel: false, opcao: null, motivos: motivosDe(codigos), codigos,
+    base: null, partidaMin: null, nomePorCompromisso: {}, escolaNoItinerario: true, ...extra,
+  });
+
+  if (rota.passageiros.some((p) => p.id === aluno.alunoId)) return vazio(['aluno_duplicado']);
+
+  const { faltamCoordenadas } = coletarPontos(rota, aluno);
+  if (faltamCoordenadas.length > 0 || !coord(aluno.casa.lat) || !coord(aluno.casa.lng)) return vazio(['localizacao']);
+
+  const rotaBase = montarOperacional(rota, veiculo, matriz, tolerancia);
+  if (!rotaBase) return vazio(['localizacao']);
+
+  // Escola do novo aluno: já no itinerário (Tier A) ou inserir nova (Tier B).
+  const existente = rotaBase.compromissos.find((c) => c.ponto.id === aluno.escolaId) ?? null;
+  const escolaPonto = existente?.ponto ?? aluno.escolaPonto ?? null;
+  if (!escolaPonto) return vazio(['escola_itinerario'], { escolaNoItinerario: false });
+
+  // Ancoragem CONSISTENTE: a escola escolhida carrega o horário usado no cálculo
+  // (declarado ou, na falta, do turno). Sem isso, uma rota sem limites ancararia
+  // à meia-noite e o deslocamento falso estouraria a tolerância dos atuais.
+  const compromissos = existente
+    ? rotaBase.compromissos.map((c) =>
+        c.ponto.id === aluno.escolaId && (c.tipo === 'escola' || c.tipo === 'desembarque')
+          ? { ...c, limiteEscolaMin: params.horarioEscolaMin }
+          : c)
+    : rotaBase.compromissos;
+  const partidaMin = Math.max(0, partidaParaSequencia(rotaBase.inicio, compromissos, matriz) ?? rotaBase.partidaMin);
+  const rotaOp: RotaOperacional = { ...rotaBase, compromissos, partidaMin };
+
+  const base = simularRota(rotaOp, matriz);
+  const pedido: PedidoEncaixe = {
+    alunoId: aluno.alunoId, casa: aluno.casa, escola: escolaPonto,
+    horarioEscolaMin: params.horarioEscolaMin, atendimentoMin: params.atendimentoMin ?? ATENDIMENTO_PADRAO_MIN,
+  };
+  const res = encontrarEncaixesProgressivo(rotaOp, pedido, matriz, {
+    anteciparPartida: true,
+    inserirEscolaNova: !existente,
+    limiteEscolaNovaMin: params.horarioEscolaMin,
+  });
+
+  if (res.opcoes.length > 0) {
+    return {
+      sentido, elegivel: true, opcao: res.opcoes[0], motivos: [], codigos: [],
+      base, partidaMin: rotaOp.partidaMin, nomePorCompromisso: {}, escolaNoItinerario: !!existente,
+    };
+  }
+  const codigos = codigosDoProgressivo(res.motivos, res.faltaDadoViario, res.limiteAtingido);
+  return {
+    sentido, elegivel: false, opcao: null, motivos: motivosDe(codigos), codigos,
+    base, partidaMin: rotaOp.partidaMin, nomePorCompromisso: {}, escolaNoItinerario: !!existente,
+  };
 }
 
 /** Horário-limite/padrão de chegada à escola conforme turno (fallback). */

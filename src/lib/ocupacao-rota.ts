@@ -59,6 +59,16 @@ export function picoOcupacao(rota: Rota): number {
   return ocupacaoPorTrecho(rota).reduce((m, t) => Math.max(m, t.ocupacao), 0);
 }
 
+/**
+ * Vagas REAIS para novos alunos = capacidade de passageiros − pico de ocupação.
+ * É o 1º filtro de elegibilidade da busca: uma van com 15 lugares e 13 ocupados
+ * tem 2 vagas. Usa o pico (trecho mais cheio), não um total ingênuo, porque a
+ * capacidade precisa valer em TODOS os trechos.
+ */
+export function vagasParaNovos(rota: Rota, veiculo: Veiculo | null): number {
+  return Math.max(0, capacidadeAlunos(rota, veiculo) - picoOcupacao(rota));
+}
+
 /** Passageiros a bordo no trecho APÓS a parada indicada. Desembarques nessa parada já saíram. */
 export function aBordoEm(rota: Rota, paradaOrdem: number): PassageiroRota[] {
   return rota.passageiros.filter((pax) => {

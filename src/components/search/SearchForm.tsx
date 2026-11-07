@@ -8,7 +8,8 @@ import { useVitrine } from '@/data/VitrineProvider';
 import { TURNO_LABEL, cn } from '@/lib/utils';
 import { criteriosParaParams } from '@/lib/searchParams';
 import { AutocompleteEndereco } from '@/components/search/AutocompleteEndereco';
-import { locaisDeDestinos } from '@/lib/geocode';
+import { locaisDeDestinos, geocodificarPreciso } from '@/lib/geocode';
+import { Loader2 } from 'lucide-react';
 
 const TITULOS = ['De onde vamos sair?', 'Qual é o destino?', 'Como é sua rotina?'];
 const DESCRICOES = ['Comece pelo bairro de embarque.', 'Escolha a escola ou a faculdade.', 'Falta pouco para encontrar suas opções.'];
@@ -29,14 +30,39 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
   const [contratacao, setContratacao] = useState<Contratacao>('mensal');
   const [dataAvulso, setDataAvulso] = useState('');
   const [modalidade, setModalidade] = useState<ModalidadeTrajeto>('ida');
+  const [localizando, setLocalizando] = useState(false);
   const titulo = useRef<HTMLHeadingElement>(null);
   // preventScroll evita que o navegador role a página (inclusive na horizontal)
   // ao focar o título programaticamente — causava a tela "deslocar para o lado".
   function ir(n: number) { setPasso(n); requestAnimationFrame(() => titulo.current?.focus({ preventScroll: true })); }
-  function enviar(e: React.FormEvent) {
+
+  async function enviar(e: React.FormEvent) {
     e.preventDefault();
     if (passo < 2) { ir(passo + 1); return; }
-    const params = criteriosParaParams({ cidadeId: CIDADE_PADRAO.id, endereco: endereco.trim(), destinoId: destinoId || null, turno: turno || null, contratacao, dataAvulso: contratacao === 'avulso' ? dataAvulso : undefined, modalidade, origemLat: origemCoord?.lat, origemLng: origemCoord?.lng });
+    if (localizando) return;
+
+    const texto = endereco.trim();
+    // Garante uma COORDENADA de origem antes de buscar. Sem ela, o motor de
+    // rotas reais não classifica compatibilidade (era por isso que "nunca
+    // encontrava"). Quando o usuário digita um endereço com número e NÃO
+    // escolhe uma sugestão — ou escolhe só a rua — geocodificamos o texto
+    // respeitando o número da casa (geocodificarPreciso trata "Rua X, 123").
+    let coord = origemCoord;
+    const temNumero = /\d/.test(texto);
+    if (texto.length >= 3 && (!coord || temNumero)) {
+      setLocalizando(true);
+      const ctrl = new AbortController();
+      const limite = window.setTimeout(() => ctrl.abort(), 7000);
+      try {
+        const ponto = await geocodificarPreciso(texto, '', ctrl.signal);
+        if (ponto && Number.isFinite(ponto.lat) && Number.isFinite(ponto.lng)) {
+          coord = { lat: ponto.lat, lng: ponto.lng };
+        }
+      } catch { /* serviço de mapas indisponível: segue sem coordenada precisa */ }
+      finally { clearTimeout(limite); setLocalizando(false); }
+    }
+
+    const params = criteriosParaParams({ cidadeId: CIDADE_PADRAO.id, endereco: texto, destinoId: destinoId || null, turno: turno || null, contratacao, dataAvulso: contratacao === 'avulso' ? dataAvulso : undefined, modalidade, origemLat: coord?.lat, origemLng: coord?.lng });
     navigate(`/resultados?${params}`);
   }
   return (
@@ -56,7 +82,7 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
         <p className="mt-2 text-sm leading-relaxed text-navy-500">{DESCRICOES[passo]}</p>
         {passo === 0 && <div className="mt-6 space-y-5">
           <div className="flex items-center gap-3 rounded-xl bg-navy-50 p-4"><MapPin className="h-5 w-5 text-mint-700" /><div><span className="block text-xs text-navy-500">Sua cidade</span><span className="text-sm font-semibold">Araçatuba, SP</span></div></div>
-          <div><label className="field-label" htmlFor="endereco">Endereço ou bairro de embarque</label><AutocompleteEndereco id="endereco" value={endereco} locais={locaisBusca} placeholder="Ex.: Rua José Geraldo, Centro, escola…" onChange={(texto, coord) => { setEndereco(texto); setOrigemCoord(coord ?? null); }} /><p className="mt-2 text-xs text-navy-500">Digite para ver sugestões de Araçatuba. O ponto exato você combina com o motorista.</p></div>
+          <div><label className="field-label" htmlFor="endereco">Endereço ou bairro de embarque</label><AutocompleteEndereco id="endereco" value={endereco} locais={locaisBusca} placeholder="Ex.: Rua José Geraldo, 450 — Centro" onChange={(texto, coord) => { setEndereco(texto); setOrigemCoord(coord ?? null); }} /><p className="mt-2 text-xs text-navy-500">Pode incluir o número (ex.: “Rua José Geraldo, 450”). Escolha uma sugestão ou apenas digite — nós localizamos no mapa. O ponto exato você combina com o motorista.</p></div>
         </div>}
         {passo === 1 && <div className="mt-6">
           <label className="field-label" htmlFor="destino">Escola, faculdade ou destino</label>
@@ -75,7 +101,7 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
         </div>}
       </div>
       <div className="mt-7 flex gap-3">{passo > 0 && <button type="button" onClick={() => ir(passo - 1)} className="btn btn-lg btn-ghost px-4" aria-label="Voltar à etapa anterior"><ArrowLeft className="h-5 w-5" /></button>}
-        <button type="submit" className="btn btn-lg btn-primary flex-1">{passo === 2 ? <><Search className="h-4 w-4" /> Encontrar vans</> : <>Continuar <ArrowRight className="h-4 w-4" /></>}</button>
+        <button type="submit" className="btn btn-lg btn-primary flex-1" disabled={localizando} aria-busy={localizando}>{passo === 2 ? (localizando ? <><Loader2 className="h-4 w-4 animate-spin" /> Localizando endereço…</> : <><Search className="h-4 w-4" /> Encontrar vans</>) : <>Continuar <ArrowRight className="h-4 w-4" /></>}</button>
       </div>
       <p className="mt-4 text-center text-xs text-navy-500">Sem criar conta. No seu tempo.</p>
     </form>

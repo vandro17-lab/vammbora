@@ -23,11 +23,14 @@ import {
 } from '@/data/source';
 
 export function AdminPage() {
-  const { session, isAdmin, carregando, sair } = useAuth();
+  const { session, isAdmin, verificandoAdmin, carregando, sair } = useAuth();
 
   if (!USE_SUPABASE) return <AdminAviso texto="O painel precisa do banco (Supabase) configurado. Neste ambiente de demonstração ele está desligado." />;
   if (carregando) return <AdminCarregando />;
   if (!session) return <Navigate to="/admin/login" replace />;
+  // Enquanto o papel de admin ainda está sendo verificado, não mostre "sem
+  // permissão" (evita o flash antes de a RPC responder).
+  if (verificandoAdmin) return <AdminCarregando />;
   if (!isAdmin) return <SemPermissao onSair={sair} email={session.user.email ?? ''} />;
 
   return <AdminDashboard onSair={sair} />;
