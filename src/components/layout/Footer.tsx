@@ -8,7 +8,7 @@ export function Footer() {
         <div className="sm:col-span-2 lg:col-span-1">
           <Logo variant="light" />
           <p className="mt-4 max-w-xs text-sm leading-relaxed text-navy-300">
-            Seu próximo caminho começa com uma boa escolha. Transporte escolar e universitário em Araçatuba.
+            Transporte escolar e universitário em Araçatuba.
           </p>
         </div>
 
@@ -64,7 +64,7 @@ export function Footer() {
           <p>© {new Date().getFullYear()} Vambora · Feito em Araçatuba.</p>
           <details className="max-w-sm text-center sm:text-right">
             <summary className="cursor-pointer text-navy-200">Sobre esta versão</summary>
-            <p className="mt-2 leading-relaxed">Protótipo acadêmico · Fatec Araçatuba. Perfis e informações ilustrativos, sem contratação disponível nesta versão.</p>
+            <p className="mt-2 leading-relaxed">Versão de demonstração desenvolvida na Fatec Araçatuba. Os dados apresentados podem ser ilustrativos. Não é possível contratar transporte nesta versão.</p>
           </details>
         </div>
       </div>
