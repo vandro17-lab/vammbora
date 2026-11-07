@@ -33,7 +33,7 @@ export function MinhaVanPage() {
             titulo="Cadastre sua van"
             texto="Informe modelo, lugares, consumo e preço do diesel para calcularmos custos, rotas e oportunidades."
             acao={
-              <button onClick={() => navigate('/app/van/cadastro')} className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-mint-500 font-semibold text-white shadow-float active:scale-[0.98]">
+              <button onClick={() => navigate('/app/van/cadastro')} className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-mint-400 font-bold text-navy-950 shadow-float active:scale-[0.98]">
                 <Plus className="h-5 w-5" /> Cadastrar van
               </button>
             }
@@ -145,7 +145,7 @@ export function CadastroVanPage() {
           return (
             <div key={n} className="flex items-center gap-2">
               <div className="flex flex-col items-center">
-                <span className={cn('grid h-8 w-8 place-items-center rounded-full text-sm font-bold', passo >= num ? 'bg-mint-500 text-white' : 'bg-navy-100 text-navy-400')}>{passo > num ? <Check className="h-4 w-4" /> : n}</span>
+                <span className={cn('grid h-8 w-8 place-items-center rounded-full text-sm font-bold', passo >= num ? 'bg-mint-400 text-navy-950' : 'bg-navy-100 text-navy-400')}>{passo > num ? <Check className="h-4 w-4" /> : n}</span>
                 <span className={cn('mt-1 text-[10px] font-medium', passo >= num ? 'text-navy-700' : 'text-navy-400')}>{label}</span>
               </div>
               {i < 2 && <span className={cn('mb-4 h-0.5 w-8', passo > num ? 'bg-mint-500' : 'bg-navy-100')} />}
@@ -190,7 +190,7 @@ export function CadastroVanPage() {
                   className="grid h-11 w-11 place-items-center rounded-full bg-navy-50 text-navy-700 ring-1 ring-navy-100 active:scale-95"><Minus className="h-5 w-5" /></button>
                 <span className="w-12 text-center font-display text-3xl font-extrabold tabular-nums text-navy-900">{lugares}</span>
                 <button type="button" onClick={() => setLugares(lugares + 1)} aria-label="Mais um lugar"
-                  className="grid h-11 w-11 place-items-center rounded-full bg-mint-500 text-white active:scale-95"><Plus className="h-5 w-5" /></button>
+                  className="grid h-11 w-11 place-items-center rounded-full bg-mint-400 text-navy-950 active:scale-95"><Plus className="h-5 w-5" /></button>
               </div>
               <p className="mt-1.5 text-[11px] text-navy-400">Sem contar você, o motorista.</p>
             </div>
@@ -274,7 +274,7 @@ function ChipRecurso({ icon: Icon, label, ativo, onClick }: { icon: LucideIcon; 
   return (
     <button type="button" onClick={onClick} aria-pressed={ativo}
       className={cn('inline-flex items-center gap-1.5 rounded-full px-3.5 py-2 text-sm font-semibold ring-1 transition active:scale-95',
-        ativo ? 'bg-mint-500 text-white ring-mint-500' : 'bg-white text-navy-600 ring-navy-200')}>
+        ativo ? 'bg-mint-400 text-navy-950 ring-mint-500' : 'bg-white text-navy-600 ring-navy-200')}>
       {ativo ? <Check className="h-4 w-4" /> : <Icon className="h-4 w-4" />} {label}
     </button>
   );
