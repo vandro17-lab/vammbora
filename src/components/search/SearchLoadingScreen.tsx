@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
-import { Route, Clock3, Sparkles } from 'lucide-react';
+import { Route, MapPin, Sparkles } from 'lucide-react';
 import { VanMark } from '@/components/brand/Logo';
-import { plural } from '@/lib/utils';
 
 interface Props {
   totalConsultados: number;
@@ -11,35 +10,41 @@ interface Props {
 }
 
 /**
- * Tela de carregamento premium exibida durante a busca.
- * Van dirigindo (rodas girando + suspensão), estrada com parallax, cidade ao
- * fundo e aurora animada. Mensagens 100% honestas. Respeita prefers-reduced-motion.
+ * Tela de carregamento premium exibida ENQUANTO a busca real acontece.
+ * Van dirigindo (rodas girando + suspensão), estrada com parallax, pontos de
+ * origem/destino e aurora animada.
+ *
+ * Honestidade (regras do comando):
+ * - Não há barra de progresso determinística: o indicador é INDETERMINADO,
+ *   porque não sabemos quanto falta — o overlay vive enquanto a busca real roda.
+ * - As mensagens descrevem atividade EM ANDAMENTO e são genéricas quando não
+ *   correspondem a etapas verificáveis; nunca afirmam etapas concluídas.
+ * - Respeita prefers-reduced-motion, teclado e leitores de tela (aria-live).
  */
 export function SearchLoadingScreen({ totalConsultados, cidade }: Props) {
   const reduzir = useReducedMotion();
   const [passo, setPasso] = useState(0);
 
   const passos = [
-    { Icone: Route, texto: 'Buscando vans para o seu destino' },
+    { Icone: Route, texto: 'Procurando vans para o seu destino' },
     {
-      Icone: Clock3,
+      Icone: MapPin,
       texto:
         totalConsultados > 0
-          ? `Conferindo vagas de ${plural(totalConsultados, 'motorista', 'motoristas')} em ${cidade}`
-          : `Procurando motoristas em ${cidade}`,
+          ? `Consultando trajetos em ${cidade}`
+          : `Consultando trajetos pelas ruas de ${cidade}`,
     },
-    { Icone: Sparkles, texto: 'Organizando as melhores opções para você' },
+    { Icone: Sparkles, texto: 'Organizando as opções para você' },
   ];
 
   useEffect(() => {
-    // Tempo suficiente para LER cada mensagem (~1,3s cada).
-    const t1 = setTimeout(() => setPasso(1), 1300);
-    const t2 = setTimeout(() => setPasso(2), 2600);
-    return () => {
-      clearTimeout(t1);
-      clearTimeout(t2);
-    };
-  }, []);
+    if (reduzir) return;
+    // Alterna a MENSAGEM visível (atividade em andamento), sem prometer que uma
+    // etapa terminou. O ciclo se repete porque a busca pode durar mais que isso.
+    const t = window.setInterval(() => setPasso((n) => (n + 1) % passos.length), 2000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reduzir]);
 
   const AtualIcone = passos[passo].Icone;
 
@@ -121,6 +126,16 @@ export function SearchLoadingScreen({ totalConsultados, cidade }: Props) {
               'repeating-linear-gradient(90deg, rgba(255,255,255,0.75) 0 26px, transparent 26px 60px)',
           }}
         />
+
+        {/* Pontos de origem (embarque) e destino (escola) sobre a estrada */}
+        <div className="absolute bottom-[34px] left-3 flex flex-col items-center gap-1">
+          <span className="h-3 w-3 rounded-full bg-emerald-400 ring-2 ring-emerald-400/30" />
+          <span className="text-[10px] font-semibold text-emerald-200/90">Origem</span>
+        </div>
+        <div className="absolute bottom-[34px] right-3 flex flex-col items-center gap-1">
+          <span className="h-3 w-3 rounded-full bg-mint-400 ring-2 ring-mint-400/30" />
+          <span className="text-[10px] font-semibold text-mint-200/90">Escola</span>
+        </div>
       </div>
 
       {/* Mensagens */}
@@ -140,14 +155,18 @@ export function SearchLoadingScreen({ totalConsultados, cidade }: Props) {
         </AnimatePresence>
       </div>
 
-      {/* Barra de progresso */}
+      {/* Indicador INDETERMINADO — não fingimos progresso nem porcentagem:
+          o overlay existe enquanto a busca real roda. */}
       <div className="relative z-10 mt-5 h-1.5 w-56 overflow-hidden rounded-full bg-white/10">
-        <motion.div
-          className="h-full rounded-full bg-gradient-to-r from-mint-400 to-mint-500"
-          initial={{ width: '8%' }}
-          animate={{ width: '100%' }}
-          transition={{ duration: 3.7, ease: [0.4, 0, 0.2, 1] }}
-        />
+        {reduzir ? (
+          <div className="h-full w-1/3 rounded-full bg-mint-400/80" />
+        ) : (
+          <motion.div
+            className="h-full w-2/5 rounded-full bg-gradient-to-r from-mint-400 to-mint-500"
+            animate={{ x: ['-110%', '260%'] }}
+            transition={{ duration: 1.25, ease: 'easeInOut', repeat: Infinity }}
+          />
+        )}
       </div>
       <p className="relative z-10 mt-3 text-xs text-navy-300">
         Mostramos vagas e horários informados pelos motoristas.
