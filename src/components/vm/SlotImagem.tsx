@@ -48,8 +48,8 @@ function SlotEditavel({ slot, children }: { slot: string; children: ReactNode })
         data-slot-editavel={slot}
         className="pointer-events-auto absolute inset-0 z-10 flex cursor-pointer items-start justify-end rounded-[inherit] focus:outline-none focus-visible:ring-2 focus-visible:ring-mint-500"
       >
-        <span className="pointer-events-none absolute inset-0 rounded-[inherit] border border-dashed border-mint-400/90 bg-mint-400/10 ring-1 ring-mint-500/20" />
-        <span className="pointer-events-none relative m-0.5 grid h-5 w-5 place-items-center rounded-full bg-mint-500 text-white shadow-md ring-2 ring-white">
+        <span className="pointer-events-none absolute inset-0 rounded-[inherit] border border-dashed border-mint-500/90 bg-mint-400/10 ring-1 ring-mint-500/20" />
+        <span className="pointer-events-none relative m-0.5 grid h-5 w-5 place-items-center rounded-full bg-mint-400 text-navy-950 shadow-md ring-2 ring-white">
           <PencilSimpleLine size={11} weight="bold" />
         </span>
       </span>
