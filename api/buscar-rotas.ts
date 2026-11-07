@@ -79,25 +79,38 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     raw += (chunk as Buffer).toString();
     if (raw.length > 8000) return reply(res, 413, { erro: 'Solicitação muito grande.' });
   }
-  let body: { origem?: { lat?: number; lng?: number }; destinoId?: string; sentido?: string; turno?: string | null; contratacao?: string | null };
+  let body: { origem?: { lat?: number; lng?: number }; destinoId?: string; escolaPonto?: { lat?: number; lng?: number } | null; sentido?: string; turno?: string | null; contratacao?: string | null };
   try { body = JSON.parse(raw || '{}'); } catch { return reply(res, 400, { erro: 'JSON inválido.' }); }
 
   if (!body.origem || !coordOk(body.origem.lat) || !coordOk(body.origem.lng)) return reply(res, 400, { erro: 'Origem (lat/lng) é obrigatória.' });
   if (!body.destinoId || typeof body.destinoId !== 'string') return reply(res, 400, { erro: 'destinoId é obrigatório.' });
   if (!sentidoValido(body.sentido)) return reply(res, 400, { erro: 'sentido deve ser ida ou volta.' });
 
-  const pedido: PedidoFamilia = {
-    origem: { lat: body.origem.lat, lng: body.origem.lng },
-    destinoId: body.destinoId,
-    sentido: body.sentido,
-    turno: body.turno ?? null,
-    contratacao: body.contratacao === 'avulso' ? 'avulso' : 'mensal',
-  };
-
   try {
     const db = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
 
-    // Rotas ELEGÍVEIS: concluídas, PUBLICADAS pelo motorista, não-demo, do sentido pedido.
+    // Coordenadas da escola escolhida (para o Tier B — inserir escola nova).
+    // Vêm do corpo; se ausentes, busca no catálogo `destinations`.
+    let escolaPonto: { lat: number; lng: number } | null =
+      body.escolaPonto && coordOk(body.escolaPonto.lat) && coordOk(body.escolaPonto.lng)
+        ? { lat: body.escolaPonto.lat, lng: body.escolaPonto.lng } : null;
+    if (!escolaPonto) {
+      const { data: destRows } = await db.from('destinations').select('lat,lng').eq('id', body.destinoId);
+      const dest = Array.isArray(destRows) ? (destRows[0] as { lat?: number; lng?: number } | undefined) : null;
+      if (dest && coordOk(dest.lat) && coordOk(dest.lng)) escolaPonto = { lat: dest.lat, lng: dest.lng };
+    }
+
+    const pedido: PedidoFamilia = {
+      origem: { lat: body.origem.lat, lng: body.origem.lng },
+      destinoId: body.destinoId,
+      escolaPonto,
+      sentido: body.sentido,
+      turno: body.turno ?? null,
+      contratacao: body.contratacao === 'avulso' ? 'avulso' : 'mensal',
+    };
+
+    // Rotas ELEGÍVEIS: concluídas, não-demo, do sentido pedido. NÃO exige
+    // publicação manual (decisão de produto: qualquer rota concluída é avaliada).
     const { data: rotas, error: errR } = await db
       .from('routes')
       .select(
@@ -107,7 +120,6 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       )
       .eq('status', 'concluida')
       .eq('is_demo', false)
-      .eq('is_published', true)
       .eq('direction', pedido.sentido);
     if (errR) return reply(res, 500, { erro: 'Falha ao consultar rotas.' });
 
@@ -137,6 +149,8 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
         rotaId: res0.rotaId,
         rotaNome: linha?.name ?? 'Rota',
         vanLugares: van?.seats_passenger ?? null,
+        vagas: res0.vagas,
+        atendeEscola: res0.atendeEscola,
         sentido: res0.sentido,
         status: res0.status,
         passagemCasaMin: res0.passagemCasaMin,

@@ -1,11 +1,17 @@
 import type { Rota, Veiculo } from '@/types/motorista';
 import {
-  simularEncaixeRota,
+  simularEncaixeProgressivo,
   limitePadraoDoTurno,
   type AlunoNovo,
   type CodigoMotivo,
 } from '@/lib/rota-para-encaixe';
-import { criarMatrizDemo, type MatrizViaria } from '@/lib/encaixe';
+import { criarMatrizDemo, haversineMetros, type MatrizViaria } from '@/lib/encaixe';
+import { vagasParaNovos } from '@/lib/ocupacao-rota';
+
+/** Distância máxima (m) de uma parada da rota à escola pedida para a rota ser
+ *  CANDIDATA quando não atende a escola (Tier B). Pré-filtro barato: o motor
+ *  ainda PRECISA provar que o encaixe cabe. */
+export const PROX_ESCOLA_M = 3000;
 
 /**
  * BUSCA PÚBLICA SOBRE ROTAS REAIS (adaptador, não um motor novo).
@@ -36,8 +42,11 @@ export type StatusBuscaReal =
 export interface PedidoFamilia {
   /** Coordenada CONFIRMADA da origem (sem ela não se classifica compatibilidade). */
   origem: { lat: number; lng: number } | null;
-  /** Id do destino/escola do catálogo (deve existir no itinerário da rota). */
+  /** Id do destino/escola do catálogo. */
   destinoId: string | null;
+  /** Coordenadas da escola do catálogo. Permitem AVALIAR rotas que passam perto
+   *  da escola mesmo sem a terem cadastrada (Tier B — inserção da escola nova). */
+  escolaPonto?: { lat: number; lng: number } | null;
   sentido: 'ida' | 'volta';
   turno?: string | null;
   contratacao?: 'mensal' | 'avulso' | null;
@@ -51,6 +60,12 @@ export interface ResultadoRotaReal {
   rotaId: string;
   sentido: 'ida' | 'volta';
   status: StatusBuscaReal;
+  /** Vagas livres da rota (capacidade − pico de ocupação). */
+  vagas: number;
+  /** A rota já atende a escola pedida (Tier A) ou foi avaliada por proximidade (Tier B). */
+  atendeEscola: boolean;
+  /** Alteração na rota (min) que o encaixe causaria; menor = melhor. */
+  desvioMin: number | null;
   /** Ida: hora que a van passaria na CASA (coleta). Volta: hora que deixaria em CASA (entrega). */
   passagemCasaMin: number | null;
   /** Ida: chegada à ESCOLA. Volta: saída da ESCOLA. */
@@ -64,17 +79,28 @@ export interface ResultadoRotaReal {
   codigos: CodigoMotivo[];
 }
 
-/** Elegibilidade NO NÍVEL DA ROTA: real, concluída, PUBLICADA pelo motorista
- *  (ação explícita — "concluída" não implica "publicada") e com casa + escola. */
+/** Elegibilidade NO NÍVEL DA ROTA: real (não-demo), concluída e com casa +
+ *  escola. NÃO exige publicação manual nem confirmação prévia do motorista:
+ *  qualquer rota concluída já é avaliada e apresentada (decisão de produto). */
 export function rotaElegivelParaBusca(
-  rota: Pick<Rota, 'status' | 'paradas' | 'isPublished'> & { isDemo?: boolean },
+  rota: Pick<Rota, 'status' | 'paradas'> & { isDemo?: boolean },
 ): boolean {
   if (rota.isDemo) return false;
   if (rota.status !== 'concluida') return false;
-  if (!rota.isPublished) return false; // só aparece quando o motorista publica
   const temEscola = rota.paradas.some((p) => p.tipo === 'escola');
   const temCasa = rota.paradas.some((p) => p.tipo === 'casa');
   return temEscola && temCasa;
+}
+
+/** A rota passa SUFICIENTEMENTE PERTO da escola pedida (pré-filtro do Tier B)?
+ *  Alguma parada a no máximo PROX_ESCOLA_M da escola. Não garante encaixe —
+ *  o motor ainda precisa provar que cabe. */
+export function rotaPassaPertoDaEscola(rota: Rota, escolaPonto?: { lat: number; lng: number } | null): boolean {
+  if (!escolaPonto || !Number.isFinite(escolaPonto.lat) || !Number.isFinite(escolaPonto.lng)) return false;
+  return rota.paradas.some(
+    (p) => p.lat != null && p.lng != null && Number.isFinite(p.lat) && Number.isFinite(p.lng)
+      && haversineMetros({ lat: p.lat, lng: p.lng }, escolaPonto) <= PROX_ESCOLA_M,
+  );
 }
 
 /**
@@ -151,10 +177,15 @@ export function avaliarRotaReal(
   pedido: PedidoFamilia,
   matriz: MatrizViaria = criarMatrizDemo(),
 ): ResultadoRotaReal {
+  const vagas = vagasParaNovos(rota, veiculo);
+  const atendeEscola = rotaAtendeDestino(rota, pedido.destinoId);
   const vazio = (status: StatusBuscaReal, motivo: string, codigos: CodigoMotivo[] = []): ResultadoRotaReal => ({
     rotaId: rota.id,
     sentido: rota.sentido,
     status,
+    vagas,
+    atendeEscola,
+    desvioMin: null,
     passagemCasaMin: null,
     horarioEscolaMin: null,
     minutosABordo: null,
@@ -166,6 +197,10 @@ export function avaliarRotaReal(
   // O sentido pedido precisa bater com o da rota (ida e volta são rotas independentes).
   if (rota.sentido !== pedido.sentido) {
     return vazio('incompativel', 'Esta rota é do outro sentido (ida/volta).');
+  }
+  // 1º FILTRO: sem vaga, não aparece como disponível.
+  if (vagas < 1) {
+    return vazio('incompativel', 'Esta van está sem vagas para novos passageiros.', ['capacidade']);
   }
   if (!pedido.origem || !Number.isFinite(pedido.origem.lat) || !Number.isFinite(pedido.origem.lng)) {
     return vazio('indeterminado', MOTIVO_SEM_ORIGEM, ['localizacao']);
@@ -184,9 +219,14 @@ export function avaliarRotaReal(
     nome: 'Família',
     casa: { id: 'familia-casa', nome: 'Origem da família', lat: pedido.origem.lat, lng: pedido.origem.lng },
     escolaId: pedido.destinoId,
+    // Coords da escola do catálogo: permitem INSERIR a escola quando a rota só
+    // passa perto (Tier B). Em Tier A a escola já está no itinerário.
+    ...(pedido.escolaPonto && Number.isFinite(pedido.escolaPonto.lat) && Number.isFinite(pedido.escolaPonto.lng)
+      ? { escolaPonto: { id: pedido.destinoId, nome: 'Escola', lat: pedido.escolaPonto.lat, lng: pedido.escolaPonto.lng } }
+      : {}),
   };
 
-  const sim = simularEncaixeRota(rota, veiculo, aluno, matriz, { horarioEscolaMin: horarioEscola });
+  const sim = simularEncaixeProgressivo(rota, veiculo, aluno, matriz, { horarioEscolaMin: horarioEscola });
 
   if (!sim.elegivel || !sim.opcao) {
     return {
@@ -202,6 +242,7 @@ export function avaliarRotaReal(
   const horarioEscolaResMin = rota.sentido === 'ida' ? op.horarioEntregaMin : op.horarioBuscaMin;
 
   const avulso = pedido.contratacao === 'avulso';
+  // Horário fraco quando veio do turno (Tier B ou escola sem horário declarado).
   const horarioFraco = fonte === 'turno';
   const status: StatusBuscaReal = avulso || horarioFraco ? 'sob_confirmacao' : 'compativel';
   const motivo = avulso ? MOTIVO_AVULSO : horarioFraco ? MOTIVO_OK_FRACO : MOTIVO_OK;
@@ -210,6 +251,9 @@ export function avaliarRotaReal(
     rotaId: rota.id,
     sentido: rota.sentido,
     status,
+    vagas,
+    atendeEscola,
+    desvioMin: op.desvioMin,
     passagemCasaMin,
     horarioEscolaMin: horarioEscolaResMin,
     minutosABordo: op.minutosABordo,
@@ -235,25 +279,34 @@ export interface ResultadoBuscaReal {
 }
 
 /**
- * Avalia o pedido da família contra uma lista de rotas reais JÁ ELEGÍVEIS
- * (status/anúncio filtrados na origem). Devolve apenas resultados sem PII,
- * ordenados por compatibilidade e menor passagem na casa.
+ * Avalia o pedido da família contra uma lista de rotas reais JÁ ELEGÍVEIS.
+ * Recortes, nesta ordem:
+ *   1) mesmo sentido;
+ *   2) COM VAGA (capacidade − pico de ocupação ≥ 1) — motoristas sem vaga não
+ *      entram;
+ *   3) que já ATENDEM a escola (Tier A) OU passam PERTO dela (Tier B).
+ * Para cada candidata o motor PROVA o encaixe (nunca "compatível" só por vaga ou
+ * proximidade). Ordena: compatíveis antes de "sob confirmação"; Tier A antes de
+ * Tier B; menor alteração de rota; coleta mais cedo. Saída sem PII.
  */
 export function buscarEmRotasReais(
   entradas: EntradaBuscaReal[],
   pedido: PedidoFamilia,
   matriz: MatrizViaria = criarMatrizDemo(),
 ): ResultadoBuscaReal {
-  // 1º recorte (o que o usuário descreveu): só as rotas do MESMO sentido pedido
-  // (ida/volta são independentes) QUE JÁ PASSAM pela escola escolhida. Para cada
-  // uma testamos o encaixe a partir do horário que o motorista declarou ali.
-  const candidatas = entradas.filter(
-    (e) => e.rota.sentido === pedido.sentido && rotaAtendeDestino(e.rota, pedido.destinoId),
-  );
+  const candidatas = entradas.filter((e) => {
+    if (e.rota.sentido !== pedido.sentido) return false;
+    if (vagasParaNovos(e.rota, e.veiculo) < 1) return false; // 1º filtro: vaga
+    return rotaAtendeDestino(e.rota, pedido.destinoId) || rotaPassaPertoDaEscola(e.rota, pedido.escolaPonto);
+  });
   const resultados = candidatas
     .map((e) => avaliarRotaReal(e.rota, e.veiculo, pedido, matriz))
     .sort((a, b) => {
       if (pesoStatus(a.status) !== pesoStatus(b.status)) return pesoStatus(a.status) - pesoStatus(b.status);
+      if (a.atendeEscola !== b.atendeEscola) return a.atendeEscola ? -1 : 1; // Tier A antes de Tier B
+      const da = a.desvioMin ?? Number.POSITIVE_INFINITY;
+      const db = b.desvioMin ?? Number.POSITIVE_INFINITY;
+      if (da !== db) return da - db; // menor alteração de rota
       const pa = a.passagemCasaMin ?? Number.POSITIVE_INFINITY;
       const pb = b.passagemCasaMin ?? Number.POSITIVE_INFINITY;
       return pa - pb;

@@ -67,18 +67,18 @@ const pedidoIda = (over: Partial<PedidoFamilia> = {}): PedidoFamilia => ({
 });
 
 describe('elegibilidade de rota', () => {
-  it('aceita rota concluída, publicada, não-demo, com casa e escola', () => {
-    expect(rotaElegivelParaBusca({ ...rotaIda(), isPublished: true })).toBe(true);
+  it('aceita rota concluída, não-demo, com casa e escola', () => {
+    expect(rotaElegivelParaBusca(rotaIda())).toBe(true);
   });
-  it('rejeita concluída mas NÃO publicada', () => {
-    expect(rotaElegivelParaBusca({ ...rotaIda(), isPublished: false })).toBe(false);
-    expect(rotaElegivelParaBusca({ ...rotaIda() })).toBe(false); // ausente = não publicada
+  it('aceita concluída SEM publicação manual (regra definitiva: não exige publicar)', () => {
+    // publicação não é mais exigida — qualquer concluída é avaliada
+    expect(rotaElegivelParaBusca({ ...rotaIda(), status: 'concluida' })).toBe(true);
   });
   it('rejeita rascunho', () => {
-    expect(rotaElegivelParaBusca({ ...rotaIda(), isPublished: true, status: 'rascunho' })).toBe(false);
+    expect(rotaElegivelParaBusca({ ...rotaIda(), status: 'rascunho' })).toBe(false);
   });
   it('rejeita rota demo', () => {
-    expect(rotaElegivelParaBusca({ ...rotaIda(), isPublished: true, isDemo: true })).toBe(false);
+    expect(rotaElegivelParaBusca({ ...rotaIda(), isDemo: true })).toBe(false);
   });
 });
 
@@ -184,16 +184,17 @@ describe('avaliarRotaReal — SEM PII (T21)', () => {
   });
 });
 
-describe('buscarEmRotasReais — agregação por sentido', () => {
-  it('avalia só rotas do sentido pedido e ordena compatíveis primeiro', () => {
+describe('buscarEmRotasReais — agregação por sentido + vaga', () => {
+  it('avalia só rotas do sentido pedido, COM vaga, e ordena compatíveis primeiro', () => {
     const entradas = [
-      { rota: rotaIda(), veiculo: veiculo(4) },
-      { rota: rotaVolta(), veiculo: veiculo(4) },
-      { rota: { ...rotaIda(), id: 'ida-lotada' }, veiculo: veiculo(2) },
+      { rota: rotaIda(), veiculo: veiculo(4) }, // 2 ocupados em 4 → 2 vagas
+      { rota: rotaVolta(), veiculo: veiculo(4) }, // outro sentido → fora
+      { rota: { ...rotaIda(), id: 'ida-lotada' }, veiculo: veiculo(2) }, // 2 ocupados em 2 → 0 vaga → fora
     ];
     const out = buscarEmRotasReais(entradas, pedidoIda());
-    expect(out.totalRotasAvaliadas).toBe(2); // só as 2 de ida
-    expect(out.resultados[0].status).toBe('compativel'); // a viável vem primeiro
+    expect(out.totalRotasAvaliadas).toBe(1); // ida com vaga; a lotada e a de volta saem
+    expect(out.resultados[0].status).toBe('compativel');
+    expect(out.resultados[0].rotaId).toBe('rota-ida');
     expect(out.resultados.every((r) => r.sentido === 'ida')).toBe(true);
   });
 });

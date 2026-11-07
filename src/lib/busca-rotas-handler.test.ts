@@ -91,7 +91,7 @@ describe('api/buscar-rotas (handler, mock Supabase)', () => {
     expect(res.body).not.toContain('identificacao');
   });
 
-  it('sem rotas publicadas => vazio (não vaza rota)', async () => {
+  it('sem rotas => vazio (não vaza rota)', async () => {
     estado.canned = { routes: [], vehicles: [] };
     const res = fakeRes();
     await handler(fakeReq(pedido), res as never);

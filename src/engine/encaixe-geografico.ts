@@ -183,6 +183,40 @@ export interface OpcoesEncaixeProgressivo {
   reorganizar?: boolean;
   /** Orçamento máximo de candidatas simuladas. Default 4000. */
   maxCandidatas?: number;
+  /**
+   * Permite que a van SAIA MAIS CEDO para acomodar o novo aluno: cada candidata
+   * é simulada com a maior partida que ainda cumpre TODOS os limites de escola
+   * daquela sequência (recuo mínimo). A tolerância continua medida contra o
+   * plano-base, então a antecipação fica limitada pela tolerância de quem já
+   * está na rota. Default false (comportamento legado: partida fixa).
+   */
+  anteciparPartida?: boolean;
+}
+
+/**
+ * Maior partida (minuto do dia) que ainda cumpre TODOS os `limiteEscolaMin` de
+ * uma sequência de compromissos — "o horário final manda", generalizado para
+ * múltiplas escolas. Retorna null se faltar dado viário ou se a sequência não
+ * tem nenhum limite (nada a ancorar).
+ */
+export function partidaParaSequencia(
+  inicio: PontoGeo, compromissos: Compromisso[], matriz: MatrizViaria,
+): number | null {
+  let acc = 0; // minutos da partida até a CHEGADA no compromisso atual
+  let anterior = inicio;
+  const folgas: number[] = [];
+  for (const c of compromissos) {
+    const t = matriz.obter(anterior, c.ponto, 0);
+    if (!t || !Number.isFinite(t.minutos)) return null;
+    acc += t.minutos;
+    if (c.limiteEscolaMin !== undefined && Number.isFinite(c.limiteEscolaMin)) {
+      folgas.push(c.limiteEscolaMin - acc); // partida ≤ folga para cumprir este limite
+    }
+    acc += c.atendimentoMin;
+    anterior = c.ponto;
+  }
+  if (!folgas.length) return null;
+  return Math.min(...folgas);
 }
 
 export interface ResultadoEncaixeProgressivo {
@@ -199,6 +233,9 @@ export interface ResultadoEncaixeProgressivo {
   limiteAtingido: boolean;
   /** true quando faltou tempo/distância rodoviária para algum trecho necessário. */
   faltaDadoViario: boolean;
+  /** Motivos CRUS coletados das candidatas rejeitadas / da base inválida (para
+   *  diagnóstico honesto por quem chama; sem significado de aprovação). */
+  motivos: string[];
 }
 
 function indiceEscolaEm(compromissos: Compromisso[], escolaId: string): number {
@@ -254,10 +291,11 @@ function* permutacoes<T>(arr: T[], teto = 60000): Generator<T[]> {
 function construirOpcaoProgressiva(
   rota: RotaOperacional, base: PlanoCalculado, matriz: MatrizViaria,
   paradas: Compromisso[], buscaId: string, entregaId: string, tolerancia: number, horarioEscolaMin: number,
-): { opcao: OpcaoEncaixe | null; faltaDado: boolean } {
-  const cand = simularRota(rota, matriz, paradas);
+  partidaMin: number = rota.partidaMin,
+): { opcao: OpcaoEncaixe | null; faltaDado: boolean; motivos: string[] } {
+  const cand = simularRota({ ...rota, partidaMin }, matriz, paradas);
   if (!cand.valido) {
-    return { opcao: null, faltaDado: cand.motivos.some((m) => m.includes('tempo/distância')) };
+    return { opcao: null, faltaDado: cand.motivos.some((m) => m.includes('tempo/distância')), motivos: cand.motivos };
   }
   const eventosBase = new Map(base.eventos.map((e) => [e.compromisso.id, e]));
   const alteracoes: OpcaoEncaixe['alteracoes'] = [];
@@ -266,15 +304,15 @@ function construirOpcaoProgressiva(
     if (!anterior) continue;
     const ref = e.compromisso.horarioBaseMin ?? anterior.chegadaMin;
     const dif = e.chegadaMin - ref;
-    if (Math.abs(dif) > tolerancia) return { opcao: null, faltaDado: false };
+    if (Math.abs(dif) > tolerancia) return { opcao: null, faltaDado: false, motivos: ['Tolerância de um passageiro atual excedida.'] };
     alteracoes.push({ id: e.compromisso.id, antesMin: ref, depoisMin: e.chegadaMin, diferencaMin: dif });
   }
   const idxB = cand.eventos.findIndex((e) => e.compromisso.id === buscaId);
   const idxE = cand.eventos.findIndex((e) => e.compromisso.id === entregaId);
-  if (idxB < 0 || idxE < 0) return { opcao: null, faltaDado: false };
+  if (idxB < 0 || idxE < 0) return { opcao: null, faltaDado: false, motivos: [] };
   const eb = cand.eventos[idxB], ed = cand.eventos[idxE];
-  if (rota.sentido === 'volta' && eb.chegadaMin < horarioEscolaMin) return { opcao: null, faltaDado: false };
-  if (ed.chegadaMin < eb.saidaMin) return { opcao: null, faltaDado: false };
+  if (rota.sentido === 'volta' && eb.chegadaMin < horarioEscolaMin) return { opcao: null, faltaDado: false, motivos: ['A van sairia da escola antes do horário permitido.'] };
+  if (ed.chegadaMin < eb.saidaMin) return { opcao: null, faltaDado: false, motivos: [] };
   let distanciaABordoMetros = 0;
   for (let k = idxB + 1; k <= idxE; k++) {
     const de = k === 0 ? rota.inicio : paradas[k - 1].ponto;
@@ -294,6 +332,7 @@ function construirOpcaoProgressiva(
       alteracoes, eventos: cand.eventos,
     },
     faltaDado: false,
+    motivos: [],
   };
 }
 
@@ -308,7 +347,7 @@ export function encontrarEncaixesProgressivo(
     classificacao: ClassificacaoEncaixe, extra: Partial<ResultadoEncaixeProgressivo> = {},
   ): ResultadoEncaixeProgressivo => ({
     classificacao, opcoes: [], escolaInserida: false, estrategia: 'nenhuma',
-    candidatasAvaliadas: 0, limiteAtingido: false, faltaDadoViario: false, ...extra,
+    candidatasAvaliadas: 0, limiteAtingido: false, faltaDadoViario: false, motivos: [], ...extra,
   });
 
   // Guardas de entrada (iguais às de `encontrarEncaixes`): entrada inválida => indeterminado.
@@ -316,7 +355,7 @@ export function encontrarEncaixesProgressivo(
   if (!inteiro(pedido.atendimentoMin ?? 1) || !inteiro(rota.toleranciaMin ?? 10) || rota.compromissos.some((p) => p.alunoId === pedido.alunoId) || new Set(rota.compromissos.map((p) => p.id)).size !== rota.compromissos.length) return vazio('indeterminado');
 
   const base = simularRota(rota, matriz);
-  if (!base.valido) return vazio('indeterminado', { faltaDadoViario: base.motivos.some((m) => m.includes('tempo/distância')) });
+  if (!base.valido) return vazio('indeterminado', { faltaDadoViario: base.motivos.some((m) => m.includes('tempo/distância')), motivos: base.motivos });
 
   const tolerancia = Math.min(10, Math.max(0, rota.toleranciaMin ?? 10));
   const escolaNova = indiceEscolaEm(rota.compromissos, pedido.escola.id) < 0;
@@ -335,7 +374,7 @@ export function encontrarEncaixesProgressivo(
 
   const maxCand = opcoes.maxCandidatas ?? 20000;
   const visitadas = new Set<string>();
-  const estado = { avaliadas: 0, limite: false, faltaDado: false };
+  const estado = { avaliadas: 0, limite: false, faltaDado: false, motivos: new Set<string>() };
 
   // Gera e avalia todas as inserções (i,j) sobre uma dada ordenação de paradas.
   const gerar = (seq: Compromisso[]): OpcaoEncaixe[] => {
@@ -356,8 +395,15 @@ export function encontrarEncaixesProgressivo(
         visitadas.add(assinatura);
         if (estado.avaliadas >= maxCand) { estado.limite = true; return out; }
         estado.avaliadas++;
-        const { opcao, faltaDado } = construirOpcaoProgressiva(rota, base, matriz, paradas, busca.id, entrega.id, tolerancia, limiteEscola);
+        // Antecipação: cada candidata pode sair mais cedo (recuo mínimo que
+        // cumpre todos os limites da própria sequência). Sem antecipar, usa a
+        // partida fixa da rota (comportamento legado).
+        const partidaCand = opcoes.anteciparPartida
+          ? Math.max(0, partidaParaSequencia(rota.inicio, paradas, matriz) ?? rota.partidaMin)
+          : rota.partidaMin;
+        const { opcao, faltaDado, motivos } = construirOpcaoProgressiva(rota, base, matriz, paradas, busca.id, entrega.id, tolerancia, limiteEscola, partidaCand);
         if (faltaDado) estado.faltaDado = true;
+        for (const m of motivos) estado.motivos.add(m);
         if (opcao) out.push(opcao);
       }
     }
@@ -402,5 +448,6 @@ export function encontrarEncaixesProgressivo(
     classificacao, opcoes: ordenadas, escolaInserida: escolaNova,
     estrategia: ordenadas.length ? estrategia : 'nenhuma',
     candidatasAvaliadas: estado.avaliadas, limiteAtingido: estado.limite, faltaDadoViario: estado.faltaDado,
+    motivos: [...estado.motivos],
   };
 }
