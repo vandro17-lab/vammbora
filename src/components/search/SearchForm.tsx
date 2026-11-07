@@ -31,6 +31,7 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
   const [dataAvulso, setDataAvulso] = useState('');
   const [modalidade, setModalidade] = useState<ModalidadeTrajeto>('ida');
   const [localizando, setLocalizando] = useState(false);
+  const [horario, setHorario] = useState('07:00');
   const titulo = useRef<HTMLHeadingElement>(null);
   // preventScroll evita que o navegador role a página (inclusive na horizontal)
   // ao focar o título programaticamente — causava a tela "deslocar para o lado".
@@ -62,8 +63,10 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
       finally { clearTimeout(limite); setLocalizando(false); }
     }
 
-    const params = criteriosParaParams({ cidadeId: CIDADE_PADRAO.id, endereco: texto, destinoId: destinoId || null, turno: turno || null, contratacao, dataAvulso: contratacao === 'avulso' ? dataAvulso : undefined, modalidade, origemLat: coord?.lat, origemLng: coord?.lng });
-    navigate(`/resultados?${params}`);
+    const paramsBase = criteriosParaParams({ cidadeId: CIDADE_PADRAO.id, endereco: texto, destinoId: destinoId || null, turno: turno || null, contratacao, dataAvulso: contratacao === 'avulso' ? dataAvulso : undefined, modalidade, origemLat: coord?.lat, origemLng: coord?.lng });
+    const params = new URLSearchParams(paramsBase);
+    params.set('horario', horario);
+    navigate(`/resultados?${params.toString()}`);
   }
   return (
     <form onSubmit={enviar} className={cn('search-panel rounded-[1.75rem] bg-white p-6 sm:p-8', compact ? '' : 'shadow-float')} aria-label="Buscar van">
@@ -94,6 +97,7 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
         </div>}
         {passo === 2 && <div className="mt-5 space-y-5">
           <fieldset><legend className="field-label">Turno</legend><div className="flex flex-wrap gap-2">{(['', 'manha', 'tarde', 'noite', 'integral'] as const).map(t => <Segment key={t} ativo={turno === t} onClick={() => setTurno(t)}>{t ? TURNO_LABEL[t] : 'Qualquer'}</Segment>)}</div></fieldset>
+          <div><label className="field-label" htmlFor="horario-escolar">{modalidade === 'volta' ? 'Horário de saída da escola' : 'Horário em que precisa chegar'}</label><input id="horario-escolar" className="field-input" type="time" value={horario} required onChange={e => setHorario(e.target.value)} /><p className="mt-1 text-xs text-navy-500">O horário escolhido será usado para calcular o trajeto.</p></div>
           <fieldset><legend className="field-label">Contratação</legend><div className="flex gap-2">{(['mensal', 'avulso'] as const).map(c => <Segment key={c} ativo={contratacao === c} onClick={() => setContratacao(c)}>{c === 'mensal' ? 'Mensal' : 'Avulso'}</Segment>)}</div>
             {contratacao === 'avulso' && <div className="mt-3"><label htmlFor="data-avulso" className="field-label">Data da viagem</label><input id="data-avulso" type="date" required className="field-input" value={dataAvulso} onChange={e => setDataAvulso(e.target.value)} /></div>}
           </fieldset>
