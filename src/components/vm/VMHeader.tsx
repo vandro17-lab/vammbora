@@ -9,7 +9,7 @@ import type { TextoDef } from '@/data/ui-config';
 
 /**
  * Cabeçalho premium de seção do app Vambora Motoristas (fiel à referência):
- * faixa em gradiente verde/teal com borda inferior em CURVA orgânica, linha da
+ * faixa em gradiente grafite com borda inferior em CURVA orgânica, linha da
  * marca (check + "Vambora Motoristas") e sino à direita, van escolar ao fundo,
  * e o título com ícone + subtítulo. Reutilizável pelas telas de aba.
  */
@@ -45,7 +45,7 @@ export function VMSectionHeader({
               </button>
             )}
             <span className="grid h-7 w-7 place-items-center rounded-lg bg-white shadow-sm">
-              <Check size={16} weight="bold" className="text-mint-600" />
+              <Check size={16} weight="bold" className="text-mint-700" />
             </span>
             <span className="font-display text-[15px] font-extrabold leading-[1.04] tracking-tight">
               Vambora<br />Motoristas
@@ -54,7 +54,7 @@ export function VMSectionHeader({
           {acao ?? (
             <button aria-label="Avisos" className="relative grid h-9 w-9 place-items-center rounded-full bg-white/10 ring-1 ring-white/20 transition active:scale-95">
               <Bell size={20} weight="regular" />
-              <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-amber-300 ring-2 ring-[#0f8a66]" />
+              <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-amber-300 ring-2 ring-[#171717]" />
             </button>
           )}
         </div>
@@ -75,8 +75,8 @@ export function VMSectionHeader({
 
       {/* Borda inferior em curva orgânica (hill) */}
       <svg className="absolute inset-x-0 bottom-[-1px] h-10 w-full" viewBox="0 0 390 40" preserveAspectRatio="none" aria-hidden="true">
-        {/* realce verde vivo acompanhando a curva */}
-        <path d="M0,14 C120,42 270,42 390,10 L390,24 C270,52 120,52 0,26 Z" fill="#20c37e" opacity="0.9" />
+        {/* realce amarelo escolar acompanhando a curva */}
+        <path d="M0,14 C120,42 270,42 390,10 L390,24 C270,52 120,52 0,26 Z" fill="#facc15" opacity="0.9" />
         {/* recorte com a cor do fundo do app */}
         <path d="M0,20 C120,48 270,48 390,16 L390,40 L0,40 Z" fill="var(--vm-surface)" />
       </svg>
