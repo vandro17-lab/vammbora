@@ -259,3 +259,90 @@ section[id] { scroll-margin-top: 90px; }
 .vm-ico-teal { background:#d2f3f0; color:#0d9488; }
 .vm-ico-navy { background:#e2e8f5; color:#213d7d; }
 .vm-ico-slate { background:#e6ebf1; color:#475569; }
+
+
+/* =====================================================================
+   VanBora | refinamento premium transversal (2026)
+   Componentes reais, sem sobrepor artes publicadas no Supabase.
+   ===================================================================== */
+:root {
+  --vb-ink: #171717;
+  --vb-ink-soft: #404040;
+  --vb-yellow: #facc15;
+  --vb-yellow-hover: #eab308;
+  --vb-line: #e7e5e4;
+  --vb-paper: #fafaf9;
+  --vb-shadow: 0 2px 4px rgb(23 23 23 / 3%), 0 16px 38px -24px rgb(23 23 23 / 24%);
+}
+.vm-app {
+  background: var(--vb-paper);
+  color: var(--vb-ink);
+}
+.vm-card {
+  border: 1px solid var(--vb-line);
+  box-shadow: var(--vb-shadow);
+  transition: border-color .2s ease, box-shadow .2s ease;
+}
+.vm-card:focus-within {
+  border-color: #d6c55c;
+}
+@media (hover: hover) and (pointer: fine) {
+  .vm-card.vm-press:hover {
+    border-color: #d6d3d1;
+    box-shadow: 0 4px 10px rgb(23 23 23 / 4%), 0 20px 40px -25px rgb(23 23 23 / 26%);
+  }
+}
+.vm-chip-ico {
+  border-radius: .85rem;
+}
+.vm-ico-green, .vm-ico-teal {
+  background: #fef9c3;
+  color: #854d0e;
+}
+.vm-ico-blue, .vm-ico-purple {
+  background: #f5f5f4;
+  color: #404040;
+}
+.vm-ico-navy, .vm-ico-slate {
+  background: #e7e5e4;
+  color: #292524;
+}
+.vm-ico-amber {
+  background: #fef3c7;
+  color: #92400e;
+}
+.vm-ico-rose {
+  background: #fff1f2;
+  color: #be123c;
+}
+.vm-btn {
+  background: var(--vb-yellow);
+  color: var(--vb-ink);
+  font-weight: 700;
+  box-shadow: 0 4px 12px rgb(202 138 4 / 12%);
+  transition: background-color .18s ease, box-shadow .18s ease, transform .18s ease;
+}
+.vm-btn:hover {
+  background: var(--vb-yellow-hover);
+  box-shadow: 0 6px 18px rgb(202 138 4 / 18%);
+}
+.vm-btn:active { transform: scale(.985); }
+.vm-grad {
+  background: linear-gradient(145deg, #171717 0%, #262626 58%, #383838 100%);
+}
+.vm-grad-soft {
+  background: linear-gradient(145deg, #fffef0 0%, #fef9c3 100%);
+}
+.vm-app :where(input, select, textarea):not([type='checkbox']):not([type='radio']):not([type='range']) {
+  accent-color: #ca8a04;
+}
+.vm-app :where(button, a, input, select, textarea):focus-visible {
+  outline: 2px solid #ca8a04;
+  outline-offset: 3px;
+}
+.vm-app :where(button, a):disabled {
+  cursor: not-allowed;
+}
+@media (prefers-reduced-motion: reduce) {
+  .vm-card, .vm-btn { transition: none; }
+}

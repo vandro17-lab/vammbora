@@ -33,8 +33,8 @@ export function VMBottomNav() {
         {TABS.map(({ to, end, label, Icon }) => (
           <NavLink key={to} to={to} end={end}
             className={({ isActive }) => cn(
-              'flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-2xl px-0.5 py-1.5 text-[9px] font-semibold tracking-tight transition-colors',
-              isActive ? 'bg-mint-500 text-white shadow-glow' : 'text-navy-400',
+              'flex min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-2xl px-0.5 py-1.5 text-[10px] font-semibold tracking-tight transition-colors',
+              isActive ? 'bg-mint-400 text-navy-950 shadow-[0_3px_12px_rgba(202,138,4,0.15)]' : 'text-navy-500 hover:bg-navy-50',
             )}>
             {({ isActive }) => (
               <>
