@@ -1,20 +1,22 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft, Heart, Star, SlidersHorizontal, X, Play, Pause, RotateCcw,
   ShieldCheck, Snowflake, UserRound, Check, Clock3, Ruler, Map as MapIcon,
-  ListChecks, Users, GraduationCap, ChevronRight,
+  ListChecks, Users, GraduationCap, ChevronRight, BadgeCheck,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { OfertaDemo } from './engine';
+import { gerarAvaliacoesDemo, type AvaliacoesDemo } from './avaliacoes-demo';
 import { VanIllustration } from '@/components/brand/VanIllustration';
 import { Avatar } from '@/components/brand/Avatar';
+import { Stars } from '@/components/ui/Stars';
 import { DemoBadge } from '@/components/ui/DemoBadge';
 import { cn } from '@/lib/utils';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
 type Props = { ofertas: OfertaDemo[]; carregando: boolean; erro?: string; horario: string; endereco: string; onEditar: () => void };
-type Ordem = 'rapido' | 'preco' | 'vagas';
+type Ordem = 'rapido' | 'preco' | 'vagas' | 'avaliacao';
 type Aba = 'trajeto' | 'perfil' | 'avaliacoes';
 
 // Ícones dos recursos — mapeados a partir dos valores reais do catálogo.
@@ -29,6 +31,7 @@ const BADGE_ORDEM: Record<Ordem, string> = {
   rapido: 'Menor tempo a bordo',
   preco: 'Menor mensalidade',
   vagas: 'Mais vagas',
+  avaliacao: 'Melhor avaliada',
 };
 
 export function FamilyDemoResults({ ofertas, carregando, erro, horario, endereco, onEditar }: Props) {
@@ -42,13 +45,22 @@ export function FamilyDemoResults({ ofertas, carregando, erro, horario, endereco
   const [rodando, setRodando] = useState(false);
   const [fotoAberta, setFotoAberta] = useState(false);
   const [solicitacao, setSolicitacao] = useState(false);
+  const [filtroNota, setFiltroNota] = useState<0 | 5 | 4 | 3>(0);
+
+  // Avaliações demonstrativas, determinísticas e estáveis por motorista.
+  const avaliacoes = useMemo(() => {
+    const m: Record<string, AvaliacoesDemo> = {};
+    for (const o of ofertas) m[o.id] = gerarAvaliacoesDemo(o.id, o.nome);
+    return m;
+  }, [ofertas]);
 
   const lista = ofertas
     .filter((o) => !somenteVagas || o.vagas > 0)
     .sort((a, b) =>
       ordenacao === 'preco' ? a.precoMensal - b.precoMensal
         : ordenacao === 'vagas' ? b.vagas - a.vagas
-          : a.duracaoMin - b.duracaoMin);
+          : ordenacao === 'avaliacao' ? (avaliacoes[b.id]?.media ?? 0) - (avaliacoes[a.id]?.media ?? 0)
+            : a.duracaoMin - b.duracaoMin);
 
   // Reprodução da posição da van ao longo das paradas (apenas ilustrativa).
   useEffect(() => {
@@ -69,7 +81,7 @@ export function FamilyDemoResults({ ofertas, carregando, erro, horario, endereco
   }, [selecionado]);
 
   function abrir(o: OfertaDemo, tab: Aba) {
-    setSelecionado(o); setAba(tab); setParada(0); setRodando(false); setSolicitacao(false); setModoTrajeto('mapa');
+    setSelecionado(o); setAba(tab); setParada(0); setRodando(false); setSolicitacao(false); setModoTrajeto('mapa'); setFiltroNota(0);
   }
   function favoritar(id: string) {
     setFavoritos((a) => a.includes(id) ? a.filter((x) => x !== id) : [...a, id]);
@@ -115,6 +127,7 @@ export function FamilyDemoResults({ ofertas, carregando, erro, horario, endereco
               aria-label="Ordenar resultados"
             >
               <option value="rapido">Menor tempo a bordo</option>
+              <option value="avaliacao">Melhor avaliada</option>
               <option value="preco">Menor mensalidade</option>
               <option value="vagas">Mais vagas</option>
             </select>
@@ -166,9 +179,9 @@ export function FamilyDemoResults({ ofertas, carregando, erro, horario, endereco
                   </span>
                 </button>
 
-                {/* Avaliações — estado honesto: ainda não há avaliações verificadas */}
-                <button onClick={() => abrir(o, 'avaliacoes')} className="mt-2.5 inline-flex w-fit items-center gap-1.5 text-xs text-navy-400">
-                  <Star size={14} className="text-navy-300" /> Avaliações ainda não disponíveis
+                {/* Avaliações demonstrativas — nota + total, abre a aba de avaliações */}
+                <button onClick={() => abrir(o, 'avaliacoes')} className="mt-2.5 inline-flex w-fit items-center gap-1 rounded-lg px-1 py-0.5 -ml-1 hover:bg-navy-50" aria-label={`Ver avaliações de ${o.nome}`}>
+                  <Stars media={avaliacoes[o.id]?.media ?? 0} quantidade={avaliacoes[o.id]?.total} />
                 </button>
 
                 {/* Grade de horários */}
@@ -219,10 +232,13 @@ export function FamilyDemoResults({ ofertas, carregando, erro, horario, endereco
 
             <div className="px-5 pb-7 pt-5 sm:px-7">
               <div className="flex items-center gap-3">
-                <Avatar nome={selecionado.nome} className="h-12 w-12 text-sm" />
-                <div>
+                <Avatar nome={selecionado.nome} className="h-14 w-14 text-base" />
+                <div className="min-w-0">
                   <h2 className="font-display text-2xl font-bold text-navy-900">{selecionado.nome}</h2>
-                  <p className="text-sm text-navy-500">{selecionado.modelo} · perfil demonstrativo</p>
+                  <p className="text-sm text-navy-500">{selecionado.modelo}</p>
+                  <button onClick={() => setAba('avaliacoes')} className="mt-1 inline-flex items-center rounded-lg -ml-1 px-1 hover:bg-navy-50">
+                    <Stars media={avaliacoes[selecionado.id]?.media ?? 0} quantidade={avaliacoes[selecionado.id]?.total} />
+                  </button>
                 </div>
               </div>
 
@@ -347,17 +363,9 @@ export function FamilyDemoResults({ ofertas, carregando, erro, horario, endereco
                 </div>
               )}
 
-              {/* TELA 5 — Avaliações (estado vazio honesto) */}
+              {/* TELA 5 — Avaliações (conjunto demonstrativo, claramente rotulado) */}
               {aba === 'avaliacoes' && (
-                <div className="mt-6 rounded-2xl bg-navy-50/60 p-8 text-center">
-                  <span className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-white shadow-sm ring-1 ring-navy-100">
-                    <Star className="text-navy-300" />
-                  </span>
-                  <h3 className="mt-4 font-display font-bold text-navy-900">Ainda não há avaliações verificadas</h3>
-                  <p className="mx-auto mt-2 max-w-sm text-sm text-navy-500">
-                    Não exibimos notas nem depoimentos inventados para perfis demonstrativos. As avaliações aparecerão aqui quando houver registros reais.
-                  </p>
-                </div>
+                <PainelAvaliacoes av={avaliacoes[selecionado.id]} filtro={filtroNota} setFiltro={setFiltroNota} />
               )}
             </div>
           </div>
@@ -402,6 +410,87 @@ function LegendaPonto({ cor, rotulo }: { cor: string; rotulo: string }) {
     <span className="inline-flex items-center gap-1.5">
       <span className="h-2.5 w-2.5 rounded-full ring-2 ring-white" style={{ background: cor }} /> {rotulo}
     </span>
+  );
+}
+
+/** Estrelas simples (sem número) — para comentários e para o resumo. */
+function EstrelasSimples({ nota, size = 14 }: { nota: number; size?: number }) {
+  const cheias = Math.round(nota);
+  return (
+    <span className="inline-flex" aria-label={`${nota.toFixed(1)} de 5`}>
+      {Array.from({ length: 5 }).map((_, i) => (
+        <Star key={i} size={size} className={i < cheias ? 'fill-amber-400 text-amber-400' : 'fill-navy-100 text-navy-100'} />
+      ))}
+    </span>
+  );
+}
+
+function PainelAvaliacoes({ av, filtro, setFiltro }: { av: AvaliacoesDemo; filtro: 0 | 5 | 4 | 3; setFiltro: (n: 0 | 5 | 4 | 3) => void }) {
+  const comentarios = filtro === 0 ? av.comentarios : av.comentarios.filter((c) => c.nota === filtro);
+  const filtros: Array<0 | 5 | 4 | 3> = [0, 5, 4, 3];
+  return (
+    <div className="mt-5">
+      {/* Resumo: nota + barras por critério */}
+      <div className="rounded-2xl bg-navy-50/60 p-5">
+        <div className="flex items-center gap-5">
+          <div className="shrink-0 text-center">
+            <div className="font-display text-4xl font-extrabold leading-none text-navy-900">{av.media.toFixed(1)}</div>
+            <div className="mt-1.5 flex justify-center"><EstrelasSimples nota={av.media} /></div>
+            <div className="mt-1 text-xs text-navy-500">{av.total} avaliações</div>
+          </div>
+          <dl className="flex-1 space-y-2">
+            {av.criterios.map((c) => (
+              <div key={c.nome} className="flex items-center gap-3 text-sm">
+                <dt className="w-24 shrink-0 text-navy-600 sm:w-28">{c.nome}</dt>
+                <div className="h-2 flex-1 overflow-hidden rounded-full bg-navy-100">
+                  <div className="h-full rounded-full bg-mint-400" style={{ width: `${(c.nota / 5) * 100}%` }} />
+                </div>
+                <dd className="w-8 text-right font-semibold tabular-nums text-navy-800">{c.nota.toFixed(1)}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+        <p className="mt-4 inline-flex items-center gap-1.5 text-[11px] text-navy-400">
+          <BadgeCheck size={13} /> Avaliações demonstrativas do modo de apresentação — não são depoimentos reais.
+        </p>
+      </div>
+
+      {/* Filtros por estrela */}
+      <div className="mt-4 flex flex-wrap gap-2">
+        {filtros.map((f) => (
+          <button
+            key={f}
+            onClick={() => setFiltro(f)}
+            aria-pressed={filtro === f}
+            className={cn('chip ring-1 transition-colors', filtro === f ? 'bg-navy-900 text-white ring-navy-900' : 'bg-white text-navy-600 ring-navy-200 hover:ring-navy-300')}
+          >
+            {f === 0 ? 'Todas' : <>{f} <Star size={12} className="fill-current" /></>}
+          </button>
+        ))}
+      </div>
+
+      {/* Comentários */}
+      <ul className="mt-4 space-y-3">
+        {comentarios.map((c, i) => (
+          <li key={i} className="rounded-2xl bg-white p-4 ring-1 ring-navy-100">
+            <div className="flex items-center gap-3">
+              <Avatar nome={c.autor} className="h-9 w-9 text-xs" />
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center justify-between gap-2">
+                  <b className="truncate text-sm text-navy-900">{c.autor}</b>
+                  <span className="shrink-0 text-xs text-navy-400">{c.quando}</span>
+                </div>
+                <EstrelasSimples nota={c.nota} size={13} />
+              </div>
+            </div>
+            <p className="mt-2.5 text-sm leading-relaxed text-navy-700">“{c.texto}”</p>
+          </li>
+        ))}
+        {comentarios.length === 0 && (
+          <li className="rounded-2xl bg-navy-50/60 p-6 text-center text-sm text-navy-500">Nenhum comentário com essa nota.</li>
+        )}
+      </ul>
+    </div>
   );
 }
 
