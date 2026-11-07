@@ -26,7 +26,7 @@ export function DriverLandingPage() {
         </div>
 
         <p className="mt-4 max-w-xs text-lg font-medium text-mint-50/90">
-          O assistente inteligente do motorista de transporte escolar.
+          Suas rotas, seus alunos e sua operação em um só lugar.
         </p>
 
         {/* Van escolar */}
