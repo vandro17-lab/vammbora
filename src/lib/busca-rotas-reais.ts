@@ -76,6 +76,10 @@ export interface ResultadoRotaReal {
   horarioEscolaMin: number | null;
   /** Minutos a bordo estimados (quando calculável). */
   minutosABordo: number | null;
+  /** IDA: minutos entre a coleta em casa e o horário de chegada à escola (quão
+   *  cedo o aluno sai de casa). É a medida de EFICIÊNCIA para a família: menor =
+   *  melhor. Null na volta ou quando não calculável. */
+  antecedenciaMin: number | null;
   /** De onde veio a âncora de horário: rota (real) > turno (fraca) > nenhuma. */
   fonteHorario: FonteHorario;
   /** Mensagem amigável (pt-BR), sem jargão técnico. */
@@ -177,6 +181,7 @@ const MOTIVO_SEM_DESTINO = 'Escolha a escola de destino para avaliarmos esta rot
 const MOTIVO_SEM_HORARIO = 'Esta rota ainda não tem horário suficiente para estimar — horário sob confirmação.';
 const MOTIVO_APOS_LIMITE = 'Esta rota chega à escola depois do horário máximo que você informou.';
 const MOTIVO_OUTRO_PERIODO = 'Esta rota é de outro período do dia — não serve para esse horário de entrada.';
+const MOTIVO_MUITO_CEDO = 'Esta van passaria cedo demais para a distância — você ficaria tempo demais a caminho. Há opções melhores.';
 /** Quão antes do horário de entrada uma rota ainda é "do mesmo período". Os
  *  períodos (manhã 07h, tarde 12h30, noite 19h) estão a >2h de distância, então
  *  120 min separa períodos sem recortar rotas do mesmo turno. */
@@ -207,6 +212,7 @@ export function avaliarRotaReal(
     passagemCasaMin: null,
     horarioEscolaMin: null,
     minutosABordo: null,
+    antecedenciaMin: null,
     fonteHorario: 'nenhuma',
     motivo,
     codigos,
@@ -279,6 +285,24 @@ export function avaliarRotaReal(
   const passagemCasaMin = rota.sentido === 'ida' ? op.horarioBuscaMin : op.horarioEntregaMin;
   const horarioEscolaResMin = rota.sentido === 'ida' ? op.horarioEntregaMin : op.horarioBuscaMin;
 
+  // EFICIÊNCIA (só IDA): quão cedo o aluno sai de casa = horário de entrada
+  // (âncora) − coleta em casa. TETO HONESTO amarrado à DISTÂNCIA real: o aluno
+  // não deve ficar a caminho muito mais do que a viagem direta. Perto da escola
+  // ⇒ teto baixo (nunca "pegar a van 1h antes"); mais longe ⇒ teto maior.
+  const antecedenciaMin = rota.sentido === 'ida' ? horarioEscola - passagemCasaMin : null;
+  // Só aplica o teto quando há horário de entrada de REFERÊNCIA (informado pela
+  // família, ou derivado do turno pelo formulário). Sem referência não recortamos
+  // por eficiência (o ranking já coloca os melhores à frente).
+  if (rota.sentido === 'ida' && antecedenciaMin != null && limiteChegada != null
+    && pedido.escolaPonto && Number.isFinite(pedido.escolaPonto.lat) && Number.isFinite(pedido.escolaPonto.lng)) {
+    const direto = matriz.obter(
+      { id: 'o', nome: 'o', lat: pedido.origem.lat, lng: pedido.origem.lng },
+      { id: 'e', nome: 'e', lat: pedido.escolaPonto.lat, lng: pedido.escolaPonto.lng }, 0);
+    const diretoMin = direto && Number.isFinite(direto.minutos) ? direto.minutos : 0;
+    const teto = Math.max(30, diretoMin + 25); // perto ≈ até 30 min; mais longe ≈ viagem direta + 25
+    if (antecedenciaMin > teto) return vazio('incompativel', MOTIVO_MUITO_CEDO, ['atraso']);
+  }
+
   const avulso = pedido.contratacao === 'avulso';
   // Horário fraco quando veio do turno (Tier B ou escola sem horário declarado).
   const horarioFraco = fonte === 'turno';
@@ -295,6 +319,7 @@ export function avaliarRotaReal(
     passagemCasaMin,
     horarioEscolaMin: horarioEscolaResMin,
     minutosABordo: op.minutosABordo,
+    antecedenciaMin,
     fonteHorario: fonte,
     motivo,
     codigos: [],
@@ -361,12 +386,13 @@ export function buscarEmRotasReais(
 
       // EFICIÊNCIA (padrão da busca):
       if (ehIda) {
-        // IDA — o aluno deve SAIR DE CASA O MAIS TARDE possível ainda chegando no
-        // horário: embarque (passagemCasaMin) MAIS TARDE primeiro. Penaliza tanto
-        // "sair 1h antes" quanto "chegar cedo demais e esperar na escola".
-        const pa = a.passagemCasaMin ?? Number.NEGATIVE_INFINITY;
-        const pb = b.passagemCasaMin ?? Number.NEGATIVE_INFINITY;
-        if (pa !== pb) return pb - pa; // mais tarde primeiro (DESC)
+        // IDA — MENOR ANTECEDÊNCIA primeiro: o aluno sai de casa o mais perto
+        // possível do horário de entrada (ainda chegando no horário). É
+        // comparável entre períodos (cada rota contra o próprio horário de
+        // chegada), então não mistura manhã/tarde/noite na ordem.
+        const aa = a.antecedenciaMin ?? Number.POSITIVE_INFINITY;
+        const ab = b.antecedenciaMin ?? Number.POSITIVE_INFINITY;
+        if (aa !== ab) return aa - ab;
       }
       // VOLTA (e desempate da IDA) — menos tempo do aluno dentro da van.
       if (ba !== bb) return ba - bb;

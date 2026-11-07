@@ -1,8 +1,9 @@
 # Base demonstrativa "VB150" — Araçatuba
 
-Pacote demonstrativo para a apresentação: **150 motoristas, 150 veículos, 300 rotas
-(150 ida + 150 volta), 2045 paradas, 4072 passageiros**, cobrindo os **41 destinos
-escolares reais** já cadastrados (37 escolas + 4 faculdades).
+Pacote demonstrativo para a apresentação: **533 motoristas, 533 veículos, 1066 rotas
+(533 ida + 533 volta), 4900 paradas, 9594 passageiros**, cobrindo os **41 destinos
+escolares reais** já cadastrados (37 escolas + 4 faculdades), com MUITAS vans por
+escola/turno (fan-out) para dar opções variadas de horário e preço em qualquer busca.
 
 A busca usa o **motor de encaixe existente** (`buscarEmRotasReais`, o mesmo do
 endpoint `/api/buscar-rotas`). Nada de resultado inventado no frontend.
@@ -22,7 +23,7 @@ endpoint `/api/buscar-rotas`). Nada de resultado inventado no frontend.
    novo/limpo**. Alinha o schema (`routes.is_published`, `route_stops.habitual_arrival_min`)
    e cria o índice da busca. No projeto atual essas colunas **já existem** → é no-op seguro.
 2. `seed-demo-150-aracatuba.sql` — importa a base (idempotente, transacional).
-3. **Validação** (no fim do próprio seed, em comentário): confere 150/150/300/2045/4072 e 41 escolas.
+3. **Validação** (no fim do próprio seed, em comentário): confere 533/533/1066/4900/9594 e 41 escolas.
 
 Remoção (desfaz **apenas** este pacote, sem tocar em dados reais/demos anteriores):
 `remover-demo-150-aracatuba.sql`.
@@ -58,16 +59,21 @@ Os SQLs são gerados a partir de um único ponto de verdade (o mesmo usado pelos
 node scripts/demo-aracatuba/build-sql.mjs
 ```
 
-## Roteiro de demonstração (pesquisas testadas que retornaram resultados)
+## Roteiro de demonstração (pesquisas validadas pelo motor)
 
-Origem = ponto público real; destino = escola real. Todos retornaram encaixes
-**compatíveis** calculados pelo motor (números dos testes de integração):
+Informe a origem, selecione o destino e **informe o horário de entrada** (ou o
+turno). Resultados medidos nos testes de integração (estimativa por coordenadas):
 
-| Origem (lugar real) | Escola de destino | Sentido | Rotas avaliadas | Encaixes viáveis | Melhor (vagas / min a bordo) |
-|---|---|---|---|---|---|
-| Praça Getúlio Vargas (Higienópolis) | EE José Cândido | ida | 105 | 103 | 5 vagas / 1 min |
-| Praça Mem de Sá (Jardim Nova Yorque) | Colégio Geração Raízes | ida | 62 | 61 | 5 vagas / 19 min |
-| Bosque da Saudade (Aviação) | EMEB Apparecida Garcia Carvalho Rico | ida | 97 | 94 | 2 vagas / 6 min |
+| Origem (região) | Destino | Entrada | Vans viáveis | Melhor embarque → chegada |
+|---|---|---|---|---|
+| Jardim Ipanema (perto da Fatec, ~600 m) | Fatec Araçatuba | 07:00 | ~100 | 06:57 → 07:00 |
+| Sul (Pça Dr. Bezerra de Menezes, ~6 km) | Fatec Araçatuba | 07:00 | ~78 | 06:27 → 06:49 |
+| Centro (Pça Rui Barbosa) | Colégio Canarinho (Ipanema) | 12:30 | ~55 | 12:13 → 12:26 |
 
-Mais exemplos (também testados): Praça Ikeda → EMEB Luiz A. Bertolucci; Praça Dr.
-Bezerra de Menezes → EE José Arantes Terra.
+Observações da lógica (§ eficiência):
+- IDA ordena por **sair de casa o mais perto possível** do horário de entrada
+  (ainda chegando no horário). Perto da escola ⇒ embarque mais tarde (~06:55);
+  mais longe ⇒ um pouco antes (~06:25) — nunca "1 hora antes".
+- Há um **teto de antecedência** amarrado à distância real: descarta encaixes em
+  que o aluno ficaria tempo demais a caminho (ex.: pegar a van 05:40 para 07:00).
+- Só mostra rotas do **período compatível** com o horário de entrada informado.

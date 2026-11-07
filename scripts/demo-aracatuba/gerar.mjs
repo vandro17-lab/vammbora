@@ -113,17 +113,23 @@ export function gerarBaseDemo() {
   let seqStop = 0;
   let seqPax = 0;
 
-  for (let i = 0; i < 150; i++) {
+  // PLANO DE COBERTURA (fan-out): por escola, MUITAS vans em cada turno, para
+  // garantir muitas opções em qualquer busca (perto ou longe), com horários e
+  // preços variados. Toda van atende a escola DIRETAMENTE (Tier A).
+  const POR_TURNO = { manha: 6, tarde: 4, noite: 3 };
+  const plano = [];
+  for (const escolaP of DESTINOS) {
+    for (const [t, k] of Object.entries(POR_TURNO)) {
+      for (let j = 0; j < k; j++) plano.push({ escola: escolaP, turno: t });
+    }
+  }
+
+  for (let i = 0; i < plano.length; i++) {
     const num = i + 1;
     const driverId = uuid(CAT.driver, num);
     const vehicleId = uuid(CAT.vehicle, num);
-    const escola = DESTINOS[i % DESTINOS.length];
-
-    // Turno do motorista (varia de forma determinística).
-    const turnoLista = ['manha', 'tarde', 'noite', 'integral'];
-    const turno = turnoLista[(i + (i % 3)) % 4] === 'integral' && i % 7 !== 0
-      ? ['manha', 'tarde', 'noite'][i % 3]
-      : turnoLista[(i + (i % 3)) % 4];
+    const escola = plano[i].escola;
+    const turno = plano[i].turno;
     const horarios = TURNOS[turno];
 
     const seats = CAPS[i % CAPS.length];
@@ -132,17 +138,20 @@ export function gerarBaseDemo() {
     const reserved = i % 12 === 0 ? 1 : 0;         // alguns com 1 lugar reservado
     const capAlunos = Math.max(1, seats - (monitorOcupa ? 1 : 0) - reserved);
 
-    // Vagas-alvo variadas: lotada (0), 1-2 vagas, ou folgada.
+    // Rota CURTA: 2–3 pontos de coleta (passageiros JÁ existentes; o novo aluno
+    // é inserido na busca). Poucas paradas ⇒ pouco tempo a bordo e embarques
+    // próximos ao horário de chegada.
+    const nCasas = 2 + (i % 2); // 2 ou 3 coletas
+    // Ocupação variada: algumas lotadas (0 vaga), outras com 1–5 vagas. O total
+    // fica limitado pela rota curta (até 3 por parada), mantendo o payload leve.
     const vagasPool = [0, 0, 1, 1, 1, 2, 2, 3, 4, 5];
-    let vagasAlvo = vagasPool[Math.floor(rand() * vagasPool.length)];
-    vagasAlvo = Math.min(vagasAlvo, capAlunos - 1);
-    if (vagasAlvo < 0) vagasAlvo = 0;
-    const nPax = Math.max(1, capAlunos - vagasAlvo);
-
-    // Pontos candidatos perto da escola; janela deslocada por motorista para
-    // que motoristas da MESMA escola usem pontos diferentes (operação própria),
-    // mas sempre dentro do cluster mais próximo (coerência geográfica).
-    const nCasas = Math.max(2, Math.min(6, Math.ceil(nPax / 3)));
+    const vagasAlvo = vagasPool[Math.floor(rand() * vagasPool.length)];
+    // vagasAlvo 0 ⇒ van LOTADA (ocupa toda a capacidade, ainda em 2–3 paradas);
+    // caso contrário, limita a ocupação pela rota curta (até 3 por parada).
+    const nPax = vagasAlvo === 0
+      ? capAlunos
+      : Math.max(1, Math.min(capAlunos - vagasAlvo, 3 * nCasas));
+    const vagas = Math.max(0, capAlunos - nPax); // vagas REAIS exibidas
     const precisa = nCasas + 1; // + saída (base)
     const cands = candidatosPerto(escola, precisa + 8).slice(0, precisa + 10);
     if (cands.length < 3) throw new Error('Poucos pontos para escola ' + escola.id);
@@ -185,7 +194,7 @@ export function gerarBaseDemo() {
       bairros,
       turnos: [turno],
       capacity_total: seats,
-      seats_available: vagasAlvo,
+      seats_available: vagas,
       feature_ac: i % 2 === 0,
       feature_monitor: monitor,
       feature_seatbelt: true,

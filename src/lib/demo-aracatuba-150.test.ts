@@ -29,12 +29,13 @@ const pontoPertoDe = (d: { lat: number; lng: number }, min = 300, max = 1200) =>
     .sort((a: { dist: number }, b: { dist: number }) => a.dist - b.dist)[0]?.p ?? null;
 
 describe('Base demonstrativa VB150 — integridade dos dados (§9)', () => {
-  it('150 motoristas, 150 veículos, 300 rotas (150 ida + 150 volta)', () => {
-    expect(BASE.drivers.length).toBe(150);
-    expect(BASE.vehicles.length).toBe(150);
-    expect(BASE.routesDb.length).toBe(300);
-    expect(BASE.routesDb.filter((r) => r.direction === 'ida').length).toBe(150);
-    expect(BASE.routesDb.filter((r) => r.direction === 'volta').length).toBe(150);
+  it('muitas vans por escola: 1 veículo por motorista, 1 ida + 1 volta cada', () => {
+    const n = BASE.drivers.length;
+    expect(n).toBeGreaterThanOrEqual(400); // fan-out: muitas vans por escola/turno
+    expect(BASE.vehicles.length).toBe(n);
+    expect(BASE.routesDb.length).toBe(n * 2);
+    expect(BASE.routesDb.filter((r) => r.direction === 'ida').length).toBe(n);
+    expect(BASE.routesDb.filter((r) => r.direction === 'volta').length).toBe(n);
   });
 
   it('todos os 41 destinos escolares reais têm cobertura (rota + vínculo)', () => {
@@ -54,7 +55,7 @@ describe('Base demonstrativa VB150 — integridade dos dados (§9)', () => {
       if (!porDriver.has(did)) porDriver.set(did, new Set());
       porDriver.get(did)!.add(r.direction);
     }
-    expect(porDriver.size).toBe(150);
+    expect(porDriver.size).toBe(BASE.drivers.length);
     for (const [, dirs] of porDriver) { expect(dirs.has('ida')).toBe(true); expect(dirs.has('volta')).toBe(true); }
   });
 
