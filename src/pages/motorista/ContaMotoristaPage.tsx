@@ -45,25 +45,48 @@ export function ContaMotoristaPage() {
       return;
     }
     setEnviando(true);
-    const r = modo === 'criar' ? await cadastrar(email, senha) : await entrar(email, senha);
-    if (r.ok && modo === 'criar' && supabase) {
-      // Guarda nome e WhatsApp no perfil (melhor esforço).
+
+    if (modo === 'entrar') {
+      const r = await entrar(email, senha);
+      setEnviando(false);
+      if (!r.ok) { setErro(r.erro ?? 'Não foi possível entrar.'); return; }
+      navigate('/app');
+      return;
+    }
+
+    // CADASTRO simples: criar a conta e já entrar, sem etapa extra de aprovação.
+    const r = await cadastrar(email, senha, nome);
+    if (!r.ok) {
+      setEnviando(false);
+      setErro(r.erro ?? 'Não foi possível criar a conta.');
+      return;
+    }
+    // Se a confirmação de e-mail estiver desligada, o cadastro já vem logado.
+    // Senão, tentamos entrar na hora (funciona quando a confirmação está off).
+    let logado = r.sessao === true;
+    if (!logado) {
+      const e = await entrar(email, senha);
+      logado = e.ok;
+    }
+    // Perfil (nome/WhatsApp) em melhor esforço — nunca bloqueia a entrada.
+    if (logado) { void salvarPerfil(nome, whats); }
+    setEnviando(false);
+
+    if (logado) { navigate('/app'); return; }
+    // Confirmação de e-mail ligada no servidor: orienta e troca para "entrar".
+    setAviso('Conta criada! Confirme seu e-mail pelo link que enviamos e depois é só entrar.');
+    setModo('entrar');
+  }
+
+  /** Atualiza o perfil sem travar o fluxo (ignora falhas de RLS/conexão). */
+  async function salvarPerfil(nomeCompleto: string, whatsapp: string) {
+    if (!supabase) return;
+    try {
       const { data } = await supabase.auth.getUser();
       if (data.user) {
-        await supabase.from('profiles').update({ full_name: nome, phone: whats }).eq('id', data.user.id);
+        await supabase.from('profiles').update({ full_name: nomeCompleto, phone: whatsapp }).eq('id', data.user.id);
       }
-    }
-    setEnviando(false);
-    if (!r.ok) {
-      setErro(r.erro ?? 'Não foi possível concluir.');
-      return;
-    }
-    if (modo === 'criar') {
-      setAviso('Conta criada! Se pedir confirmação, verifique seu e-mail. Depois é só entrar.');
-      setModo('entrar');
-      return;
-    }
-    navigate('/app');
+    } catch { /* melhor esforço */ }
   }
 
   return (
