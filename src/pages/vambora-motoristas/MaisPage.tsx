@@ -22,6 +22,13 @@ import { MOTORISTA_DEMO, MANUTENCAO_DEMO, DOCUMENTOS_DEMO, CALENDARIO_DEMO } fro
 import { useAuth } from '@/lib/auth';
 import { formatBRL, cn } from '@/lib/utils';
 import type { Icon as PhosphorIcon } from '@phosphor-icons/react';
+// Banners do Clube EMBUTIDOS no bundle (webp otimizado). Antes vinham do banco
+// (Supabase Storage), o que exigia uma consulta + download a cada carregamento.
+// Incorporados ao código, carregam instantaneamente e ficam em cache.
+import bannerCombustivel from '@/assets/clube/combustivel.webp';
+import bannerCentroAutomotivo from '@/assets/clube/centro-automotivo.webp';
+import bannerAcai from '@/assets/clube/acai.webp';
+import bannerSeguro from '@/assets/clube/seguro.webp';
 
 /** Atalhos do hub (grade de 2 colunas, fiel à referência). */
 interface Atalho { to: string; slot: string; label: string; descr: string; Icone: PhosphorIcon; cor: string }
@@ -236,11 +243,13 @@ function Calendario() {
   );
 }
 
+// Banners do Clube — imagem embutida (bundle) + rótulos de fallback caso a
+// imagem não carregue. Ordem = ordem de exibição na tela.
 const CLUBE = [
-  { slot: 'clube.card.postos', cat: 'Postos', nome: 'Rede de combustível parceira', oferta: 'Condição especial para motoristas escolares', Icone: Fuel, cor: 'vm-ico-rose' },
-  { slot: 'clube.card.oficinas', cat: 'Oficinas', nome: 'Oficina mecânica', oferta: 'Revisão com prioridade de agenda', Icone: WrenchL, cor: 'vm-ico-slate' },
-  { slot: 'clube.card.pneus', cat: 'Pneus', nome: 'Centro automotivo', oferta: 'Alinhamento + balanceamento', Icone: RouteIcon, cor: 'vm-ico-navy' },
-  { slot: 'clube.card.seguro', cat: 'Seguro', nome: 'Seguro veicular', oferta: 'Cotação para transporte escolar', Icone: Tag, cor: 'vm-ico-green' },
+  { img: bannerCombustivel, cat: 'Combustível', nome: 'Rede de postos parceira', oferta: 'Desconto no abastecimento', Icone: Fuel, cor: 'vm-ico-rose' },
+  { img: bannerCentroAutomotivo, cat: 'Manutenção', nome: 'Centro automotivo', oferta: 'Revisão e manutenção da van', Icone: WrenchL, cor: 'vm-ico-slate' },
+  { img: bannerAcai, cat: 'Alimentação', nome: 'Açaí e lanches', oferta: 'Energia para seguir a rota', Icone: RouteIcon, cor: 'vm-ico-purple' },
+  { img: bannerSeguro, cat: 'Seguro', nome: 'Seguro auto escolar', oferta: 'Condições especiais', Icone: Tag, cor: 'vm-ico-green' },
 ];
 function Clube() {
   return (
@@ -264,28 +273,31 @@ function Clube() {
         <p className="text-sm text-navy-600">Vantagens para motoristas escolares de Araçatuba.</p>
         <DemoChip />
       </div>
-      {CLUBE.map((c) => (
-        <div key={c.nome} className="relative aspect-[30/7] w-full overflow-hidden rounded-[1.25rem] bg-white shadow-card ring-1 ring-navy-100">
-          <SlotIlustracao
-            slot={c.slot + '.banner'}
-            alt={`Banner de benefício: ${c.cat}`}
-            className="object-contain"
-            fallback={
-              <div className="flex h-full w-full items-center gap-3 px-3.5">
-                <span className={cn('vm-chip-ico shrink-0 overflow-hidden', c.cor)}>
-                  <SlotIcone slot={c.slot} fallback={<c.Icone className="h-5 w-5" />} />
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p className="text-[10px] font-semibold uppercase tracking-wide text-navy-400">{c.cat}</p>
-                  <p className="truncate text-sm font-semibold text-navy-900">{c.nome}</p>
-                  <p className="truncate text-xs text-navy-500">{c.oferta}</p>
-                </div>
-                <span className="chip shrink-0 bg-mint-50 text-mint-700">consultar</span>
+      {CLUBE.map((c) => {
+        const Icone = c.Icone;
+        return (
+          <div key={c.nome} className="relative aspect-[3/1] w-full overflow-hidden rounded-[1.25rem] bg-white shadow-card ring-1 ring-navy-100">
+            {/* Fallback vetorial — visível só se a imagem embutida falhar (raro). */}
+            <div className="absolute inset-0 flex items-center gap-3 px-3.5">
+              <span className={cn('vm-chip-ico shrink-0 overflow-hidden', c.cor)}><Icone className="h-5 w-5" /></span>
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-semibold uppercase tracking-wide text-navy-400">{c.cat}</p>
+                <p className="truncate text-sm font-semibold text-navy-900">{c.nome}</p>
+                <p className="truncate text-xs text-navy-500">{c.oferta}</p>
               </div>
-            }
-          />
-        </div>
-      ))}
+              <span className="chip shrink-0 bg-mint-50 text-mint-700">consultar</span>
+            </div>
+            {/* Banner embutido (bundle) — carrega instantâneo, sem ida ao banco. */}
+            <img
+              src={c.img}
+              alt={`Benefício do Clube — ${c.cat}: ${c.nome}`}
+              loading="lazy"
+              className="absolute inset-0 h-full w-full object-cover"
+              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+            />
+          </div>
+        );
+      })}
       <p className="text-center text-[11px] text-navy-400">Ofertas ilustrativas — parcerias comerciais a confirmar. Estrutura pronta para ofertas reais.</p>
     </>
   );

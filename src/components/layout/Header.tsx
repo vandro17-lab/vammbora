@@ -7,7 +7,6 @@ import { cn } from '@/lib/utils';
 
 const LINKS = [
   { to: '/#como-funciona', label: 'Como funciona' },
-  { to: '/#motoristas', label: 'Motoristas' },
   { to: '/#duvidas', label: 'Dúvidas' },
 ];
 

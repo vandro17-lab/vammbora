@@ -79,8 +79,19 @@ export function AutocompleteEndereco({
   }, [value, locais]);
 
   function escolher(s: SugestaoEndereco) {
-    ignorar.current = s.rotulo;
-    onChange(s.rotulo, { lat: s.lat, lng: s.lng });
+    // Preserva o NÚMERO da casa digitado pelo usuário (ex.: "Rua X, 450")
+    // quando a sugestão escolhida é só a rua (sem número). Sem isso, tocar numa
+    // sugestão apagava o número e a busca ficava só no nível da rua.
+    const numeroDigitado = (value.match(/(\d{1,6})\s*$/) || [])[1] || '';
+    const sugestaoTemNumero = /\d/.test(s.rotulo);
+    const manterNumero = numeroDigitado && !sugestaoTemNumero;
+    const texto = manterNumero ? `${s.rotulo}, ${numeroDigitado}` : s.rotulo;
+    ignorar.current = texto;
+    // Se mantivemos um número que a sugestão não tinha, a coordenada da sugestão
+    // é só da RUA — não a usamos; deixamos o formulário geocodificar o texto COM
+    // número na hora de buscar (geocodificarPreciso trata "Rua X, 123").
+    if (manterNumero) onChange(texto);
+    else onChange(texto, { lat: s.lat, lng: s.lng });
     setSugestoes([]);
     setAberto(false);
   }
