@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft, Heart, Star, SlidersHorizontal, X, Play, Pause, RotateCcw,
-  ShieldCheck, Snowflake, UserRound, Check, Clock3, Ruler, Map as MapIcon,
+  ShieldCheck, Check, Clock3, Ruler, Map as MapIcon,
   ListChecks, Users, GraduationCap, ChevronRight, BadgeCheck,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -12,6 +12,10 @@ import { Avatar } from '@/components/brand/Avatar';
 import { Stars } from '@/components/ui/Stars';
 import { DemoBadge } from '@/components/ui/DemoBadge';
 import { cn } from '@/lib/utils';
+import iconeCinto from '@/assets/icones-recursos/cinto-seguranca.svg';
+import iconeAr from '@/assets/icones-recursos/ar-condicionado.svg';
+import iconeMonitor from '@/assets/icones-recursos/monitor.svg';
+import ilustracaoSemResultado from '@/assets/ilustracoes/nenhum-resultado.png';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -19,11 +23,12 @@ type Props = { ofertas: OfertaDemo[]; carregando: boolean; erro?: string; horari
 type Ordem = 'rapido' | 'preco' | 'vagas' | 'avaliacao';
 type Aba = 'trajeto' | 'perfil' | 'avaliacoes';
 
-// Ícones dos recursos — mapeados a partir dos valores reais do catálogo.
-const RECURSO_ICONE: Record<string, LucideIcon> = {
-  'Cinto de segurança': ShieldCheck,
-  'Ar-condicionado': Snowflake,
-  Monitor: UserRound,
+// Ícones oficiais dos recursos (SVG do pacote visual — preto + acento #FFC700).
+// Usados como <img> para preservar o desenho bicolor da marca.
+const RECURSO_SVG: Record<string, string> = {
+  'Cinto de segurança': iconeCinto,
+  'Ar-condicionado': iconeAr,
+  Monitor: iconeMonitor,
 };
 // Rótulo honesto do destaque do 1º resultado: descreve o critério de ordenação
 // ativo (é, de fato, o melhor por aquele critério). Não é uma pontuação inventada.
@@ -33,6 +38,20 @@ const BADGE_ORDEM: Record<Ordem, string> = {
   vagas: 'Mais vagas',
   avaliacao: 'Melhor avaliada',
 };
+
+/** Foto do motorista (recorte circular). Volta às iniciais se a foto faltar. */
+function FotoMotorista({ src, nome, className }: { src?: string; nome: string; className?: string }) {
+  const [erro, setErro] = useState(false);
+  if (!src || erro) return <Avatar nome={nome} className={className} />;
+  return <img src={src} alt={nome} loading="lazy" draggable={false} onError={() => setErro(true)} className={cn('rounded-full bg-navy-100 object-cover', className)} />;
+}
+
+/** Foto da van. Volta à ilustração vetorial se a foto faltar (ex.: van 21–30). */
+function FotoVan({ src, seed, alt, className }: { src?: string; seed: string; alt: string; className?: string }) {
+  const [erro, setErro] = useState(false);
+  if (!src || erro) return <VanIllustration seedKey={seed} className={className} />;
+  return <img src={src} alt={alt} loading="lazy" draggable={false} onError={() => setErro(true)} className={cn('bg-navy-100 object-cover', className)} />;
+}
 
 export function FamilyDemoResults({ ofertas, carregando, erro, horario, endereco, onEditar }: Props) {
   const [somenteVagas, setSomenteVagas] = useState(true);
@@ -139,6 +158,7 @@ export function FamilyDemoResults({ ofertas, carregando, erro, horario, endereco
       {/* Estado vazio honesto */}
       {!carregando && lista.length === 0 && !erro && (
         <div className="mt-8 rounded-3xl bg-white p-8 text-center ring-1 ring-navy-100">
+          <img src={ilustracaoSemResultado} alt="" className="mx-auto mb-4 h-40 w-auto" />
           <h3 className="font-display text-lg font-bold text-navy-900">Nenhuma opção viável nesta pesquisa</h3>
           <p className="mx-auto mt-2 max-w-md text-sm text-navy-500">Confirme o endereço e o destino, ou tente outro horário. O serviço de rotas também pode estar indisponível no momento.</p>
           <button onClick={onEditar} className="btn btn-md btn-primary mt-5">Alterar pesquisa</button>
@@ -153,7 +173,7 @@ export function FamilyDemoResults({ ofertas, carregando, erro, horario, endereco
             <article key={o.id} className="group flex flex-col overflow-hidden rounded-3xl bg-white shadow-card ring-1 ring-navy-100/70 transition-shadow hover:shadow-card-hover">
               {/* Capa vetorial da van (segura de licença; sem depender de fotos externas) */}
               <div className="relative">
-                <VanIllustration seedKey={o.slug} className="h-40 w-full" />
+                <FotoVan src={o.vanImagem} seed={o.slug} alt={`Van de ${o.nome}`} className="h-40 w-full" />
                 {destaque && (
                   <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-mint-400 px-3 py-1 text-xs font-bold text-navy-950 shadow">
                     <Star size={13} className="fill-navy-950" /> {BADGE_ORDEM[ordenacao]}
@@ -172,7 +192,7 @@ export function FamilyDemoResults({ ofertas, carregando, erro, horario, endereco
 
               <div className="flex flex-1 flex-col p-5">
                 <button onClick={() => abrir(o, 'perfil')} className="flex items-center gap-3 text-left">
-                  <Avatar nome={o.nome} className="h-11 w-11 text-sm" />
+                  <FotoMotorista src={o.imagem} nome={o.nome} className="h-11 w-11 text-sm" />
                   <span className="min-w-0">
                     <strong className="block truncate font-display text-navy-900">{o.nome}</strong>
                     <small className="text-navy-500">{o.modelo}</small>
@@ -195,10 +215,10 @@ export function FamilyDemoResults({ ofertas, carregando, erro, horario, endereco
                 {o.recursos.length > 0 && (
                   <div className="mt-3 flex flex-wrap gap-1.5">
                     {o.recursos.map((r) => {
-                      const Ico = RECURSO_ICONE[r] ?? Check;
+                      const ico = RECURSO_SVG[r];
                       return (
-                        <span key={r} className="chip bg-navy-50 text-navy-600">
-                          <Ico size={13} className="text-mint-700" /> {r}
+                        <span key={r} className="chip bg-navy-50 text-navy-700">
+                          {ico ? <img src={ico} alt="" className="h-4 w-4" /> : <Check size={13} className="text-mint-700" />} {r}
                         </span>
                       );
                     })}
@@ -232,7 +252,7 @@ export function FamilyDemoResults({ ofertas, carregando, erro, horario, endereco
 
             <div className="px-5 pb-7 pt-5 sm:px-7">
               <div className="flex items-center gap-3">
-                <Avatar nome={selecionado.nome} className="h-14 w-14 text-base" />
+                <FotoMotorista src={selecionado.imagem} nome={selecionado.nome} className="h-14 w-14 text-base" />
                 <div className="min-w-0">
                   <h2 className="font-display text-2xl font-bold text-navy-900">{selecionado.nome}</h2>
                   <p className="text-sm text-navy-500">{selecionado.modelo}</p>
@@ -326,9 +346,9 @@ export function FamilyDemoResults({ ofertas, carregando, erro, horario, endereco
                 <div className="mt-5">
                   <div className="relative">
                     <button onClick={() => setFotoAberta(true)} className="block w-full overflow-hidden rounded-2xl" aria-label="Ampliar imagem do veículo">
-                      <VanIllustration seedKey={selecionado.slug} className="h-56 w-full" />
+                      <FotoVan src={selecionado.vanImagem} seed={selecionado.slug} alt={`Van de ${selecionado.nome}`} className="h-56 w-full" />
                     </button>
-                    <Avatar nome={selecionado.nome} className="absolute -bottom-6 left-5 h-20 w-20 text-lg ring-4 ring-white" />
+                    <FotoMotorista src={selecionado.imagem} nome={selecionado.nome} className="absolute -bottom-6 left-5 h-20 w-20 text-lg ring-4 ring-white" />
                   </div>
                   <div className="mt-8 flex items-center justify-between gap-3">
                     <div>
@@ -373,7 +393,7 @@ export function FamilyDemoResults({ ofertas, carregando, erro, horario, endereco
           {fotoAberta && (
             <div role="dialog" aria-label="Imagem ampliada do veículo" className="fixed inset-0 z-[1100] flex items-center justify-center bg-navy-950/90 p-5" onClick={() => setFotoAberta(false)}>
               <div className="w-full max-w-2xl overflow-hidden rounded-2xl" onClick={(e) => e.stopPropagation()}>
-                <VanIllustration seedKey={selecionado.slug} className="aspect-[5/3] w-full" />
+                <FotoVan src={selecionado.vanImagem} seed={selecionado.slug} alt={`Van de ${selecionado.nome}`} className="aspect-[5/3] w-full" />
               </div>
               <button aria-label="Fechar imagem" className="absolute right-5 top-5 grid h-10 w-10 place-items-center rounded-full bg-white/10 text-white" onClick={() => setFotoAberta(false)}><X /></button>
             </div>
