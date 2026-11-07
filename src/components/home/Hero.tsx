@@ -11,10 +11,10 @@ export function Hero() {
             <span className="h-1.5 w-1.5 rounded-full bg-mint-400" /> Araçatuba · São Paulo
           </span>
           <h1 className="mt-6 max-w-xl font-display text-[clamp(2.65rem,5.5vw,5rem)] font-extrabold leading-[1.06] tracking-[-0.055em]">
-            O próximo passo<br />é <span className="text-mint-300">ir tranquilo.</span>
+            A van certa<br />para o <span className="text-mint-300">seu caminho.</span>
           </h1>
           <p className="mt-6 max-w-md text-lg leading-relaxed text-navy-100">
-            Encontre uma van para a escola ou faculdade. Compare as opções e combine o caminho com quem dirige.
+            Encontre motoristas que atendem sua região e o destino do aluno. Confira as opções e entre em contato.
           </p>
           <div className="mt-8 flex flex-wrap gap-x-6 gap-y-3 text-sm text-navy-100">
             <span className="inline-flex items-center gap-2"><Route className="h-4 w-4 text-mint-300" /> Escolar e universitário</span>
@@ -22,7 +22,7 @@ export function Hero() {
           </div>
           <div className="mt-12 hidden max-w-md items-center gap-4 border-t border-white/15 pt-6 lg:flex">
             <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/10"><MapPin className="h-5 w-5 text-mint-300" /></span>
-            <div><p className="font-semibold">Da sua região ao próximo destino.</p><p className="mt-1 text-sm text-navy-200">Uma rotina mais simples começa aqui.</p></div>
+            <div><p className="font-semibold">Transporte escolar e universitário.</p><p className="mt-1 text-sm text-navy-200">Encontre opções para sua região.</p></div>
             <ArrowUpRight className="ml-auto h-5 w-5 text-mint-300" />
           </div>
         </div>
@@ -30,7 +30,7 @@ export function Hero() {
       </div>
       <div className="border-t border-white/10 bg-white/[0.03]">
         <div className="container-page flex flex-wrap items-center justify-between gap-3 py-5 text-xs text-navy-100 sm:text-sm">
-          <span>Mais clareza para escolher. Mais leveza para ir.</span>
+          <span></span>
           <a href="#como-funciona" className="inline-flex items-center gap-2 font-semibold text-mint-300">Conheça o Vambora <ArrowUpRight className="h-4 w-4" /></a>
         </div>
       </div>
