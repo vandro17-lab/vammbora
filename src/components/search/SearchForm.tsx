@@ -33,9 +33,18 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
   const [localizando, setLocalizando] = useState(false);
   const [horario, setHorario] = useState('07:00');
   const titulo = useRef<HTMLHeadingElement>(null);
-  // preventScroll evita que o navegador role a página (inclusive na horizontal)
-  // ao focar o título programaticamente — causava a tela "deslocar para o lado".
-  function ir(n: number) { setPasso(n); requestAnimationFrame(() => titulo.current?.focus({ preventScroll: true })); }
+  // Ao trocar de passo, focamos o título (acessibilidade). `preventScroll` tenta
+  // evitar que a página role ao focar — mas iOS antigo o ignora e a tela "foge
+  // para o lado". Por isso também RESTAURAMOS a posição de rolagem (x e y) logo
+  // após o foco, garantindo que a tela não se desloque horizontalmente.
+  function ir(n: number) {
+    const x = window.scrollX, y = window.scrollY;
+    setPasso(n);
+    requestAnimationFrame(() => {
+      titulo.current?.focus({ preventScroll: true });
+      if (window.scrollX !== x || window.scrollY !== y) window.scrollTo(x, y);
+    });
+  }
 
   async function enviar(e: React.FormEvent) {
     e.preventDefault();
