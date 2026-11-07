@@ -77,21 +77,50 @@ export function rotaElegivelParaBusca(
   return temEscola && temCasa;
 }
 
-/** Âncora de horário de escola para o destino escolhido, preferindo dados REAIS. */
+/**
+ * A rota ATENDE a escola pedida? (tem uma parada de escola com esse destino).
+ * É o 1º filtro da busca: "todos os motoristas que passam por aquela escola".
+ */
+export function rotaAtendeDestino(rota: Pick<Rota, 'paradas'>, destinoId: string | null): boolean {
+  if (!destinoId) return true; // sem destino escolhido, não filtra por escola
+  return rota.paradas.some((p) => p.tipo === 'escola' && p.destinoId === destinoId);
+}
+
+/** Localiza a parada da escola escolhida e diz se é a ÚLTIMA escola da rota. */
+function escolaEscolhida(rota: Rota, destinoId: string | null) {
+  if (!destinoId) return null;
+  const escolas = rota.paradas.filter((p) => p.tipo === 'escola');
+  const alvo = escolas.find((p) => p.destinoId === destinoId);
+  if (!alvo) return null;
+  const ultimaOrdem = escolas.reduce((m, p) => Math.max(m, p.ordem), Number.NEGATIVE_INFINITY);
+  return { alvo, ehUltimaEscola: alvo.ordem === ultimaOrdem };
+}
+
+/**
+ * Âncora de horário: o horário que o MOTORISTA declarou para chegar NAQUELA
+ * escola. É a base de todo o cálculo (planejamento de trás pra frente), por isso
+ * a escolha é estrita, para dar menos erro:
+ *   1) horário informado explicitamente no pedido (override do servidor);
+ *   2) horário de chegada da PRÓPRIA parada da escola escolhida (dado real);
+ *   3) último desembarque da rota — SÓ quando a escola escolhida é a última da
+ *      rota (senão esse horário é de OUTRA escola e induziria a erro);
+ *   4) padrão do turno — fraco, resultado nunca confirmado;
+ *   5) nenhum — não dá para estimar com segurança.
+ */
 function ancoraHorarioEscola(rota: Rota, pedido: PedidoFamilia): { min: number | null; fonte: FonteHorario } {
   if (pedido.horarioEscolaMin != null && Number.isFinite(pedido.horarioEscolaMin)) {
     return { min: pedido.horarioEscolaMin, fonte: 'rota' };
   }
-  // Horário habitual de chegada da parada da escola escolhida (dado real da rota).
-  const escolaStop = rota.paradas.find((p) => p.tipo === 'escola' && p.destinoId === pedido.destinoId);
-  if (escolaStop && escolaStop.horarioChegadaMin != null && Number.isFinite(escolaStop.horarioChegadaMin)) {
-    return { min: escolaStop.horarioChegadaMin, fonte: 'rota' };
+  const esc = escolaEscolhida(rota, pedido.destinoId);
+  // 2) Horário habitual de chegada da parada da escola escolhida (dado real).
+  if (esc && esc.alvo.horarioChegadaMin != null && Number.isFinite(esc.alvo.horarioChegadaMin)) {
+    return { min: esc.alvo.horarioChegadaMin, fonte: 'rota' };
   }
-  // Limite final da rota (último desembarque), também real.
-  if (rota.ultimoDesembarqueMin != null && Number.isFinite(rota.ultimoDesembarqueMin)) {
+  // 3) Último desembarque só vale para a ÚLTIMA escola da rota.
+  if (esc && esc.ehUltimaEscola && rota.ultimoDesembarqueMin != null && Number.isFinite(rota.ultimoDesembarqueMin)) {
     return { min: rota.ultimoDesembarqueMin, fonte: 'rota' };
   }
-  // Último recurso: padrão do turno — resultado NUNCA confirmado.
+  // 4) Último recurso: padrão do turno — resultado NUNCA confirmado.
   const padrao = limitePadraoDoTurno(pedido.turno ?? rota.turno ?? null);
   if (padrao != null) return { min: padrao, fonte: 'turno' };
   return { min: null, fonte: 'nenhuma' };
@@ -215,9 +244,13 @@ export function buscarEmRotasReais(
   pedido: PedidoFamilia,
   matriz: MatrizViaria = criarMatrizDemo(),
 ): ResultadoBuscaReal {
-  // Só avalia rotas do MESMO sentido pedido (ida e volta são independentes).
-  const doSentido = entradas.filter((e) => e.rota.sentido === pedido.sentido);
-  const resultados = doSentido
+  // 1º recorte (o que o usuário descreveu): só as rotas do MESMO sentido pedido
+  // (ida/volta são independentes) QUE JÁ PASSAM pela escola escolhida. Para cada
+  // uma testamos o encaixe a partir do horário que o motorista declarou ali.
+  const candidatas = entradas.filter(
+    (e) => e.rota.sentido === pedido.sentido && rotaAtendeDestino(e.rota, pedido.destinoId),
+  );
+  const resultados = candidatas
     .map((e) => avaliarRotaReal(e.rota, e.veiculo, pedido, matriz))
     .sort((a, b) => {
       if (pesoStatus(a.status) !== pesoStatus(b.status)) return pesoStatus(a.status) - pesoStatus(b.status);
@@ -225,5 +258,5 @@ export function buscarEmRotasReais(
       const pb = b.passagemCasaMin ?? Number.POSITIVE_INFINITY;
       return pa - pb;
     });
-  return { resultados, totalRotasAvaliadas: doSentido.length };
+  return { resultados, totalRotasAvaliadas: candidatas.length };
 }

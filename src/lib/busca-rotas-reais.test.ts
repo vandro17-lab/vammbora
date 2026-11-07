@@ -3,6 +3,7 @@ import {
   avaliarRotaReal,
   buscarEmRotasReais,
   rotaElegivelParaBusca,
+  rotaAtendeDestino,
   type PedidoFamilia,
 } from './busca-rotas-reais';
 import type { Rota, Veiculo, ParadaRota, PassageiroRota } from '@/types/motorista';
@@ -194,5 +195,66 @@ describe('buscarEmRotasReais — agregação por sentido', () => {
     expect(out.totalRotasAvaliadas).toBe(2); // só as 2 de ida
     expect(out.resultados[0].status).toBe('compativel'); // a viável vem primeiro
     expect(out.resultados.every((r) => r.sentido === 'ida')).toBe(true);
+  });
+});
+
+/* ----- Lógica robusta: escola escolhida é o 1º recorte e a âncora de horário ----- */
+
+/** Rota IDA com DUAS escolas: casaA → escX(07:00) → casaB → escY(08:00). */
+function rotaIdaDuasEscolas(opts: { horaX?: number | null; horaY?: number | null; ultimo?: number | null } = {}): Rota {
+  const paradas: ParadaRota[] = [
+    { id: 's', ordem: 0, tipo: 'saida', rotulo: 'Garagem', confirmado: true, lat: C.garagem.lat, lng: C.garagem.lng },
+    { id: 'a', ordem: 1, tipo: 'casa', rotulo: 'Rua A, 1', confirmado: true, lat: C.casaA.lat, lng: C.casaA.lng },
+    { id: 'ex', ordem: 2, tipo: 'escola', rotulo: 'Escola X', destinoId: 'escX', destinoNome: 'Escola X', confirmado: true, lat: C.escola.lat, lng: C.escola.lng, horarioChegadaMin: opts.horaX === undefined ? 7 * 60 : opts.horaX },
+    { id: 'b', ordem: 3, tipo: 'casa', rotulo: 'Rua B, 2', confirmado: true, lat: C.casaB.lat, lng: C.casaB.lng },
+    { id: 'ey', ordem: 4, tipo: 'escola', rotulo: 'Escola Y', destinoId: 'escY', destinoNome: 'Escola Y', confirmado: true, lat: C.casaB.lat, lng: C.casaB.lng, horarioChegadaMin: opts.horaY === undefined ? 8 * 60 : opts.horaY },
+  ];
+  const passageiros: PassageiroRota[] = [
+    { id: 'p1', identificacao: 'A', embarqueParadaId: 'a', desembarqueParadaId: 'ex', destinoId: 'escX' },
+  ];
+  return {
+    id: 'rota-2esc', nome: 'Rota 2 escolas', sentido: 'ida', turno: 'manha', dias: ['seg'],
+    veiculoId: 'v1', monitor: false, monitorOcupaLugar: false, lugaresReservados: 0,
+    ultimoDesembarqueMin: opts.ultimo === undefined ? 8 * 60 : opts.ultimo,
+    limiteAntecipacaoMin: null, status: 'concluida', isPublished: true, paradas, passageiros, atualizadoEm: '2026-11-06T00:00:00Z',
+  };
+}
+
+describe('rotaAtendeDestino — 1º recorte por escola', () => {
+  it('reconhece a escola que a rota atende e descarta as demais', () => {
+    const r = rotaIdaDuasEscolas();
+    expect(rotaAtendeDestino(r, 'escX')).toBe(true);
+    expect(rotaAtendeDestino(r, 'escY')).toBe(true);
+    expect(rotaAtendeDestino(r, 'esc-outra')).toBe(false);
+  });
+
+  it('buscarEmRotasReais só considera rotas que passam pela escola pedida', () => {
+    const entradas = [
+      { rota: rotaIda(), veiculo: veiculo(4) }, // atende esc1
+      { rota: rotaIdaDuasEscolas(), veiculo: veiculo(4) }, // atende escX/escY, NÃO esc1
+    ];
+    const out = buscarEmRotasReais(entradas, pedidoIda()); // destino esc1
+    expect(out.totalRotasAvaliadas).toBe(1);
+    expect(out.resultados.every((r) => r.rotaId === 'rota-ida')).toBe(true);
+  });
+});
+
+describe('âncora de horário é a da escola ESCOLHIDA (menos erro)', () => {
+  it('escola intermediária SEM horário não herda o último desembarque de outra escola', () => {
+    // escX (intermediária) sem horário; só o último desembarque (escY, 08:00)
+    // está preenchido. Antes, isso virava âncora errada; agora não: sem turno,
+    // fica indeterminado em vez de calcular com o horário de outra escola.
+    const r = rotaIdaDuasEscolas({ horaX: null, horaY: null, ultimo: 8 * 60 });
+    const semTurno = { ...r, turno: null as Rota['turno'] };
+    const res = avaliarRotaReal(semTurno, veiculo(4), pedidoIda({ destinoId: 'escX', turno: null }));
+    expect(res.status).toBe('indeterminado');
+    expect(res.horarioEscolaMin).toBeNull();
+  });
+
+  it('escola escolhida COM horário próprio ancora nela (fonte real)', () => {
+    const res = avaliarRotaReal(rotaIdaDuasEscolas(), veiculo(4), pedidoIda({ destinoId: 'escX' }));
+    // Chega em escX no máximo às 07:00 (horário declarado dessa escola), nunca às 08:00.
+    expect(res.fonteHorario).toBe('rota');
+    if (res.horarioEscolaMin != null) expect(res.horarioEscolaMin).toBeLessThanOrEqual(7 * 60);
   });
 });
