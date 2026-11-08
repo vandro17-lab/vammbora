@@ -121,7 +121,7 @@ export function CriarRotaPage() {
           <div className="space-y-3.5">
             <ConfigRota rota={rota} setRota={setRota} />
             <VanViz capacidade={capacidade} aBordo={aBordoFinal.length} rota={rota} veiculo={veiculo} />
-            {rota.paradas.length > 0 && <LinhaPercurso rota={rota} setRota={setRota} />}
+            {rota.paradas.length > 0 && <LinhaPercurso rota={rota} setRota={setRota} mostrarHorarios={false} />}
             {rota.paradas.length > 0 && (
               <Card className="p-3.5">
                 <p className="mb-2.5 inline-flex items-center gap-2 font-display font-bold text-navy-900">
@@ -132,7 +132,7 @@ export function CriarRotaPage() {
                 </div>
               </Card>
             )}
-            <AcaoParada rota={rota} setRota={setRota} destinos={destinos} locais={locaisBusca} aBordo={aBordoFinal} capacidade={capacidade} />
+            <AcaoParada rota={rota} setRota={setRota} destinos={destinos} locais={locaisBusca} aBordo={aBordoFinal} capacidade={capacidade} escolaFinalObrigatoria />
 
             {problemas.length > 0 && (
               <div className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">
@@ -318,7 +318,7 @@ function ConfirmacaoRota({ rota, setRota, veiculo, capacidade, aBordo, onConclui
       </Card>
 
       {/* Horários (motor real) — o botão "Concluir rota" salva via salvarRota. */}
-      <Horarios rota={rota} setRota={setRota} onConfirmar={onConcluir} salvando={salvando} />
+          <Horarios rota={rota} setRota={setRota} veiculo={veiculo} onConfirmar={onConcluir} salvando={salvando} />
     </div>
   );
 }

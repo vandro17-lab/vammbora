@@ -10,6 +10,7 @@ import type { Turno } from '@/types';
 import { useVitrine } from '@/data/VitrineProvider';
 import { capacidadeAlunos, aBordoEm, validarRota, podeFinalizar } from '@/lib/ocupacao-rota';
 import { PlanoMotor } from '@/components/motorista/PlanoMotor';
+import { planejarRotaDoCadastro } from '@/lib/rota-para-motor';
 import { MapaInterativoRota } from '@/components/motorista/MapaInterativoRota';
 import { SeletorPontoMapa } from '@/components/motorista/SeletorPontoMapa';
 import { AutocompleteEndereco } from '@/components/search/AutocompleteEndereco';
@@ -300,7 +301,7 @@ export function VanViz({ capacidade, aBordo, rota, veiculo }: { capacidade: numb
 }
 
 /* ----------------------------- Linha do percurso ----------------------------- */
-export function LinhaPercurso({ rota, setRota }: { rota: Rota; setRota: (r: Rota) => void }) {
+export function LinhaPercurso({ rota, setRota, mostrarHorarios = true }: { rota: Rota; setRota: (r: Rota) => void; mostrarHorarios?: boolean }) {
   if (rota.paradas.length === 0) return null;
   const paradas = [...rota.paradas].sort((a, b) => a.ordem - b.ordem);
 
@@ -341,7 +342,7 @@ export function LinhaPercurso({ rota, setRota }: { rota: Rota; setRota: (r: Rota
                   {descem.length > 0 && `Desce: ${descem.map((x) => x.identificacao).join(', ')}`}
                   {embarcam.length === 0 && descem.length === 0 && (p.confirmado ? 'Confirmada' : 'Sem confirmação')}
                 </p>
-                <label className="mt-2 flex items-center gap-2 text-xs text-navy-600">
+                {mostrarHorarios && <label className="mt-2 flex items-center gap-2 text-xs text-navy-600">
                   <span className="shrink-0">Chegada habitual</span>
                   <input type="time" aria-label={`Horário habitual de chegada: ${p.rotulo}`}
                     className="field-input !w-32 !py-1.5 text-sm"
@@ -356,7 +357,7 @@ export function LinhaPercurso({ rota, setRota }: { rota: Rota; setRota: (r: Rota
                             ? { ...aluno, horarioHabitualMin: minutos } : aluno),
                       });
                     }} />
-                </label>
+                </label>}
               </div>
               {p.tipo !== 'saida' && (
                 <div className="flex shrink-0 items-center gap-1">
@@ -374,11 +375,11 @@ export function LinhaPercurso({ rota, setRota }: { rota: Rota; setRota: (r: Rota
 }
 
 /* ----------------------------- Ação: adicionar parada ----------------------------- */
-export function AcaoParada({ rota, setRota, destinos, locais, aBordo, capacidade }: {
+export function AcaoParada({ rota, setRota, destinos, locais, aBordo, capacidade, escolaFinalObrigatoria = false }: {
   rota: Rota; setRota: (r: Rota) => void;
   destinos: { id: string; nome: string; bairro: string; lat?: number | null; lng?: number | null }[];
   locais: SugestaoEndereco[];
-  aBordo: { id: string; identificacao: string }[]; capacidade: number;
+  aBordo: { id: string; identificacao: string }[]; capacidade: number; escolaFinalObrigatoria?: boolean;
 }) {
   const [modo, setModo] = useState<null | TipoParada>(null);
   const temSaida = rota.paradas.some((p) => p.tipo === 'saida');
@@ -400,6 +401,10 @@ export function AcaoParada({ rota, setRota, destinos, locais, aBordo, capacidade
   }
   if (modo === 'escola') {
     return <FormEscola rota={rota} setRota={setRota} destinos={destinos} proxOrdem={proxOrdem()} aBordo={aBordo} onFechar={() => setModo(null)} />;
+  }
+
+  if (escolaFinalObrigatoria && rota.paradas.some((p) => p.tipo === 'escola')) {
+    return <div className="card mt-4 border border-mint-200 bg-mint-50 p-5"><p className="font-display font-bold text-mint-900">Escola final cadastrada</p><p className="mt-1 text-sm text-mint-800">A rota termina em {rota.paradas.find((p) => p.tipo === 'escola')?.destinoNome || 'sua escola'}. Revise o percurso e informe somente o horário de chegada final.</p></div>;
   }
 
   return (
@@ -632,9 +637,11 @@ function FormEscola({ rota, setRota, destinos, proxOrdem, aBordo, onFechar }: {
 }
 
 /* ----------------------------- Horários ----------------------------- */
-export function Horarios({ rota, setRota, onConfirmar, salvando }: { rota: Rota; setRota: (r: Rota) => void; onConfirmar: (rotaAtualizada: Rota) => void; salvando: boolean }) {
+export function Horarios({ rota, setRota, veiculo = null, onConfirmar, salvando }: { rota: Rota; setRota: (r: Rota) => void; veiculo?: Veiculo | null; onConfirmar: (rotaAtualizada: Rota) => void; salvando: boolean }) {
   const [hora, setHora] = useState(rota.ultimoDesembarqueMin != null ? minutosParaTextoHora(rota.ultimoDesembarqueMin).replace('h', ':') : '');
   const [antecip, setAntecip] = useState(rota.limiteAntecipacaoMin != null ? String(rota.limiteAntecipacaoMin) : '');
+  const rotaComHorario = useMemo(() => ({ ...rota, ultimoDesembarqueMin: /^\d{1,2}:\d{2}$/.test(hora) ? horaParaMinutos(hora) : null, limiteAntecipacaoMin: antecip ? Number(antecip) : null }), [rota, hora, antecip]);
+  const planejamento = useMemo(() => planejarRotaDoCadastro(rotaComHorario, veiculo), [rotaComHorario, veiculo]);
 
   function confirmar() {
     const min = /^\d{1,2}:\d{2}$/.test(hora) ? horaParaMinutos(hora) : null;
@@ -653,7 +660,21 @@ export function Horarios({ rota, setRota, onConfirmar, salvando }: { rota: Rota;
         <label className="field-label">Se precisar, você pode sair mais cedo? Quantos minutos antes?</label>
         <input className="field-input" inputMode="numeric" placeholder="Ex.: 10" value={antecip} onChange={(e) => setAntecip(e.target.value.replace(/\D/g, ''))} />
       </div>
-      <p className="mt-3 text-xs text-navy-400">A previsão de horário de cada parada é calculada pelo sistema de compatibilidade (em preparação). Sair mais cedo não garante que um novo aluno caiba.</p>
+      {planejamento.plano?.valido ? (
+        <div className="mt-4 rounded-xl bg-mint-50 p-3 text-sm text-mint-900">
+          <p className="font-bold">Rota calculada de trás para frente</p>
+          <p className="mt-1">Para chegar à escola às <strong>{hora}</strong>, a van deve sair às <strong>{minutosParaTextoHora(planejamento.plano.saida ?? 0)}</strong>.</p>
+          <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-navy-700">
+            {planejamento.plano.paradas.map((p) => {
+              const parada = rota.paradas.find((x) => x.id === p.id);
+              return <span key={p.id}>{parada?.rotulo || 'Parada'}: <strong>{minutosParaTextoHora(p.chegada)}</strong></span>;
+            })}
+          </div>
+        </div>
+      ) : (
+        <p className="mt-3 rounded-xl bg-amber-50 p-3 text-xs text-amber-800">{planejamento.dadosFaltantes.slice(0, 2).join(' ') || 'Informe o horário final para calcular a saída.'}</p>
+      )}
+      <p className="mt-3 text-xs text-navy-400">O sistema usa o tempo real dos trechos no mapa e calcula os horários anteriores sem exigir que você informe horário em cada parada.</p>
       <button className="btn btn-lg btn-primary mt-5 w-full" onClick={confirmar} disabled={salvando}>
         {salvando ? <><Loader2 className="h-5 w-5 animate-spin" /> Salvando…</> : 'Concluir rota'}
       </button>

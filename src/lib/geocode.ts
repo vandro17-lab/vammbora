@@ -237,6 +237,8 @@ export interface TrajetoRota {
   geometria: [number, number][];
   /** Minutos por trecho (do ponto i ao i+1). */
   temposMin: number[];
+  /** Metros por trecho (do ponto i ao i+1). */
+  distanciasMetros: number[];
 }
 
 /**
@@ -255,13 +257,14 @@ export async function trajetoOSRM(
     const r = await fetch(u, { signal });
     if (!r.ok) return null;
     const d = (await r.json()) as {
-      routes?: Array<{ geometry: { coordinates: [number, number][] }; legs: Array<{ duration: number }> }>;
+      routes?: Array<{ geometry: { coordinates: [number, number][] }; legs: Array<{ duration: number; distance: number }> }>;
     };
     const rota = d.routes?.[0];
     if (!rota) return null;
     const geometria = (rota.geometry?.coordinates ?? []).map(([lng, lat]) => [lat, lng] as [number, number]);
     const temposMin = (rota.legs ?? []).map((l) => Math.max(1, Math.round(l.duration / 60)));
-    return { geometria, temposMin };
+    const distanciasMetros = (rota.legs ?? []).map((l) => Math.max(0, Math.round(l.distance ?? 0)));
+    return { geometria, temposMin, distanciasMetros };
   } catch {
     return null;
   }

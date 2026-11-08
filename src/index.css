@@ -272,3 +272,5 @@ section[id] { scroll-margin-top: 90px; }
 .vambora-van-icon i { left: 5px; }
 .vambora-van-icon b { right: 4px; }
 .vambora-stop-icon { display: grid; place-items: center; width: 28px; height: 28px; border: 3px solid #fff; border-radius: 999px; background: var(--stop-color); color: #fff; font: 700 11px/1 Inter, sans-serif; box-shadow: 0 2px 6px rgb(11 31 58 / 35%); }
+.vambora-route-label-wrap { background: transparent; border: 0; white-space: nowrap; }
+.vambora-route-label { display: inline-flex; align-items: center; gap: 3px; transform: translate(-50%, -50%); border: 1px solid rgb(255 255 255 / 85%); border-radius: 999px; background: rgb(255 255 255 / 92%); padding: 4px 7px; color: #0b1f3a; font: 700 10px/1 Inter, sans-serif; box-shadow: 0 2px 7px rgb(11 31 58 / 22%); }
