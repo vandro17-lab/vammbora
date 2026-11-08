@@ -116,25 +116,19 @@ export function ContaMotoristaPage() {
 
           {/* ---- Login DEMONSTRATIVO: e-mail/senha de fachada, entra sem verificar ---- */}
           {DEMO_LOGIN && (
-            <>
-              <p className="mt-5 rounded-xl bg-amber-50 p-3 text-center text-sm text-amber-800">
-                Modo demonstração: entre no painel sem verificação. Os dados ficam só neste navegador.
-              </p>
-              <form onSubmit={onSubmit} className="mt-6 space-y-3.5">
-                <div>
-                  <label className="field-label" htmlFor="email">E-mail</label>
-                  <input id="email" type="email" className="field-input" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" />
-                </div>
-                <div>
-                  <label className="field-label" htmlFor="senha">Senha</label>
-                  <input id="senha" type="password" className="field-input" value={senha} onChange={(e) => setSenha(e.target.value)} autoComplete="current-password" />
-                </div>
-                <button type="submit" className="btn btn-sheen btn-lg btn-primary w-full">
-                  Entrar no painel
-                </button>
-              </form>
-              <p className="mt-3 text-center text-xs text-navy-400">Demonstração — qualquer e-mail/senha entra.</p>
-            </>
+            <form onSubmit={onSubmit} className="mt-6 space-y-3.5">
+              <div>
+                <label className="field-label" htmlFor="email">E-mail</label>
+                <input id="email" type="email" className="field-input" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" />
+              </div>
+              <div>
+                <label className="field-label" htmlFor="senha">Senha</label>
+                <input id="senha" type="password" className="field-input" value={senha} onChange={(e) => setSenha(e.target.value)} autoComplete="current-password" />
+              </div>
+              <button type="submit" className="btn btn-sheen btn-lg btn-primary w-full">
+                Entrar no painel
+              </button>
+            </form>
           )}
 
           {/* CTA principal: entrar com o Google (login social do motorista). */}
