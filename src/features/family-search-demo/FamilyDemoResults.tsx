@@ -303,16 +303,26 @@ export function FamilyDemoResults({ ofertas, carregando, erro, horario, endereco
 
       {/* Modal de detalhes (telas 3, 4 e 5) */}
       {selecionado && (
-        <div role="dialog" aria-modal="true" aria-label={`Detalhes de ${selecionado.nome}`} className="fixed inset-0 z-[1000] overflow-y-auto bg-navy-950/60 p-3 backdrop-blur-sm sm:p-8">
-          <div className="mx-auto max-w-3xl overflow-hidden rounded-3xl bg-white shadow-float">
-            <div className="flex items-center justify-between gap-3 border-b border-navy-100 px-5 py-4 sm:px-7">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Detalhes de ${selecionado.nome}`}
+          onClick={(e) => { if (e.target === e.currentTarget) { setSelecionado(null); setRodando(false); } }}
+          className="fixed inset-0 z-[1000] flex flex-col bg-navy-950/60 backdrop-blur-sm sm:items-center sm:justify-center sm:p-6 md:p-8"
+        >
+          {/* Celular: folha em tela cheia ancorada no viewport atual (não abre "lá no
+              topo" da página), com cabeçalho fixo — o X fica sempre acessível — e
+              rolagem apenas no conteúdo. Computador: cartão centralizado. O fundo não
+              rola enquanto aberto (travado pelo efeito acima) e volta ao mesmo lugar. */}
+          <div className="flex h-full w-full flex-col overflow-hidden bg-white shadow-float sm:h-auto sm:max-h-[90vh] sm:max-w-3xl sm:rounded-3xl">
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-navy-100 px-5 py-4 sm:px-7">
               <button className="inline-flex items-center gap-2 text-sm font-semibold text-navy-700" onClick={() => { setSelecionado(null); setRodando(false); }}>
                 <ArrowLeft size={18} /> Voltar aos resultados
               </button>
               <button aria-label="Fechar" onClick={() => setSelecionado(null)} className="grid h-9 w-9 place-items-center rounded-full text-navy-500 hover:bg-navy-50"><X size={18} /></button>
             </div>
 
-            <div className="px-5 pb-7 pt-5 sm:px-7">
+            <div className="flex-1 overflow-y-auto overscroll-contain px-5 pb-7 pt-5 sm:px-7">
               <div className="flex items-center gap-3">
                 <FotoMotorista src={selecionado.imagem} nome={selecionado.nome} className="h-14 w-14 text-base" />
                 <div className="min-w-0">

@@ -1,8 +1,162 @@
-.vb-search-cover{position:fixed;inset:0;z-index:9999;overflow:hidden;background:radial-gradient(ellipse 85% 25% at 5% 15%,rgba(164,119,47,.12),transparent 75%),linear-gradient(155deg,#1c1b19,#17191b 48%,#101214);color:#f6f4ef;display:grid;place-items:center;isolation:isolate}
-.vb-search-content{width:min(100%,570px);height:100%;max-height:900px;min-height:0;display:flex;flex-direction:column;justify-content:space-evenly;align-items:center;padding:clamp(12px,2.8dvh,28px) 22px;box-sizing:border-box;overflow:hidden}
-.vb-search-brand{display:flex;align-items:center;gap:12px;flex-shrink:0}.vb-search-logo{width:47px;height:47px;border-radius:14px;background:#e8b925;color:#1d1d1d;display:grid;place-items:center;font-size:25px}.vb-search-brand strong{display:block;font-size:clamp(26px,5vw,34px);font-weight:850;letter-spacing:-1.5px;line-height:1}.vb-search-brand strong span{color:#e9bf38}.vb-search-brand small{display:block;margin-top:6px;color:#c7c5c0;font-size:11px;letter-spacing:.04em}
-.vb-search-scene{position:relative;flex:0 1 285px;width:100%;min-height:125px;max-height:285px;overflow:hidden}.vb-search-arc{position:absolute;left:17%;top:2%;width:64%;height:57%;overflow:visible}.vb-search-arc path{stroke:#d6ad49;stroke-width:2;stroke-dasharray:5 9;fill:none;opacity:.8;animation:vb-dash 14s linear infinite}.vb-search-pin{position:absolute;left:18%;top:12%;width:25px;height:33px;z-index:2;animation:vb-pin 3.5s ease-in-out infinite}.vb-search-pin svg{width:100%;height:100%;fill:#e5bb48}.vb-search-school{position:absolute;right:13%;top:17%;width:59px;height:59px;border:2px solid #d9b34d;border-radius:50%;background:#2b2923;display:grid;place-items:center;z-index:2}.vb-search-school svg{width:35px;height:35px;fill:#eee9dc}.vb-search-skyline{position:absolute;left:0;right:0;bottom:49px;height:42%;opacity:.3;background:linear-gradient(transparent 50%,#55544c 50%);clip-path:polygon(0 100%,0 65%,5% 65%,5% 35%,11% 35%,11% 70%,17% 70%,17% 17%,23% 17%,23% 55%,30% 55%,30% 27%,37% 27%,37% 65%,45% 65%,45% 12%,52% 12%,52% 50%,59% 50%,59% 30%,66% 30%,66% 70%,73% 70%,73% 20%,80% 20%,80% 58%,88% 58%,88% 35%,95% 35%,95% 70%,100% 70%,100% 100%)}.vb-search-road{position:absolute;bottom:0;left:0;right:0;height:52px;background:linear-gradient(#343638,#1c1d1e);border-top:1px solid #85837b}.vb-search-road:after{content:'';position:absolute;top:28px;left:-100px;width:calc(100% + 200px);height:3px;background:repeating-linear-gradient(90deg,#c8c6bd 0 45px,transparent 45px 90px);animation:vb-road 1.2s linear infinite}.vb-search-van{position:absolute;bottom:28px;left:50%;width:min(88%,390px);height:clamp(75px,24vw,155px);object-fit:contain;transform:translateX(-50%);filter:drop-shadow(0 9px 8px #0009);z-index:3;animation:vb-bounce 2.3s ease-in-out infinite}
-.vb-search-title{display:flex;gap:15px;align-items:center;justify-content:center;flex-shrink:0}.vb-search-title svg{width:40px;height:40px;color:#e7be4c}.vb-search-title h1{font-size:clamp(21px,5vw,30px);line-height:1.18;letter-spacing:-.6px;font-weight:750;margin:0}.vb-search-progress{height:7px;width:min(80%,340px);border-radius:20px;overflow:hidden;background:#393c3d;flex-shrink:0}.vb-search-progress div{width:36%;height:100%;border-radius:inherit;background:linear-gradient(90deg,#c69a35,#edc756);animation:vb-progress 2.4s ease-in-out infinite}.vb-search-steps{display:flex;align-items:flex-start;justify-content:space-around;gap:8px;width:100%;max-width:460px;border:1px solid #ffffff20;border-radius:18px;background:#ffffff08;padding:15px 9px;flex-shrink:0}.vb-search-step{flex:1;display:flex;flex-direction:column;align-items:center;text-align:center;gap:9px;color:#d9d9d9;font-size:clamp(10px,2.7vw,13px)}.vb-search-step-circle{width:clamp(37px,9vw,53px);height:clamp(37px,9vw,53px);border-radius:50%;border:1px solid #ffffff40;display:grid;place-items:center;font-size:25px;color:#e0b84b;transition:background .35s,border-color .35s}.vb-search-step-circle.active{background:#e0b84b20;border-color:#dcb64d}.vb-search-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
-@keyframes vb-road{to{transform:translateX(-90px)}}@keyframes vb-bounce{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(-2px)}}@keyframes vb-pin{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}@keyframes vb-dash{to{stroke-dashoffset:-100}}@keyframes vb-progress{0%{transform:translateX(-110%)}100%{transform:translateX(380%)}}
-@media(max-height:640px){.vb-search-content{padding:8px 16px}.vb-search-scene{flex-basis:180px}.vb-search-brand strong{font-size:25px}.vb-search-logo{width:37px;height:37px}.vb-search-steps{padding:8px}.vb-search-title h1{font-size:21px}.vb-search-title svg{width:30px;height:30px}}
-@media(prefers-reduced-motion:reduce){.vb-search-cover *{animation:none!important}}
+/* Tela de transição exibida sobre os resultados enquanto a busca por vans é
+   calculada. Renderizada em portal no <body> e posicionada como overlay fixo —
+   por isso ela "fica na frente" de tudo e ocupa um único viewport, sem rolagem.
+   Todas as classes são prefixadas com vb-search- para não colidir com o app. */
+
+.vb-search-cover{
+  position:fixed;inset:0;z-index:9999;overflow:hidden;isolation:isolate;
+  color:#f6f4ef;
+  font-family:Inter,ui-sans-serif,system-ui,-apple-system,'Segoe UI',Arial,sans-serif;
+  background:
+    radial-gradient(ellipse 82% 25% at 5% 17%,rgba(164,119,47,.15),transparent 77%),
+    radial-gradient(ellipse 65% 22% at 95% 97%,rgba(171,126,37,.09),transparent 76%),
+    linear-gradient(155deg,#1c1b19 0%,#17191b 42%,#101214 100%);
+  display:grid;place-items:center;
+  overscroll-behavior:none;touch-action:none;
+}
+.vb-search-cover:before{
+  content:'';position:absolute;inset:0;pointer-events:none;z-index:-1;
+  background:radial-gradient(ellipse at 50% 40%,rgba(235,191,91,.035),transparent 55%);
+}
+.vb-search-cover *{box-sizing:border-box}
+
+/* Coluna única, do topo ao rodapé do viewport, distribuída com space-between. */
+.vb-search-screen{
+  width:min(100%,520px);max-width:520px;
+  height:100vh;height:100dvh;min-height:0;
+  padding:clamp(12px,2.8dvh,30px) clamp(14px,4vw,24px) clamp(10px,2.5dvh,24px);
+  display:flex;flex-direction:column;justify-content:space-between;align-items:center;
+  overflow:hidden;contain:layout paint;
+  opacity:0;visibility:hidden;transition:opacity .42s ease;
+}
+.vb-search-screen.vb-ready{opacity:1;visibility:visible}
+
+/* Marca */
+.vb-search-brand{display:flex;align-items:center;gap:13px;flex:0 0 auto;min-height:0;z-index:5}
+.vb-search-logo{
+  width:clamp(40px,7dvh,62px);height:clamp(40px,7dvh,62px);flex:none;
+  border-radius:16px;background:#e8b925;display:grid;place-items:center;
+  box-shadow:0 6px 18px rgba(0,0,0,.20);
+}
+.vb-search-logo svg{width:72%;height:72%}
+.vb-search-brandtext{display:flex;flex-direction:column;line-height:1}
+.vb-search-brandname{display:block;font-size:clamp(25px,4.9dvh,41px);font-weight:850;letter-spacing:-1.8px;line-height:1}
+.vb-search-brandname span{color:#e9bf38}
+.vb-search-sub{display:block;font-size:clamp(10px,1.6dvh,13px);margin-top:6px;color:#d2d2d2;letter-spacing:.01em;white-space:nowrap}
+
+/* Cenário: skyline, pôr do sol, arco, pino, escola, pista e a van */
+.vb-search-scene{
+  position:relative;flex:1 1 auto;min-height:0;
+  width:calc(100% + 48px);align-self:center;
+  margin:clamp(8px,1.5dvh,16px) -24px clamp(6px,1dvh,12px);
+  overflow:hidden;
+}
+.vb-search-city{position:absolute;inset:auto 0 40px;top:60px;background:linear-gradient(to top,rgba(145,108,62,.17),transparent 50%);mask-image:linear-gradient(to top,#000 60%,transparent 100%)}
+.vb-search-city svg{width:100%;height:100%;position:absolute;bottom:0;filter:blur(1px);opacity:.66}
+.vb-search-sunset{position:absolute;bottom:44px;width:100%;height:75px;background:linear-gradient(0deg,rgba(174,120,57,.19),transparent);filter:blur(22px)}
+.vb-search-arc{position:absolute;left:13%;top:0;width:74%;height:clamp(72px,14dvh,132px);overflow:visible}
+.vb-search-arc path{stroke:#d6ad49;stroke-width:2;fill:none;stroke-dasharray:5 9;opacity:.84;animation:vb-dash 14s linear infinite}
+.vb-search-pin{position:absolute;top:clamp(2px,1dvh,10px);left:50%;z-index:4;animation:vb-pin 3.6s ease-in-out infinite}
+.vb-search-pin svg{display:block;width:clamp(20px,3.5dvh,27px);height:clamp(26px,4.5dvh,35px);fill:#e5bb48;filter:drop-shadow(0 3px 5px rgba(0,0,0,.25))}
+.vb-search-school{
+  position:absolute;right:8%;top:clamp(16px,4dvh,50px);
+  width:clamp(40px,8dvh,70px);height:clamp(40px,8dvh,70px);
+  display:grid;place-items:center;border:2px solid #d9b34d;border-radius:50%;
+  background:#2b2923;box-shadow:0 6px 20px rgba(0,0,0,.28);
+}
+.vb-search-school svg{width:65%;height:65%;fill:#eee9dc}
+.vb-search-road{
+  position:absolute;bottom:10px;left:0;width:100%;height:clamp(46px,10dvh,88px);
+  background:linear-gradient(180deg,#333536,#202224 60%,#17191b);
+  border-top:1px solid #8b8982;box-shadow:0 -5px 15px rgba(0,0,0,.14);
+}
+.vb-search-road:after{
+  content:'';position:absolute;top:52%;left:-100%;width:200%;height:3px;
+  background:repeating-linear-gradient(90deg,rgba(240,237,224,.58) 0 40px,transparent 40px 85px);
+  animation:vb-road 2.2s linear infinite;
+}
+.vb-search-van{
+  position:absolute;bottom:clamp(10px,3dvh,27px);left:50%;
+  width:min(96%,440px);height:auto;transform:translateX(-50%);
+  filter:drop-shadow(0 11px 8px rgba(0,0,0,.56));
+  animation:vb-van-bob 2.3s ease-in-out infinite;z-index:3;
+}
+
+/* Título com a lupa */
+.vb-search-heading{display:flex;align-items:center;justify-content:center;gap:clamp(7px,1.5vw,14px);flex:0 0 auto;margin:0 0 clamp(7px,1.5dvh,17px)}
+.vb-search-magnify{width:clamp(25px,5dvh,43px);height:clamp(25px,5dvh,43px);color:#e7be4c;flex:none}
+.vb-search-heading h1{font-size:clamp(17px,3.1dvh,26px);line-height:1.14;letter-spacing:-.65px;font-weight:740;margin:0;text-align:center}
+
+/* Barra de progresso */
+.vb-search-progress{flex:0 0 auto;width:95%;height:clamp(5px,1dvh,8px);border-radius:100px;overflow:hidden;background:#3a3d3e;margin:0 0 clamp(9px,2dvh,22px)}
+.vb-search-progress>div{height:100%;width:8%;border-radius:100px;background:linear-gradient(90deg,#c69a35,#edc756);animation:vb-progress 8s ease-in-out infinite}
+
+/* Etapas com conectores e confirmações sequenciais */
+.vb-search-steps{
+  flex:0 0 auto;width:100%;
+  display:grid;grid-template-columns:minmax(0,1fr) 13px minmax(0,1fr) 13px minmax(0,1fr);align-items:center;
+  border:1px solid rgba(255,255,255,.16);border-radius:19px;background:rgba(255,255,255,.035);
+  padding:clamp(9px,1.8dvh,17px) 7px;
+}
+.vb-search-step{text-align:center;font-size:clamp(10px,1.6dvh,12px);line-height:1.25;color:#d9d9d9;min-width:0}
+.vb-search-circle{
+  position:relative;margin:0 auto clamp(5px,1dvh,10px);
+  width:clamp(35px,7dvh,57px);height:clamp(35px,7dvh,57px);
+  border:1px solid rgba(255,255,255,.32);border-radius:50%;
+  display:grid;place-items:center;color:#e0b84b;
+}
+.vb-search-circle svg{width:54%;height:54%}
+.vb-search-check{
+  position:absolute;right:-4px;bottom:-2px;
+  width:clamp(15px,2.5dvh,20px);height:clamp(15px,2.5dvh,20px);
+  border-radius:50%;background:#5aa981;color:#fff;font-size:12px;
+  display:grid;place-items:center;opacity:0;
+  animation:vb-check-stage 7.2s ease-out infinite;
+}
+.vb-search-step:nth-child(1) .vb-search-check{animation-delay:0s}
+.vb-search-step:nth-child(3) .vb-search-check{animation-delay:2.2s}
+.vb-search-step:nth-child(5) .vb-search-check{animation-delay:4.4s}
+.vb-search-connector{height:1px;background:rgba(214,185,101,.46);align-self:center;margin-bottom:clamp(12px,3dvh,26px)}
+
+/* Onda decorativa ao fundo */
+.vb-search-wave{position:absolute;bottom:0;left:0;width:100%;height:clamp(24px,5dvh,50px);pointer-events:none;opacity:.28;z-index:0}
+.vb-search-wave path{fill:none;stroke:#d4aa43;stroke-width:2;animation:vb-wave 8s ease-in-out infinite}
+
+.vb-search-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+
+@keyframes vb-dash{to{stroke-dashoffset:-160}}
+@keyframes vb-pin{0%,100%{transform:translate(-50%,0)}50%{transform:translate(-50%,-3px)}}
+@keyframes vb-road{to{transform:translateX(-80px)}}
+@keyframes vb-van-bob{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(-3px)}}
+@keyframes vb-progress{0%{width:8%}65%{width:80%}90%{width:94%}100%{width:8%}}
+@keyframes vb-check-stage{0%,10%{opacity:0;transform:scale(.45)}16%,91%{opacity:1;transform:scale(1)}96%,100%{opacity:0;transform:scale(.85)}}
+@keyframes vb-wave{50%{transform:translateY(6px)}}
+
+@media(max-height:610px){
+  .vb-search-screen{padding-top:9px;padding-bottom:9px}
+  .vb-search-brand{gap:9px}
+  .vb-search-steps{padding:7px 6px}
+  .vb-search-heading{margin-bottom:6px}
+  .vb-search-progress{margin-bottom:8px}
+  .vb-search-scene{margin-top:3px;margin-bottom:3px}
+  .vb-search-school{width:38px;height:38px;top:12px}
+}
+@media(max-height:440px){
+  .vb-search-logo{width:35px;height:35px}
+  .vb-search-brandname{font-size:23px}
+  .vb-search-sub{font-size:9px;margin-top:2px}
+  .vb-search-arc{height:60px}
+  .vb-search-circle{width:29px;height:29px;margin-bottom:3px}
+  .vb-search-steps{padding:4px}
+  .vb-search-heading h1{font-size:15px}
+}
+@media(min-width:700px){
+  .vb-search-screen{max-height:860px;border-radius:0}
+}
+
+@media(prefers-reduced-motion:reduce){
+  .vb-search-cover *,.vb-search-cover *:before,.vb-search-cover *:after{animation:none!important;transition:none!important}
+  .vb-search-screen{opacity:1;visibility:visible}
+  .vb-search-progress>div{width:60%}
+  .vb-search-check{opacity:1;transform:none}
+}
