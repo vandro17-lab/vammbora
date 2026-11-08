@@ -229,6 +229,7 @@ section[id] { scroll-margin-top: 90px; }
 }
 .vm-app { background: var(--vm-surface); min-height: 100dvh; }
 .vm-screen { max-width: 30rem; margin: 0 auto; }
+.vm-screen-wide { max-width: 100%; }
 /* Cabeçalho em gradiente verde/teal (identidade das telas) */
 .vm-grad { background: linear-gradient(145deg, #171717 0%, #292524 55%, #44403c 100%); }
 .vm-grad-soft { background: linear-gradient(140deg, #fef9c3 0%, #fef08a 100%); }

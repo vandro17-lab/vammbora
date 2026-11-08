@@ -375,11 +375,11 @@ export function LinhaPercurso({ rota, setRota, mostrarHorarios = true }: { rota:
 }
 
 /* ----------------------------- Ação: adicionar parada ----------------------------- */
-export function AcaoParada({ rota, setRota, destinos, locais, aBordo, capacidade, escolaFinalObrigatoria = false }: {
+export function AcaoParada({ rota, setRota, destinos, locais, aBordo, capacidade, escolaFinalObrigatoria = false, compacto = false }: {
   rota: Rota; setRota: (r: Rota) => void;
   destinos: { id: string; nome: string; bairro: string; lat?: number | null; lng?: number | null }[];
   locais: SugestaoEndereco[];
-  aBordo: { id: string; identificacao: string }[]; capacidade: number; escolaFinalObrigatoria?: boolean;
+  aBordo: { id: string; identificacao: string }[]; capacidade: number; escolaFinalObrigatoria?: boolean; compacto?: boolean;
 }) {
   const [modo, setModo] = useState<null | TipoParada>(null);
   const temSaida = rota.paradas.some((p) => p.tipo === 'saida');
@@ -393,14 +393,14 @@ export function AcaoParada({ rota, setRota, destinos, locais, aBordo, capacidade
   }
 
   if (!temSaida) {
-    return <FormEndereco titulo="De onde sua van sai?" dica="Esse endereço fica privado, mesmo que seja sua casa." botao="Confirmar saída" locais={locais} onConfirmar={addSaida} onCancelar={null} />;
+    return <FormEndereco titulo="De onde sua van sai?" dica="Esse endereço fica privado, mesmo que seja sua casa." botao="Confirmar saída" locais={locais} onConfirmar={addSaida} onCancelar={null} compacto={compacto} />;
   }
 
   if (modo === 'casa') {
-    return <FormCasa rota={rota} setRota={setRota} locais={locais} proxOrdem={proxOrdem()} capacidade={capacidade} aBordo={aBordo} onFechar={() => setModo(null)} />;
+    return <FormCasa rota={rota} setRota={setRota} locais={locais} proxOrdem={proxOrdem()} capacidade={capacidade} aBordo={aBordo} onFechar={() => setModo(null)} compacto={compacto} />;
   }
   if (modo === 'escola') {
-    return <FormEscola rota={rota} setRota={setRota} destinos={destinos} proxOrdem={proxOrdem()} aBordo={aBordo} onFechar={() => setModo(null)} />;
+    return <FormEscola rota={rota} setRota={setRota} destinos={destinos} proxOrdem={proxOrdem()} aBordo={aBordo} onFechar={() => setModo(null)} compacto={compacto} />;
   }
 
   if (escolaFinalObrigatoria && rota.paradas.some((p) => p.tipo === 'escola')) {
@@ -424,10 +424,10 @@ export function AcaoParada({ rota, setRota, destinos, locais, aBordo, capacidade
 
 /* Formulário de endereço com autocomplete + número que GEOCODIFICA com precisão
  * (respeita o número da casa) e deixa o motorista arrastar o alfinete no mapa. */
-function FormEndereco({ titulo, dica, botao, locais, onConfirmar, onCancelar }: {
+function FormEndereco({ titulo, dica, botao, locais, onConfirmar, onCancelar, compacto = false }: {
   titulo: string; dica?: string; botao: string; locais: SugestaoEndereco[];
   onConfirmar: (rotulo: string, coord?: { lat: number; lng: number }) => void;
-  onCancelar: (() => void) | null;
+  onCancelar: (() => void) | null; compacto?: boolean;
 }) {
   const [texto, setTexto] = useState('');
   const [coord, setCoord] = useState<{ lat: number; lng: number } | null>(null);
@@ -471,7 +471,7 @@ function FormEndereco({ titulo, dica, botao, locais, onConfirmar, onCancelar }: 
   const aviso = buscandoExato
     ? { c: 'bg-navy-50 text-navy-700', t: 'Localizando o número exato no mapa…' }
     : !temPonto
-      ? { c: 'bg-amber-50 text-amber-800', t: 'Informe rua e número no mesmo campo, ou marque o ponto no mapa.' }
+      ? { c: 'bg-amber-50 text-amber-800', t: compacto ? 'Digite rua e número para localizar o ponto no mapa principal.' : 'Informe rua e número no mesmo campo, ou marque o ponto no mapa.' }
       : precisao === 'exato'
         ? { c: 'bg-mint-50 text-mint-800', t: 'Número localizado ✓ — confira no mapa e ajuste se precisar.' }
         : precisao === 'ajustado'
@@ -479,11 +479,11 @@ function FormEndereco({ titulo, dica, botao, locais, onConfirmar, onCancelar }: 
           : { c: 'bg-amber-50 text-amber-800', t: 'Localizamos a rua. Arraste o alfinete até o número certo.' };
 
   return (
-    <div className="card mt-4 p-5">
+    <div className={cn('card mt-0', compacto ? 'p-2.5 shadow-none ring-0' : 'mt-4 p-5')}>
       <h2 className="font-display font-bold">{titulo}</h2>
       {dica && <p className="mt-1 text-sm text-navy-500">{dica}</p>}
 
-      <div className="mt-3">
+      <div className="mt-2">
         <label className="field-label">Endereço (rua e número)</label>
         <AutocompleteEndereco
           value={texto}
@@ -496,25 +496,25 @@ function FormEndereco({ titulo, dica, botao, locais, onConfirmar, onCancelar }: 
             else if (!t.trim()) { setCoord(null); setPrecisao(undefined); setEnderecoNoMapa(null); }
           }}
         />
-        <p className="mt-1 text-xs text-navy-400">Digite rua e número juntos. Confira o ponto localizado no mapa.</p>
+        <p className="mt-1 text-[11px] text-navy-400">Digite rua e número juntos. O mapa principal será atualizado.</p>
       </div>
 
       <p className={cn('mt-3 rounded-xl p-2.5 text-sm', aviso.c)}>{aviso.t}</p>
 
-      <div className="mt-3">
+      {!compacto && <div className="mt-3">
         <SeletorPontoMapa ponto={coord} precisao={precisao} onMover={aoArrastar} />
         {enderecoNoMapa && <p className="mt-1 text-xs text-navy-500">No mapa: {enderecoNoMapa}</p>}
-      </div>
+      </div>}
 
-      <div className="mt-4 flex gap-3">
+      <div className="mt-3 flex gap-2">
         <button
-          className="btn btn-lg btn-primary flex-1"
+          className="btn btn-md btn-primary flex-1"
           disabled={!texto.trim() || !coord}
           onClick={() => onConfirmar(montarRotulo(), coord ?? undefined)}
         >
           {botao}
         </button>
-        {onCancelar && <button className="btn btn-lg btn-ghost" onClick={onCancelar}>Cancelar</button>}
+        {onCancelar && <button className="btn btn-md btn-ghost" onClick={onCancelar}>Cancelar</button>}
       </div>
 
       {texto.trim() && !coord && (
@@ -529,8 +529,8 @@ function FormEndereco({ titulo, dica, botao, locais, onConfirmar, onCancelar }: 
   );
 }
 
-function FormCasa({ rota, setRota, locais, proxOrdem, capacidade, aBordo, onFechar }: {
-  rota: Rota; setRota: (r: Rota) => void; locais: SugestaoEndereco[]; proxOrdem: number; capacidade: number; aBordo: { id: string }[]; onFechar: () => void;
+function FormCasa({ rota, setRota, locais, proxOrdem, capacidade, aBordo, onFechar, compacto = false }: {
+  rota: Rota; setRota: (r: Rota) => void; locais: SugestaoEndereco[]; proxOrdem: number; capacidade: number; aBordo: { id: string }[]; onFechar: () => void; compacto?: boolean;
 }) {
   const [etapa, setEtapa] = useState<'endereco' | 'aluno'>('endereco');
   const [paradaId, setParadaId] = useState<string | null>(null);
@@ -554,28 +554,28 @@ function FormCasa({ rota, setRota, locais, proxOrdem, capacidade, aBordo, onFech
   }
 
   if (etapa === 'endereco') {
-    return <FormEndereco titulo="Onde você busca o aluno?" botao="Confirmar endereço" locais={locais} onConfirmar={confirmarEndereco} onCancelar={onFechar} />;
+    return <FormEndereco titulo="Onde você busca o aluno?" botao="Confirmar endereço" locais={locais} onConfirmar={confirmarEndereco} onCancelar={onFechar} compacto={compacto} />;
   }
   return (
-    <div className="card mt-4 p-5">
+    <div className={cn('card mt-0', compacto ? 'p-2.5 shadow-none ring-0' : 'mt-4 p-5')}>
       <h2 className="font-display font-bold">Como podemos identificar esse aluno?</h2>
       <p className="mt-1 text-sm text-navy-500">Primeiro nome ou apelido curto. Não precisa nome completo nem documento.</p>
       <input className="field-input mt-3" placeholder="Ex.: João, Duda, Pedro…" value={nome} onChange={(e) => setNome(e.target.value)} />
-      <div className="mt-4 flex flex-wrap gap-3">
-        <button className="btn btn-lg btn-primary flex-1" disabled={!nome.trim()} onClick={() => addAluno(false)}>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button className="btn btn-md btn-primary flex-1" disabled={!nome.trim()} onClick={() => addAluno(false)}>
           <Plus className="h-5 w-5" /> Adicionar aluno
         </button>
-        <button className="btn btn-lg btn-ghost" disabled={!nome.trim()} onClick={() => addAluno(true)}>Adicionar outro aqui</button>
+        <button className="btn btn-md btn-ghost" disabled={!nome.trim()} onClick={() => addAluno(true)}>Adicionar outro aqui</button>
       </div>
       <button className="mt-3 w-full text-center text-sm text-navy-500" onClick={onFechar}>Pronto nesta casa</button>
     </div>
   );
 }
 
-function FormEscola({ rota, setRota, destinos, proxOrdem, aBordo, onFechar }: {
+function FormEscola({ rota, setRota, destinos, proxOrdem, aBordo, onFechar, compacto = false }: {
   rota: Rota; setRota: (r: Rota) => void;
   destinos: { id: string; nome: string; bairro: string; lat?: number | null; lng?: number | null }[];
-  proxOrdem: number; aBordo: { id: string; identificacao: string }[]; onFechar: () => void;
+  proxOrdem: number; aBordo: { id: string; identificacao: string }[]; onFechar: () => void; compacto?: boolean;
 }) {
   const [destinoId, setDestinoId] = useState('');
   const [selec, setSelec] = useState<string[]>(aBordo.map((p) => p.id)); // por padrão todos descem
@@ -598,7 +598,7 @@ function FormEscola({ rota, setRota, destinos, proxOrdem, aBordo, onFechar }: {
   }
 
   return (
-    <div className="card mt-4 p-5">
+    <div className={cn('card mt-0', compacto ? 'p-2.5 shadow-none ring-0' : 'mt-4 p-5')}>
       <h2 className="font-display font-bold">Qual escola?</h2>
       <select className="field-input mt-3 appearance-none" value={destinoId} onChange={(e) => setDestinoId(e.target.value)}>
         <option value="">Escolha a escola…</option>
@@ -626,11 +626,11 @@ function FormEscola({ rota, setRota, destinos, proxOrdem, aBordo, onFechar }: {
         <p className="mt-4 rounded-xl bg-navy-50 p-3 text-sm text-navy-500">Nenhum aluno a bordo para descer aqui ainda.</p>
       )}
 
-      <div className="mt-5 flex gap-3">
-        <button className="btn btn-lg btn-primary flex-1" disabled={!destinoId} onClick={confirmar}>
+      <div className="mt-3 flex gap-2">
+        <button className="btn btn-md btn-primary flex-1" disabled={!destinoId} onClick={confirmar}>
           <CheckCircle2 className="h-5 w-5" /> Confirmar parada na escola
         </button>
-        <button className="btn btn-lg btn-ghost" onClick={onFechar}><X className="h-5 w-5" /></button>
+        <button className="btn btn-md btn-ghost" onClick={onFechar}><X className="h-5 w-5" /></button>
       </div>
     </div>
   );

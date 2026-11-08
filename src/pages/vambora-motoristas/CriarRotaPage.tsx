@@ -9,7 +9,7 @@ import { SubHeader, Card } from '@/components/vm/ui';
 import { VanEscolar } from '@/components/vm/VanEscolar';
 import { SlotIlustracao } from '@/components/vm/SlotImagem';
 import { MapaInterativoRota } from '@/components/motorista/MapaInterativoRota';
-import { VanViz, LinhaPercurso, AcaoParada, Horarios, rotaNova } from '@/pages/motorista/RotaBuilderPage';
+import { AcaoParada, Horarios, rotaNova } from '@/pages/motorista/RotaBuilderPage';
 import { listarVeiculos, salvarRota } from '@/data/motorista-store';
 import { USE_SUPABASE } from '@/lib/supabase';
 import { VEICULO_CENARIO } from '@/lib/vm/cenario';
@@ -101,9 +101,9 @@ export function CriarRotaPage() {
   const idxEtapa = etapa === 'van' ? 0 : etapa === 'paradas' ? 1 : 2;
 
   return (
-    <VMShell nav={false}>
+    <VMShell nav={false} wide className={etapa === 'paradas' ? 'h-dvh overflow-hidden pb-0' : undefined}>
       <SubHeader titulo="Criar rota" onVoltar={voltar} />
-      <div className="px-4 pb-10 pt-4">
+      <div className={etapa === 'paradas' ? 'px-3 pt-1' : 'px-4 pb-10 pt-4'}>
         <Stepper atual={idxEtapa} />
 
         {aviso && <p className="mb-3 rounded-xl bg-red-50 p-2.5 text-sm font-medium text-red-600">{aviso}</p>}
@@ -118,40 +118,52 @@ export function CriarRotaPage() {
               onCadastrarOutra={() => navigate('/app/van/cadastro')} onContinuar={escolherVan} />
           )
         ) : etapa === 'paradas' ? (
-          <div className="space-y-3.5">
-            <ConfigRota rota={rota} setRota={setRota} />
-            <VanViz capacidade={capacidade} aBordo={aBordoFinal.length} rota={rota} veiculo={veiculo} />
-            {rota.paradas.length > 0 && <LinhaPercurso rota={rota} setRota={setRota} mostrarHorarios={false} />}
-            {rota.paradas.length > 0 && (
-              <Card className="p-3.5">
-                <p className="mb-2.5 inline-flex items-center gap-2 font-display font-bold text-navy-900">
-                  <Navigation className="h-4 w-4 text-mint-600" /> Mapa da rota
-                </p>
-                <div className="h-60 overflow-hidden rounded-2xl ring-1 ring-navy-100">
-                  <MapaInterativoRota paradas={rota.paradas} onTempos={aplicarTempos} bare />
-                </div>
-              </Card>
-            )}
-            <AcaoParada rota={rota} setRota={setRota} destinos={destinos} locais={locaisBusca} aBordo={aBordoFinal} capacidade={capacidade} escolaFinalObrigatoria />
-
-            {problemas.length > 0 && (
-              <div className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">
-                {problemas.slice(0, 3).map((p, i) => (
-                  <p key={i} className="inline-flex items-start gap-1.5"><AlertCircle className="mt-0.5 h-4 w-4 shrink-0" /> {p.mensagem}</p>
-                ))}
-              </div>
-            )}
-            <button onClick={() => setEtapa('confirmacao')} disabled={!podeFinalizar(rota, veiculo)}
-              className="flex h-14 w-full items-center justify-center gap-2 rounded-full bg-mint-500 font-display text-base font-bold text-white shadow-float transition active:scale-[0.98] disabled:opacity-60">
-              <Flag className="h-5 w-5" /> Finalizar rota
-            </button>
-          </div>
+          <CadastroParadasPremium rota={rota} setRota={setRota} destinos={destinos} locais={locaisBusca} aBordo={aBordoFinal} capacidade={capacidade} veiculo={veiculo} aplicarTempos={aplicarTempos} problemas={problemas} onFinalizar={() => setEtapa('confirmacao')} />
         ) : (
           <ConfirmacaoRota rota={rota} setRota={setRota} veiculo={veiculo} capacidade={capacidade}
             aBordo={aBordoFinal.length} onConcluir={concluir} salvando={salvando} />
         )}
       </div>
     </VMShell>
+  );
+}
+
+function CadastroParadasPremium({ rota, setRota, destinos, locais, aBordo, capacidade, veiculo, aplicarTempos, problemas, onFinalizar }: {
+  rota: Rota; setRota: (r: Rota) => void;
+  destinos: { id: string; nome: string; bairro: string; lat?: number | null; lng?: number | null }[];
+  locais: { rotulo: string; lat: number; lng: number }[];
+  aBordo: { id: string; identificacao: string }[];
+  capacidade: number; veiculo: Veiculo | null; aplicarTempos: (tempos: number[]) => void;
+  problemas: { mensagem: string }[]; onFinalizar: () => void;
+}) {
+  const ultima = [...rota.paradas].sort((a, b) => b.ordem - a.ordem)[0];
+  const pode = podeFinalizar(rota, veiculo);
+  return (
+    <div className="h-[calc(100dvh-9.25rem)] min-h-0 overflow-hidden rounded-[1.5rem] bg-navy-950 p-2 shadow-2xl ring-1 ring-black/10 sm:h-[calc(100dvh-9rem)] sm:p-3 lg:h-[calc(100dvh-8.5rem)]">
+      <div className="grid h-full min-h-0 grid-rows-[42%_58%] gap-2 lg:grid-cols-[minmax(0,1.3fr)_minmax(22rem,0.7fr)] lg:grid-rows-1 lg:gap-3">
+        <section className="relative min-h-0 overflow-hidden rounded-[1.2rem] bg-navy-100 shadow-xl">
+          <MapaInterativoRota paradas={rota.paradas} onTempos={aplicarTempos} bare />
+          <div className="pointer-events-none absolute inset-x-3 top-3 flex items-start justify-between gap-2 sm:inset-x-4 sm:top-4">
+            <div className="ml-10 rounded-2xl bg-navy-950/90 px-3 py-2 text-white shadow-xl backdrop-blur sm:ml-12"><p className="text-[9px] font-bold uppercase tracking-[0.18em] text-mint-300">Percurso em construção</p><p className="mt-0.5 text-sm font-extrabold">{rota.paradas.length ? `${rota.paradas.length} ponto(s) confirmado(s)` : 'Comece pela saída da van'}</p></div>
+            <div className="rounded-2xl bg-white/95 px-3 py-2 text-right text-[10px] font-bold text-navy-900 shadow-xl"><span className="block text-navy-400">VAN</span>{veiculo?.modelo || 'Sua van'}</div>
+          </div>
+          <div className="pointer-events-none absolute bottom-3 left-3 rounded-full bg-white/95 px-3 py-1.5 text-[10px] font-bold text-navy-900 shadow-xl sm:bottom-4 sm:left-4">A van acompanha o último ponto</div>
+        </section>
+        <aside className="flex min-h-0 flex-col overflow-hidden rounded-[1.2rem] bg-white shadow-xl">
+          <div className="shrink-0 border-b border-navy-100 bg-gradient-to-r from-navy-950 to-navy-800 px-4 py-3 text-white sm:px-5">
+            <div className="flex items-center justify-between gap-2"><div><p className="text-[9px] font-bold uppercase tracking-[0.18em] text-mint-300">Próximo ponto</p><h2 className="font-display text-lg font-extrabold">{ultima ? (ultima.tipo === 'escola' ? 'Escola final' : 'Adicionar endereço') : 'Endereço de saída'}</h2></div><Navigation className="h-5 w-5 text-mint-300" /></div>
+            <div className="mt-2 flex gap-2 text-[10px] font-semibold text-white/70"><span className="rounded-full bg-white/10 px-2 py-1">{rota.passageiros.length} aluno(s)</span><span className="rounded-full bg-white/10 px-2 py-1">{aBordo.length}/{capacidade} a bordo</span></div>
+          </div>
+          <div className="min-h-0 flex-1 overflow-hidden p-2 sm:p-3">
+            <AcaoParada rota={rota} setRota={setRota} destinos={destinos} locais={locais} aBordo={aBordo} capacidade={capacidade} escolaFinalObrigatoria compacto />
+          </div>
+          <div className="shrink-0 border-t border-navy-100 bg-navy-50 p-2 sm:p-3">
+            {problemas.length > 0 && <p className="mb-2 flex items-start gap-1.5 text-[10px] font-semibold text-amber-700"><AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />{problemas[0].mensagem}</p>}
+            <button onClick={onFinalizar} disabled={!pode} className="flex h-11 w-full items-center justify-center gap-2 rounded-full bg-mint-500 text-sm font-extrabold text-white shadow-lg transition hover:bg-mint-600 disabled:cursor-not-allowed disabled:opacity-40"><Flag className="h-4 w-4" /> Revisar e informar horário final</button>
+          </div>
+        </aside>
+      </div>
+    </div>
   );
 }
 
@@ -249,43 +261,6 @@ function MiniRecurso({ icon: Icon, label }: { icon: typeof Snowflake; label: str
     <span className="inline-flex items-center gap-1 rounded-full bg-navy-50 px-2 py-0.5 text-[10px] font-semibold text-navy-500">
       <Icon className="h-3 w-3" /> {label}
     </span>
-  );
-}
-
-/* ------------------------- Passo 2: configurações da rota ------------------------- */
-function ConfigRota({ rota, setRota }: { rota: Rota; setRota: (r: Rota) => void }) {
-  return (
-    <Card className="p-4">
-      <p className="field-label">Sentido</p>
-      <div className="mt-1 flex gap-2">
-        <PillSel ativo={rota.sentido === 'ida'} onClick={() => setRota({ ...rota, sentido: 'ida' })}>Ida (leva à escola)</PillSel>
-        <PillSel ativo={rota.sentido === 'volta'} onClick={() => setRota({ ...rota, sentido: 'volta' })}>Volta (traz da escola)</PillSel>
-      </div>
-      <p className="field-label mt-4">Vai um monitor?</p>
-      <div className="mt-1 flex gap-2">
-        <PillSel ativo={rota.monitor} onClick={() => setRota({ ...rota, monitor: true })}>Sim</PillSel>
-        <PillSel ativo={!rota.monitor} onClick={() => setRota({ ...rota, monitor: false, monitorOcupaLugar: false })}>Não</PillSel>
-      </div>
-      {rota.monitor && (
-        <>
-          <p className="field-label mt-3">O monitor ocupa um lugar?</p>
-          <div className="mt-1 flex gap-2">
-            <PillSel ativo={rota.monitorOcupaLugar} onClick={() => setRota({ ...rota, monitorOcupaLugar: true })}>Sim</PillSel>
-            <PillSel ativo={!rota.monitorOcupaLugar} onClick={() => setRota({ ...rota, monitorOcupaLugar: false })}>Não</PillSel>
-          </div>
-        </>
-      )}
-    </Card>
-  );
-}
-
-function PillSel({ ativo, onClick, children }: { ativo: boolean; onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button type="button" onClick={onClick} aria-pressed={ativo}
-      className={cn('flex-1 rounded-full px-3 py-2 text-[13px] font-semibold transition',
-        ativo ? 'bg-mint-500 text-white shadow-glow' : 'bg-navy-50 text-navy-600 ring-1 ring-navy-100')}>
-      {children}
-    </button>
   );
 }
 

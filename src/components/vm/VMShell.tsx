@@ -17,10 +17,10 @@ export const TABS = [
 ] as const;
 
 /** Casca do app Vambora Motoristas: fundo + conteúdo + navegação inferior. */
-export function VMShell({ children, nav = true }: { children: ReactNode; nav?: boolean }) {
+export function VMShell({ children, nav = true, className, wide = false }: { children: ReactNode; nav?: boolean; className?: string; wide?: boolean }) {
   return (
-    <div className="vm-app pb-24">
-      <div className="vm-screen">{children}</div>
+    <div className={cn('vm-app pb-24', className)}>
+      <div className={cn('vm-screen', wide && 'vm-screen-wide')}>{children}</div>
       {nav && <VMBottomNav />}
     </div>
   );
