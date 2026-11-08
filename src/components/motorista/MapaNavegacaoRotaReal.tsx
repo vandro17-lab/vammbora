@@ -4,6 +4,8 @@ import type { TrajetoRota } from '@/lib/geocode';
 
 type LeafletMap = {
   fitBounds: (bounds: unknown, options?: unknown) => void;
+  setView: (center: [number, number], zoom?: number, options?: unknown) => void;
+  invalidateSize: (options?: unknown) => void;
   remove: () => void;
 };
 type LeafletLayer = { addTo: (map: unknown) => LeafletLayer; clearLayers?: () => void };
@@ -36,11 +38,17 @@ export function MapaNavegacaoRotaReal({
   trajeto,
   progresso,
   seguindo,
+  posicaoGPS,
+  acompanharPosicao,
+  centralizarToken,
 }: {
   paradas: ParadaRota[];
   trajeto: TrajetoRota;
   progresso: number;
   seguindo: boolean;
+  posicaoGPS?: [number, number] | null;
+  acompanharPosicao?: boolean;
+  centralizarToken?: number;
 }) {
   const elRef = useRef<HTMLDivElement | null>(null);
   const mapaRef = useRef<LeafletMap | null>(null);
@@ -94,7 +102,7 @@ export function MapaNavegacaoRotaReal({
       });
       L.marker([p.lat, p.lng], { icon }).addTo(layer as never).bindTooltip(p.tipo === 'escola' ? (p.destinoNome || 'Escola') : (p.rotulo || 'Parada'));
     });
-    const van = L.marker(pontoNaGeometria(pontos, progresso), { icon: vanIcon(L), zIndexOffset: 1000 }).addTo(layer as never);
+    const van = L.marker(posicaoGPS ?? pontoNaGeometria(pontos, progresso), { icon: vanIcon(L), zIndexOffset: 1000 }).addTo(layer as never);
     vanRef.current = van as unknown as { setLatLng: (p: [number, number]) => void };
     if (pontos.length >= 2) map.fitBounds(L.latLngBounds(pontos), { padding: [34, 34], maxZoom: 16 });
   }
@@ -111,7 +119,18 @@ export function MapaNavegacaoRotaReal({
   useEffect(() => {
     if (!vanRef.current || !trajeto.geometria.length) return;
     vanRef.current.setLatLng(pontoNaGeometria(trajeto.geometria, progresso));
-  }, [progresso, seguindo, trajeto.geometria]);
+  }, [progresso, seguindo, trajeto.geometria, posicaoGPS]);
+
+  useEffect(() => {
+    const map = mapaRef.current;
+    if (!map) return;
+    map.invalidateSize({ animate: false });
+    if (posicaoGPS && acompanharPosicao) {
+      map.setView(posicaoGPS, 17, { animate: true, duration: 0.35 });
+    } else if (centralizarToken !== undefined && trajeto.geometria.length) {
+      map.setView(pontoNaGeometria(trajeto.geometria, progresso), 16, { animate: true, duration: 0.35 });
+    }
+  }, [posicaoGPS, acompanharPosicao, centralizarToken, progresso, trajeto.geometria]);
 
   return <div ref={elRef} className="h-full w-full bg-navy-100" aria-label="Mapa real da rota com a van em deslocamento" />;
 }
