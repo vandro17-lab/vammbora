@@ -29,7 +29,7 @@ export function catalogoDemo() {
     imagem:'/vanbora-visual/01_motoristas/motorista-'+String(i+1).padStart(2,'0')+'-'+SLUGS[i]+'.webp',
     vanImagem:'/vanbora-visual/02_veiculos/van-'+String(i+1).padStart(2,'0')+'.webp',
     modelo:MODELOS[i%4],vagas:1+(i*7%5),precoMensal:240+(i*31%240),
-    recursos:['Cinto de segurança',...(i%2===0?['Ar-condicionado']:[]),...(i%3===0?['Monitor']:[])],
+    recursos:['Transporte infantil','Documentação',...(i%2===0?['Ar-condicionado']:[]),...(i%3===0?['Monitor']:[])],
     turnos:TURNOS.filter((_,j)=>j===i%4||j===(i+1)%4||i%5===0),
   }));
 }

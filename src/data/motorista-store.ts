@@ -1,5 +1,12 @@
 import type { Rota, Veiculo, OrigemAtendimento } from '@/types/motorista';
-import { supabase, USE_SUPABASE } from '@/lib/supabase';
+import { supabase, USE_SUPABASE, DEMO_MOTORISTA } from '@/lib/supabase';
+
+/**
+ * Usa o banco real só quando o Supabase está configurado E o login demonstrativo
+ * do motorista está DESLIGADO. No modo demo, tudo vai para o localStorage, então
+ * o painel grava/lê sem depender de sessão (nunca trava).
+ */
+const USAR_BANCO_MOTORISTA = USE_SUPABASE && !DEMO_MOTORISTA;
 
 /**
  * Armazenamento do motorista (veículos e rotas).
@@ -39,7 +46,7 @@ function lsSet<T>(k: string, v: T): void {
 
 /* ------------------------------- VEÍCULOS -------------------------------- */
 export async function listarVeiculos(): Promise<Veiculo[]> {
-  if (USE_SUPABASE && supabase) {
+  if (USAR_BANCO_MOTORISTA && supabase) {
     const { data, error } = await supabase
       .from('vehicles')
       .select('id,model,year,plate,seats_passenger,feature_ac,feature_accessible,feature_seatbelt,photo_urls')
@@ -63,7 +70,7 @@ export async function listarVeiculos(): Promise<Veiculo[]> {
 }
 
 export async function salvarVeiculo(v: Veiculo): Promise<Veiculo> {
-  if (USE_SUPABASE && supabase) {
+  if (USAR_BANCO_MOTORISTA && supabase) {
     // owner_id é obrigatório (NOT NULL) e usado pela RLS: preenche com o usuário logado.
     const { data: u } = await supabase.auth.getUser();
     const ownerId = u.user?.id;
@@ -99,7 +106,7 @@ export async function salvarVeiculo(v: Veiculo): Promise<Veiculo> {
 
 /* -------------------------------- ROTAS ---------------------------------- */
 export async function listarRotas(): Promise<Rota[]> {
-  if (USE_SUPABASE && supabase) {
+  if (USAR_BANCO_MOTORISTA && supabase) {
     // Lê rotas + paradas + passageiros do dono (RLS cuida do escopo).
     const { data, error } = await supabase
       .from('routes')
@@ -125,7 +132,7 @@ export async function obterRota(id: string): Promise<Rota | null> {
 
 export async function salvarRota(rota: Rota): Promise<Rota> {
   const atualizada = { ...rota, atualizadoEm: new Date().toISOString() };
-  if (USE_SUPABASE && supabase) {
+  if (USAR_BANCO_MOTORISTA && supabase) {
     // Salvamento transacional via RPC (criada na migração de rotas).
     const { data, error } = await supabase.rpc('salvar_rota_completa', {
       p_rota: rotaParaBanco(atualizada),
@@ -144,7 +151,7 @@ export async function salvarRota(rota: Rota): Promise<Rota> {
 }
 
 export async function excluirRota(id: string): Promise<void> {
-  if (USE_SUPABASE && supabase) {
+  if (USAR_BANCO_MOTORISTA && supabase) {
     const { error } = await supabase.from('routes').delete().eq('id', id);
     if (error) throw new Error(error.message);
     return;
@@ -159,7 +166,7 @@ export async function excluirRota(id: string): Promise<void> {
  * pelo RPC de salvamento, para não depender dele. No modo demo, grava local.
  */
 export async function publicarRota(id: string, publicar: boolean): Promise<void> {
-  if (USE_SUPABASE && supabase) {
+  if (USAR_BANCO_MOTORISTA && supabase) {
     const { error } = await supabase.from('routes').update({ is_published: publicar }).eq('id', id);
     if (error) throw new Error(error.message);
     return;

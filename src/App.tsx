@@ -7,6 +7,7 @@ import { OportunidadesPage, SimularEncaixePage as VMSimularPage } from '@/pages/
 import { InteligenciaPage } from '@/pages/vambora-motoristas/InteligenciaPage';
 import { MinhaVanPage, CadastroVanPage } from '@/pages/vambora-motoristas/MinhaVanPage';
 import { MaisPage, ModuloPage } from '@/pages/vambora-motoristas/MaisPage';
+import { EditorMotoristasPage } from '@/pages/vambora-motoristas/EditorMotoristasPage';
 import { CriarRotaPage } from '@/pages/vambora-motoristas/CriarRotaPage';
 import { AparenciaPage } from '@/pages/vambora-motoristas/admin/AparenciaPage';
 import { AppAssetsProvider } from '@/lib/vm/useAppAssets';
@@ -78,6 +79,7 @@ export default function App() {
               <Route path="van" element={<MinhaVanPage />} />
               <Route path="van/cadastro" element={<CadastroVanPage />} />
               <Route path="mais" element={<MaisPage />} />
+              <Route path="mais/motoristas" element={<EditorMotoristasPage />} />
               <Route path="mais/:modulo" element={<ModuloPage />} />
               <Route path="admin/aparencia" element={<AparenciaPage />} />
             </Route>

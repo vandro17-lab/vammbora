@@ -2,17 +2,19 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft, Heart, Star, SlidersHorizontal, X, Play, Pause, RotateCcw,
   ShieldCheck, Check, Clock3, Ruler, Map as MapIcon,
-  ListChecks, Users, GraduationCap, ChevronRight, BadgeCheck,
+  ListChecks, Users, GraduationCap, ChevronRight, ChevronDown, BadgeCheck,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { OfertaDemo } from './engine';
 import { gerarAvaliacoesDemo, type AvaliacoesDemo } from './avaliacoes-demo';
+import { lerOverrides } from '@/data/motoristas-override';
 import { VanIllustration } from '@/components/brand/VanIllustration';
 import { Avatar } from '@/components/brand/Avatar';
 import { Stars } from '@/components/ui/Stars';
 import { DemoBadge } from '@/components/ui/DemoBadge';
 import { cn } from '@/lib/utils';
-import iconeCinto from '@/assets/icones-recursos/cinto-seguranca.svg';
+import iconeTransporte from '@/assets/icones-recursos/transporte-escolar.svg';
+import iconeDocumentos from '@/assets/icones-recursos/documentos.svg';
 import iconeAr from '@/assets/icones-recursos/ar-condicionado.svg';
 import iconeMonitor from '@/assets/icones-recursos/monitor.svg';
 import ilustracaoSemResultado from '@/assets/ilustracoes/nenhum-resultado.png';
@@ -26,10 +28,19 @@ type Aba = 'trajeto' | 'perfil' | 'avaliacoes';
 // Ícones oficiais dos recursos (SVG do pacote visual — preto + acento #FFC700).
 // Usados como <img> para preservar o desenho bicolor da marca.
 const RECURSO_SVG: Record<string, string> = {
-  'Cinto de segurança': iconeCinto,
+  'Transporte infantil': iconeTransporte,
+  'Documentação': iconeDocumentos,
   'Ar-condicionado': iconeAr,
   Monitor: iconeMonitor,
 };
+
+// Documentação do motorista (sub-selo exibido ao abrir o perfil). Todos os
+// perfis demonstrativos exibidos já passaram pela verificação documental.
+const DOCUMENTOS_MOTORISTA: { nome: string; status: string }[] = [
+  { nome: 'Habilitação (CNH)', status: 'OK' },
+  { nome: 'Alvará de transporte escolar', status: 'OK' },
+  { nome: 'Curso de condutor de veículo escolar', status: 'Autorizado' },
+];
 // Rótulo honesto do destaque do 1º resultado: descreve o critério de ordenação
 // ativo (é, de fato, o melhor por aquele critério). Não é uma pontuação inventada.
 const BADGE_ORDEM: Record<Ordem, string> = {
@@ -65,15 +76,25 @@ export function FamilyDemoResults({ ofertas, carregando, erro, horario, endereco
   const [fotoAberta, setFotoAberta] = useState(false);
   const [solicitacao, setSolicitacao] = useState(false);
   const [filtroNota, setFiltroNota] = useState<0 | 5 | 4 | 3>(0);
+  const [docAberta, setDocAberta] = useState(false);
+
+  // Aplica os ajustes do admin (nome/foto corrigidos no editor), se houver.
+  const ofertasAjustadas = useMemo(() => {
+    const ov = lerOverrides();
+    return ofertas.map((o) => {
+      const x = ov[o.slug];
+      return x ? { ...o, nome: x.nome || o.nome, imagem: x.imagem || o.imagem } : o;
+    });
+  }, [ofertas]);
 
   // Avaliações demonstrativas, determinísticas e estáveis por motorista.
   const avaliacoes = useMemo(() => {
     const m: Record<string, AvaliacoesDemo> = {};
-    for (const o of ofertas) m[o.id] = gerarAvaliacoesDemo(o.id, o.nome);
+    for (const o of ofertasAjustadas) m[o.id] = gerarAvaliacoesDemo(o.id, o.nome);
     return m;
-  }, [ofertas]);
+  }, [ofertasAjustadas]);
 
-  const lista = ofertas
+  const lista = ofertasAjustadas
     .filter((o) => !somenteVagas || o.vagas > 0)
     .sort((a, b) =>
       ordenacao === 'preco' ? a.precoMensal - b.precoMensal
@@ -99,8 +120,27 @@ export function FamilyDemoResults({ ofertas, carregando, erro, horario, endereco
     return () => window.removeEventListener('keydown', onKey);
   }, [selecionado]);
 
+  // Enquanto o modal está aberto, TRAVA a rolagem do fundo e guarda a posição.
+  // Assim o pop-up abre enquadrado na tela (não "lá em cima") e, ao fechar, a
+  // página volta exatamente para onde o usuário estava. Essencial no celular.
+  useEffect(() => {
+    if (!selecionado) return;
+    const y = window.scrollY;
+    const body = document.body;
+    const anterior = body.style.cssText;
+    body.style.position = 'fixed';
+    body.style.top = `-${y}px`;
+    body.style.left = '0';
+    body.style.right = '0';
+    body.style.width = '100%';
+    return () => {
+      body.style.cssText = anterior;
+      window.scrollTo(0, y);
+    };
+  }, [selecionado]);
+
   function abrir(o: OfertaDemo, tab: Aba) {
-    setSelecionado(o); setAba(tab); setParada(0); setRodando(false); setSolicitacao(false); setModoTrajeto('mapa'); setFiltroNota(0);
+    setSelecionado(o); setAba(tab); setParada(0); setRodando(false); setSolicitacao(false); setModoTrajeto('mapa'); setFiltroNota(0); setDocAberta(false);
   }
   function favoritar(id: string) {
     setFavoritos((a) => a.includes(id) ? a.filter((x) => x !== id) : [...a, id]);
@@ -369,7 +409,47 @@ export function FamilyDemoResults({ ofertas, carregando, erro, horario, endereco
                   <dl className="mt-5 space-y-3 rounded-2xl bg-navy-50/60 p-4">
                     <InfoLinha Icone={GraduationCap} rotulo="Atende" valor={`${selecionado.escola} e região`} />
                     <InfoLinha Icone={Users} rotulo="Vagas informadas" valor={`${selecionado.vagas} ${selecionado.vagas === 1 ? 'vaga' : 'vagas'}`} />
-                    <InfoLinha Icone={ShieldCheck} rotulo="Recursos do veículo" valor={selecionado.recursos.join(' · ')} />
+                    <div className="flex items-start gap-3">
+                      <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-white text-mint-700 ring-1 ring-navy-100"><ShieldCheck size={16} /></span>
+                      <div className="min-w-0 flex-1">
+                        <dt className="text-xs text-navy-500">Selos</dt>
+                        <div className="mt-1.5 flex flex-wrap gap-1.5">
+                          {selecionado.recursos.map((r) => {
+                            const ico = RECURSO_SVG[r];
+                            if (r === 'Documentação') {
+                              return (
+                                <button
+                                  key={r}
+                                  type="button"
+                                  onClick={() => setDocAberta((v) => !v)}
+                                  aria-expanded={docAberta}
+                                  className={cn('chip ring-1 transition-colors', docAberta ? 'bg-mint-50 text-navy-900 ring-mint-300' : 'bg-white text-navy-700 ring-navy-200 hover:ring-navy-300')}
+                                >
+                                  {ico && <img src={ico} alt="" className="h-4 w-4" />} Documentação
+                                  <ChevronDown size={13} className={cn('transition-transform', docAberta && 'rotate-180')} />
+                                </button>
+                              );
+                            }
+                            return (
+                              <span key={r} className="chip bg-white text-navy-700 ring-1 ring-navy-200">
+                                {ico ? <img src={ico} alt="" className="h-4 w-4" /> : <Check size={13} className="text-mint-700" />} {r}
+                              </span>
+                            );
+                          })}
+                        </div>
+                        {docAberta && (
+                          <ul className="mt-3 space-y-2 rounded-xl bg-white p-3 ring-1 ring-navy-100">
+                            {DOCUMENTOS_MOTORISTA.map((d) => (
+                              <li key={d.nome} className="flex items-center justify-between gap-3 text-sm">
+                                <span className="inline-flex items-center gap-2 text-navy-700"><BadgeCheck size={15} className="shrink-0 text-emerald-500" /> {d.nome}</span>
+                                <span className="chip shrink-0 bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200">{d.status}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                        <p className="mt-2 text-[11px] text-navy-400">Documentação demonstrativa — confirme os dados reais com o motorista.</p>
+                      </div>
+                    </div>
                   </dl>
 
                   <button onClick={() => setSolicitacao(true)} className="btn btn-md btn-primary mt-5 w-full">

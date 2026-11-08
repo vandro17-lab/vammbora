@@ -149,6 +149,16 @@ export function MaisPage() {
             <LogOut className="h-4 w-4" /> Sair da conta
           </button>
         )}
+
+        {/* Acesso DISFARÇADO ao editor de motoristas da demonstração (admin). */}
+        <button
+          onClick={() => navigate('/app/mais/motoristas')}
+          aria-label="Editar motoristas (demonstração)"
+          title="Editar motoristas"
+          className="mx-auto mt-2 flex h-8 w-8 items-center justify-center rounded-full text-navy-200 transition hover:text-navy-500 active:scale-90"
+        >
+          <UserCircle size={18} weight="duotone" />
+        </button>
       </div>
     </VMShell>
   );
