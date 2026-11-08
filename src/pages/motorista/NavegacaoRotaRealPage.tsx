@@ -174,7 +174,7 @@ function NavegacaoProtegida() {
   if (erro || !rota || !trajeto) return <div className="flex min-h-dvh items-center justify-center bg-navy-950 p-4"><div className="card max-w-md p-7 text-center"><RouteIcon className="mx-auto h-10 w-10 text-navy-300" /><h1 className="mt-4 font-display text-xl font-bold text-navy-900">Não foi possível abrir a rota</h1><p className="mt-2 text-sm text-navy-600">{erro}</p><Link to="/app/rotas" className="btn btn-lg btn-primary mt-6 w-full">Voltar para minhas rotas</Link></div></div>;
 
   return (
-    <div className="min-h-dvh bg-navy-950 text-white">
+    <div className="h-dvh overflow-hidden bg-navy-950 text-white">
       <header className="relative z-20 border-b border-white/10 bg-navy-950/95 backdrop-blur">
         <div className="mx-auto flex min-h-16 max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <Link to={`/app/rotas/${rota.id}`} className="inline-flex items-center gap-2 text-sm font-semibold text-white/80 hover:text-white"><ArrowLeft className="h-4 w-4" /> Voltar</Link>
@@ -182,44 +182,44 @@ function NavegacaoProtegida() {
           <span className="hidden rounded-full bg-mint-400/15 px-3 py-1 text-[11px] font-bold text-mint-200 sm:inline-flex">{percentual}% concluído</span>
         </div>
       </header>
-      <main className="mx-auto grid min-h-[calc(100dvh-4rem)] max-w-7xl gap-4 p-3 sm:p-5 lg:grid-cols-[minmax(0,1fr)_25rem]">
-        <section className="relative h-[46dvh] min-h-[20rem] overflow-hidden rounded-[1.6rem] bg-navy-100 shadow-2xl ring-1 ring-white/10 sm:h-[55dvh] lg:h-[calc(100dvh-7rem)]">
+      <main className="mx-auto grid h-[calc(100dvh-4rem)] min-h-0 max-w-7xl grid-rows-[minmax(0,36%)_minmax(0,64%)] gap-2 overflow-hidden p-2 sm:gap-4 sm:p-5 lg:grid-cols-[minmax(0,1fr)_25rem] lg:grid-rows-1">
+        <section className="relative min-h-0 overflow-hidden rounded-[1.6rem] bg-navy-100 shadow-2xl ring-1 ring-white/10">
           <MapaNavegacaoRotaReal paradas={paradas} trajeto={trajeto} progresso={progresso} seguindo={estado === 'movendo'} />
           <div className="pointer-events-none absolute left-3 right-3 top-3 flex items-start justify-between gap-3 sm:left-5 sm:right-5 sm:top-5">
             <div className="rounded-2xl bg-navy-950/90 px-4 py-3 shadow-xl backdrop-blur"><p className="text-[10px] font-bold uppercase tracking-[0.18em] text-mint-300">{estado === 'finalizada' ? 'Rota concluída' : estado === 'chegou' ? 'Você chegou' : estado === 'movendo' ? 'Em deslocamento' : 'Rota pronta'}</p><p className="mt-1 max-w-[14rem] font-display text-base font-extrabold text-white">{estado === 'finalizada' ? 'Todos os eventos registrados' : nomeParada(paradaAlvo)}</p></div>
             <div className="rounded-2xl bg-white/95 px-3 py-2 text-right text-xs font-bold text-navy-900 shadow-lg"><span className="block text-[10px] uppercase tracking-widest text-navy-500">Paradas</span>{Math.min(indiceAtual, paradas.length - 1)} / {Math.max(0, paradas.length - 1)}</div>
           </div>
         </section>
-        <aside className="flex min-w-0 flex-col gap-3">
-          <section className="rounded-[1.6rem] bg-navy-900 p-5 shadow-xl ring-1 ring-white/10">
+        <aside className="grid min-h-0 min-w-0 grid-cols-2 grid-rows-[auto_auto_auto_minmax(0,1fr)] gap-2 overflow-hidden lg:flex lg:flex-col lg:gap-3">
+          <section className="col-span-2 min-h-0 rounded-[1.6rem] bg-navy-900 p-3 shadow-xl ring-1 ring-white/10 sm:p-5 lg:col-span-1">
             <div className="flex items-start justify-between gap-3"><div><p className="text-[10px] font-bold uppercase tracking-[0.2em] text-mint-300">Operação da van</p><h1 className="mt-1 font-display text-2xl font-extrabold">{estado === 'finalizada' ? 'Viagem finalizada' : estado === 'chegou' ? 'Confirme a parada' : estado === 'movendo' ? 'Em deslocamento' : 'Pronta para sair'}</h1></div><Navigation className="h-7 w-7 shrink-0 text-mint-300" /></div>
-            <p className="mt-3 text-sm leading-relaxed text-white/65">O mapa mostra o trajeto real. A viagem só avança depois que você confirma quem embarcou e quem desembarcou.</p>
-            <button className="btn btn-lg btn-primary mt-5 w-full" disabled={estado === 'movendo' || estado === 'finalizada'} onClick={estado === 'chegou' ? confirmarParada : estado === 'pronta' || estado === 'confirmada' ? iniciarRota : undefined}>
+            <p className="mt-2 hidden text-sm leading-relaxed text-white/65 sm:mt-3 sm:block">O mapa mostra o trajeto real. A viagem só avança depois que você confirma quem embarcou e quem desembarcou.</p>
+            <button className="btn btn-md btn-primary mt-3 w-full sm:btn-lg sm:mt-5" disabled={estado === 'movendo' || estado === 'finalizada'} onClick={estado === 'chegou' ? confirmarParada : estado === 'pronta' || estado === 'confirmada' ? iniciarRota : undefined}>
               {estado === 'movendo' ? <><Clock3 className="h-5 w-5 animate-pulse" /> {textoAcao}</> : estado === 'finalizada' ? <><CheckCircle2 className="h-5 w-5" /> {textoAcao}</> : estado === 'chegou' ? <><Check className="h-5 w-5" /> {textoAcao}</> : <><Play className="h-5 w-5" /> {textoAcao}</>}
             </button>
             {estado === 'finalizada' && <button className="btn btn-md btn-ghost mt-2 w-full border border-white/15 bg-white/5 text-white hover:bg-white/10" onClick={reiniciar}><RotateCcw className="h-4 w-4" /> Reiniciar rota</button>}
-            {erroOperacao && <p role="alert" className="mt-3 flex items-start gap-2 rounded-xl bg-red-500/15 p-3 text-sm text-red-100"><XCircle className="mt-0.5 h-4 w-4 shrink-0" />{erroOperacao}</p>}
+            {erroOperacao && <p role="alert" className="mt-2 flex items-start gap-2 rounded-xl bg-red-500/15 p-2 text-xs text-red-100 sm:mt-3 sm:p-3 sm:text-sm"><XCircle className="mt-0.5 h-4 w-4 shrink-0" />{erroOperacao}</p>}
           </section>
-          <section className="grid grid-cols-3 gap-2 rounded-[1.6rem] bg-white p-3 text-center text-navy-900 shadow-xl ring-1 ring-white/10">
+          <section className="col-span-2 grid grid-cols-3 gap-1 rounded-[1.6rem] bg-white p-2 text-center text-navy-900 shadow-xl ring-1 ring-white/10 sm:gap-2 sm:p-3 lg:col-span-1">
             <div><Users className="mx-auto h-5 w-5 text-blue-600" /><strong className="mt-1 block font-display text-lg">{aBordo.length}</strong><span className="text-[11px] text-navy-500">a bordo</span></div>
             <div><CheckCircle2 className="mx-auto h-5 w-5 text-mint-600" /><strong className="mt-1 block font-display text-lg">{entregues.length}</strong><span className="text-[11px] text-navy-500">entregues</span></div>
             <div><Users className="mx-auto h-5 w-5 text-amber-600" /><strong className="mt-1 block font-display text-lg">{Math.max(0, capacidade - aBordo.length)}</strong><span className="text-[11px] text-navy-500">livres</span></div>
           </section>
-          <section className="rounded-[1.6rem] bg-white p-5 text-navy-900 shadow-xl ring-1 ring-white/10">
+          <section className="col-span-2 min-h-0 rounded-[1.6rem] bg-white p-3 text-navy-900 shadow-xl ring-1 ring-white/10 sm:p-5 lg:col-span-1">
             <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-navy-400">{estado === 'chegou' ? 'Operação desta parada' : 'Próxima parada'}</p>
             <h2 className="mt-1 font-display text-lg font-extrabold">{estado === 'finalizada' ? 'Todos chegaram' : nomeParada(paradaAlvo)}</h2>
             {estado === 'chegou' && <p className="mt-1 text-xs text-navy-500">Confirme a operação para registrar a viagem e liberar a próxima etapa.</p>}
-            {alunosNaParada.length > 0 && <div className="mt-3 space-y-2">{alunosNaParada.map(({ p, acao }) => <div key={`${acao}-${p.id}`} className="flex items-center justify-between gap-2 rounded-xl bg-navy-50 px-3 py-2 text-sm"><span className="min-w-0 truncate font-semibold">{nomePassageiro(p)}</span><span className={cn('shrink-0 rounded-full px-2 py-1 text-[10px] font-bold uppercase', acao === 'embarca' ? 'bg-mint-100 text-mint-700' : 'bg-blue-100 text-blue-700')}>{acao}</span></div>)}</div>}
-            {estado === 'chegou' && alunosNaParada.length === 0 && <p className="mt-3 rounded-xl bg-navy-50 p-3 text-sm text-navy-600">Nenhum aluno associado a esta parada. Confirme para continuar.</p>}
-            <div className="mt-4 h-2 overflow-hidden rounded-full bg-navy-100"><div className="h-full rounded-full bg-mint-500 transition-[width] duration-300" style={{ width: `${percentual}%` }} /></div>
+            {alunosNaParada.length > 0 && <div className="mt-2 space-y-1 sm:mt-3 sm:space-y-2">{alunosNaParada.map(({ p, acao }) => <div key={`${acao}-${p.id}`} className="flex items-center justify-between gap-2 rounded-xl bg-navy-50 px-3 py-1.5 text-xs sm:py-2 sm:text-sm"><span className="min-w-0 truncate font-semibold">{nomePassageiro(p)}</span><span className={cn('shrink-0 rounded-full px-2 py-1 text-[10px] font-bold uppercase', acao === 'embarca' ? 'bg-mint-100 text-mint-700' : 'bg-blue-100 text-blue-700')}>{acao}</span></div>)}</div>}
+            {estado === 'chegou' && alunosNaParada.length === 0 && <p className="mt-2 rounded-xl bg-navy-50 p-2 text-xs text-navy-600 sm:mt-3 sm:p-3 sm:text-sm">Nenhum aluno associado a esta parada. Confirme para continuar.</p>}
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-navy-100 sm:mt-4 sm:h-2"><div className="h-full rounded-full bg-mint-500 transition-[width] duration-300" style={{ width: `${percentual}%` }} /></div>
           </section>
-          <section className="rounded-[1.6rem] bg-white p-5 text-navy-900 shadow-xl ring-1 ring-white/10">
-            <div className="flex items-center justify-between"><h2 className="font-display font-extrabold">Passageiros a bordo</h2><span className="text-xs font-semibold text-navy-400">{aBordo.length}/{capacidade}</span></div>
-            <div className="mt-3 space-y-2">{aBordo.length ? aBordo.map((p) => <div key={p.id} className="flex items-center gap-3 rounded-xl bg-mint-50 px-3 py-2 text-sm"><span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-mint-500 text-xs font-bold text-white">{nomePassageiro(p).slice(0, 1).toUpperCase()}</span><span className="min-w-0 flex-1 truncate font-semibold">{nomePassageiro(p)}</span><span className="text-[10px] font-bold uppercase text-mint-700">a bordo</span></div>) : <p className="rounded-xl bg-navy-50 p-3 text-sm text-navy-500">Nenhum aluno a bordo ainda.</p>}</div>
+          <section className="min-h-0 overflow-hidden rounded-[1.6rem] bg-white p-3 text-navy-900 shadow-xl ring-1 ring-white/10 sm:p-5">
+            <div className="flex items-center justify-between"><h2 className="font-display text-sm font-extrabold sm:text-base">Passageiros a bordo</h2><span className="text-xs font-semibold text-navy-400">{aBordo.length}/{capacidade}</span></div>
+            <div className="mt-2 max-h-16 space-y-1 overflow-hidden sm:mt-3 sm:max-h-none sm:space-y-2">{aBordo.length ? aBordo.map((p) => <div key={p.id} className="flex items-center gap-2 rounded-xl bg-mint-50 px-2 py-1.5 text-xs sm:gap-3 sm:px-3 sm:py-2 sm:text-sm"><span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-mint-500 text-[10px] font-bold text-white sm:h-7 sm:w-7 sm:text-xs">{nomePassageiro(p).slice(0, 1).toUpperCase()}</span><span className="min-w-0 flex-1 truncate font-semibold">{nomePassageiro(p)}</span><span className="text-[9px] font-bold uppercase text-mint-700 sm:text-[10px]">a bordo</span></div>) : <p className="rounded-xl bg-navy-50 p-2 text-xs text-navy-500 sm:p-3 sm:text-sm">Nenhum aluno a bordo ainda.</p>}</div>
           </section>
-          <section className="rounded-[1.6rem] bg-white p-5 text-navy-900 shadow-xl ring-1 ring-white/10">
-            <div className="flex items-center justify-between"><h2 className="font-display font-extrabold">Histórico da viagem</h2><span className="text-xs font-semibold text-navy-400">{eventos.length}</span></div>
-            <div className="mt-3 space-y-2">{eventos.length ? eventos.map((evento, i) => <div key={i} className="flex gap-2 text-sm text-navy-600"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-mint-600" />{evento.texto}</div>) : <p className="text-sm text-navy-500">As confirmações aparecerão aqui.</p>}</div>
+          <section className="min-h-0 overflow-hidden rounded-[1.6rem] bg-white p-3 text-navy-900 shadow-xl ring-1 ring-white/10 sm:p-5">
+            <div className="flex items-center justify-between"><h2 className="font-display text-sm font-extrabold sm:text-base">Histórico</h2><span className="text-xs font-semibold text-navy-400">{eventos.length}</span></div>
+            <div className="mt-2 max-h-16 space-y-1 overflow-hidden text-xs sm:mt-3 sm:max-h-none sm:space-y-2 sm:text-sm">{eventos.length ? eventos.map((evento, i) => <div key={i} className="flex gap-2 text-navy-600"><CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-mint-600 sm:h-4 sm:w-4" />{evento.texto}</div>) : <p className="text-navy-500">As confirmações aparecerão aqui.</p>}</div>
           </section>
         </aside>
       </main>
