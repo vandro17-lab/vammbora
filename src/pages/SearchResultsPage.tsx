@@ -67,11 +67,11 @@ export function SearchResultsPage(){
   });
   return () => cancelAnimationFrame(id);
  }, [carregando, imagensProntas, mostrarOverlay]);
- return <main className="container-page py-8">
+ return <main className="container-page vb-marketplace-page py-8">
   <AnimatePresence>{mostrarOverlay&&<SearchLoadingScreen key="busca-loading" totalConsultados={0} cidade="Araçatuba" />}</AnimatePresence>
   <Link to="/" className="inline-flex items-center gap-2 text-sm font-semibold text-navy-700 hover:text-navy-900"><ArrowLeft size={17}/> Nova busca</Link>
   <div className="mt-5"><span className="chip bg-mint-100 font-bold text-mint-800 ring-1 ring-mint-200">Experiência demonstrativa</span></div>
-  <h1 className="mt-3 font-display text-3xl font-bold tracking-tight text-navy-900">Vans para {destino?.nome||'sua escola'}</h1>
+  <div className="vb-results-intro"><div><span className="vb-eyebrow">TRANSPORTE ESCOLAR EM ARAÇATUBA</span><h1 className="mt-3 font-display text-3xl font-bold tracking-tight text-navy-900">Encontre a van ideal para sua família</h1><p className="vb-intro-caption">Compare opções para {destino?.nome||'sua escola'}, confira horários e conheça os motoristas.</p></div><div className="vb-intro-symbol" aria-hidden="true"><span>Van<span>Bora</span></span><span className="vb-intro-line" /></div></div>
   <p className="mt-2 text-sm text-navy-500">Ofertas ilustrativas · localização e trajetos consultados em mapas reais.</p>
   <FamilyDemoResults ofertas={ofertas} carregando={carregando} erro={erro} horario={horario} endereco={criterios.endereco} onEditar={()=>window.location.assign('/')}/>
  </main>;

@@ -167,7 +167,7 @@ export function FamilyDemoResults({ ofertas, carregando, erro, horario, endereco
   }
 
   return (
-    <section className="mt-7">
+    <section className="vb-marketplace-results mt-7">
       {/* Cabeçalho dos resultados */}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
@@ -226,13 +226,13 @@ export function FamilyDemoResults({ ofertas, carregando, erro, horario, endereco
       )}
 
       {/* Grade de cards (marketplace) */}
-      <div className="mt-5 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+      <div className="vb-driver-grid mt-5 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
         {lista.map((o, i) => {
           const destaque = i === 0 && lista.length > 1 && !carregando;
           return (
-            <article key={o.id} className="group flex flex-col overflow-hidden rounded-3xl bg-white shadow-card ring-1 ring-navy-100/70 transition-shadow hover:shadow-card-hover">
+            <article key={o.id} className="vb-driver-card group flex flex-col overflow-hidden rounded-3xl bg-white shadow-card ring-1 ring-navy-100/70 transition-shadow hover:shadow-card-hover">
               {/* Capa vetorial da van (segura de licença; sem depender de fotos externas) */}
-              <div className="relative">
+              <div className="vb-card-cover relative">
                 <FotoVan src={o.vanImagem} seed={o.slug} alt={`Van de ${o.nome}`} className="h-40 w-full" />
                 {destaque && (
                   <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-mint-400 px-3 py-1 text-xs font-bold text-navy-950 shadow">
@@ -250,7 +250,7 @@ export function FamilyDemoResults({ ofertas, carregando, erro, horario, endereco
                 </button>
               </div>
 
-              <div className="flex flex-1 flex-col p-5">
+              <div className="vb-card-body flex flex-1 flex-col p-5">
                 <button onClick={() => abrir(o, 'perfil')} className="flex items-center gap-3 text-left">
                   <FotoMotorista src={o.imagem} nome={o.nome} className="h-11 w-11 text-sm" />
                   <span className="min-w-0">
@@ -259,7 +259,7 @@ export function FamilyDemoResults({ ofertas, carregando, erro, horario, endereco
                   </span>
                 </button>
 
-                <div className="mt-3"><SelosVerificacaoDemo oferta={o} /></div>
+                <div className="vb-verification-badges mt-3"><SelosVerificacaoDemo oferta={o} /></div>
 
                 {/* Avaliações demonstrativas — nota + total, abre a aba de avaliações */}
                 <button onClick={() => abrir(o, 'avaliacoes')} className="mt-2.5 inline-flex w-fit items-center gap-1 rounded-lg px-1 py-0.5 -ml-1 hover:bg-navy-50" aria-label={`Ver avaliações de ${o.nome}`}>
@@ -267,7 +267,7 @@ export function FamilyDemoResults({ ofertas, carregando, erro, horario, endereco
                 </button>
 
                 {/* Grade de horários */}
-                <div className="mt-4 grid grid-cols-3 gap-px overflow-hidden rounded-2xl bg-navy-100 text-center ring-1 ring-navy-100">
+                <div className="vb-time-metrics mt-4 grid grid-cols-3 gap-px overflow-hidden rounded-2xl bg-navy-100 text-center ring-1 ring-navy-100">
                   <Metrica rotulo="Embarque" valor={o.embarque} />
                   <Metrica rotulo="Chegada" valor={o.chegada} />
                   <Metrica rotulo="A bordo" valor={`${o.duracaoMin} min`} />
@@ -303,8 +303,8 @@ export function FamilyDemoResults({ ofertas, carregando, erro, horario, endereco
 
       {/* Modal de detalhes (telas 3, 4 e 5) */}
       {selecionado && (
-        <div role="dialog" aria-modal="true" aria-label={`Detalhes de ${selecionado.nome}`} className="fixed inset-0 z-[1000] overflow-y-auto bg-navy-950/60 p-3 backdrop-blur-sm sm:p-8">
-          <div className="mx-auto max-w-3xl overflow-hidden rounded-3xl bg-white shadow-float">
+        <div role="dialog" aria-modal="true" aria-label={`Detalhes de ${selecionado.nome}`} className="vb-driver-dialog fixed inset-0 z-[1000] overflow-y-auto bg-navy-950/60 p-3 backdrop-blur-sm sm:p-8">
+          <div className="vb-driver-dialog-panel mx-auto max-w-3xl overflow-hidden rounded-3xl bg-white shadow-float">
             <div className="flex items-center justify-between gap-3 border-b border-navy-100 px-5 py-4 sm:px-7">
               <button className="inline-flex items-center gap-2 text-sm font-semibold text-navy-700" onClick={() => { setSelecionado(null); setRodando(false); }}>
                 <ArrowLeft size={18} /> Voltar aos resultados
@@ -325,7 +325,7 @@ export function FamilyDemoResults({ ofertas, carregando, erro, horario, endereco
               </div>
 
               {/* Abas */}
-              <div className="mt-5 flex gap-2 border-b border-navy-100 pb-3" role="tablist">
+              <div className="vb-driver-tabs mt-5 flex gap-2 border-b border-navy-100 pb-3" role="tablist">
                 {(['trajeto', 'perfil', 'avaliacoes'] as const).map((a) => (
                   <button
                     key={a}
