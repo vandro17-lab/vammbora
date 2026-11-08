@@ -123,8 +123,8 @@ export function AutocompleteEndereco({
               <button
                 type="button"
                 className="flex w-full items-start gap-2 px-3 py-2.5 text-left text-sm hover:bg-mint-50"
-                onMouseDown={(e) => { e.preventDefault(); escolher(s); }}
-                onClick={() => { if (aberto) escolher(s); }}
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => escolher(s)}
               >
                 <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-mint-600" />
                 <span className="text-navy-700">{s.rotulo}</span>
