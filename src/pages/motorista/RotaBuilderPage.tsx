@@ -453,7 +453,7 @@ function FormEndereco({ titulo, dica, botao, locais, onConfirmar, onCancelar, co
         const p = await geocodificarPreciso(endereco, '', ctrl.signal);
         if (!vivo) return;
         if (p) { setCoord({ lat: p.lat, lng: p.lng }); setPrecisao(p.precisao); setEnderecoNoMapa(p.rotulo || null); }
-        else { setCoord(null); setPrecisao(undefined); setEnderecoNoMapa(null); }
+        else { /* Mantém a coordenada da sugestão escolhida se a busca precisa falhar. */ }
       } finally {
         if (vivo) setBuscandoExato(false);
       }
@@ -490,11 +490,12 @@ function FormEndereco({ titulo, dica, botao, locais, onConfirmar, onCancelar, co
         <AutocompleteEndereco
           value={texto}
           locais={locais}
+          usarSugestaoCompleta
           placeholder="Ex.: Rua José Geraldo, 580"
           onChange={(t, c) => {
             setTexto(t);
             // Sugestão escolhida: ponto provisório (nível de rua) até a geocodificação precisa.
-            if (c && !/(\d{1,6})\s*$/.test(t.trim())) { setCoord(c); setPrecisao('rua'); setEnderecoNoMapa(null); }
+            if (c) { setCoord(c); setPrecisao('rua'); setEnderecoNoMapa(null); }
             else { setCoord(null); setPrecisao(undefined); setEnderecoNoMapa(null); }
           }}
         />
