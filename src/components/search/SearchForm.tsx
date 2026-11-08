@@ -2,17 +2,17 @@ import { nomeDestinoParaExibicao } from '@/lib/utils';
 import { useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Check, MapPin, Search } from 'lucide-react';
-import type { Contratacao, ModalidadeTrajeto, Turno } from '@/types';
+import type { Contratacao, ModalidadeTrajeto } from '@/types';
 import { CIDADE_PADRAO } from '@/data/cidades';
 import { useVitrine } from '@/data/VitrineProvider';
-import { TURNO_LABEL, cn } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import { criteriosParaParams } from '@/lib/searchParams';
 import { AutocompleteEndereco } from '@/components/search/AutocompleteEndereco';
 import { locaisDeDestinos, geocodificarPreciso } from '@/lib/geocode';
 import { Loader2 } from 'lucide-react';
 
-const TITULOS = ['De onde vamos sair?', 'Qual é o destino?', 'Como é sua rotina?'];
-const DESCRICOES = ['Comece pelo bairro de embarque.', 'Escolha a escola ou a faculdade.', 'Falta pouco para encontrar suas opções.'];
+const TITULOS = ['De onde vamos sair?', 'Qual é o destino?', 'Qual horário você precisa?'];
+const DESCRICOES = ['Comece pelo bairro de embarque.', 'Escolha a escola ou a faculdade.', 'Informe o horário e escolha como deseja viajar.'];
 
 export function SearchForm({ compact = false }: { compact?: boolean }) {
   const navigate = useNavigate();
@@ -26,7 +26,6 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
   const [endereco, setEndereco] = useState('');
   const [origemCoord, setOrigemCoord] = useState<{ lat: number; lng: number } | null>(null);
   const [destinoId, setDestinoId] = useState('');
-  const [turno, setTurno] = useState<Turno | ''>('');
   const [contratacao, setContratacao] = useState<Contratacao>('mensal');
   const [dataAvulso, setDataAvulso] = useState('');
   const [modalidade, setModalidade] = useState<ModalidadeTrajeto>('ida');
@@ -72,7 +71,7 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
       finally { clearTimeout(limite); setLocalizando(false); }
     }
 
-    const paramsBase = criteriosParaParams({ cidadeId: CIDADE_PADRAO.id, endereco: texto, destinoId: destinoId || null, turno: turno || null, contratacao, dataAvulso: contratacao === 'avulso' ? dataAvulso : undefined, modalidade, origemLat: coord?.lat, origemLng: coord?.lng });
+    const paramsBase = criteriosParaParams({ cidadeId: CIDADE_PADRAO.id, endereco: texto, destinoId: destinoId || null, turno: null, contratacao, dataAvulso: contratacao === 'avulso' ? dataAvulso : undefined, modalidade, origemLat: coord?.lat, origemLng: coord?.lng });
     const params = new URLSearchParams(paramsBase);
     params.set('horario', horario);
     navigate(`/resultados?${params.toString()}`);
@@ -105,12 +104,11 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
           <p className="mt-4 rounded-xl bg-mint-50 p-4 text-sm leading-relaxed text-mint-800">{erro ? 'Não foi possível carregar os destinos. Você ainda pode explorar as vans da cidade.' : 'Você pode explorar as opções e confirmar o trajeto diretamente com o motorista.'}</p>
         </div>}
         {passo === 2 && <div className="mt-5 space-y-5">
-          <fieldset><legend className="field-label">Turno</legend><div className="flex flex-wrap gap-2">{(['', 'manha', 'tarde', 'noite', 'integral'] as const).map(t => <Segment key={t} ativo={turno === t} onClick={() => setTurno(t)}>{t ? TURNO_LABEL[t] : 'Qualquer'}</Segment>)}</div></fieldset>
-          <div><label className="field-label" htmlFor="horario-escolar">{modalidade === 'volta' ? 'Horário de saída da escola' : 'Horário em que precisa chegar'}</label><input id="horario-escolar" className="field-input" type="time" value={horario} required onChange={e => setHorario(e.target.value)} /><p className="mt-1 text-xs text-navy-500">O horário escolhido será usado para calcular o trajeto.</p></div>
+          <div><label className="field-label" htmlFor="horario-escolar">{modalidade === 'volta' ? 'Horário de saída da escola' : 'Horário em que precisa chegar'}</label><input id="horario-escolar" className="field-input block w-full min-w-0 max-w-full tabular-nums [color-scheme:light]" type="time" step="60" value={horario} required onChange={e => setHorario(e.target.value)} /><p className="mt-1 text-xs text-navy-500">O horário escolhido será usado para calcular o trajeto.</p></div>
           <fieldset><legend className="field-label">Contratação</legend><div className="flex gap-2">{(['mensal', 'avulso'] as const).map(c => <Segment key={c} ativo={contratacao === c} onClick={() => setContratacao(c)}>{c === 'mensal' ? 'Mensal' : 'Avulso'}</Segment>)}</div>
             {contratacao === 'avulso' && <div className="mt-3"><label htmlFor="data-avulso" className="field-label">Data da viagem</label><input id="data-avulso" type="date" required className="field-input" value={dataAvulso} onChange={e => setDataAvulso(e.target.value)} /></div>}
           </fieldset>
-          <fieldset><legend className="field-label">Trajeto</legend><div className="flex flex-wrap gap-2">{([['ida', 'Só ida'], ['volta', 'Só volta'], ['ambos', 'Ida e volta']] as const).map(([v, label]) => <Segment key={v} ativo={modalidade === v} onClick={() => setModalidade(v)}>{label}</Segment>)}</div></fieldset>
+          <fieldset><legend className="field-label">Trajeto</legend><div className="grid grid-cols-3 gap-2">{([['ida', 'Só ida'], ['volta', 'Só volta'], ['ambos', 'Ida e volta']] as const).map(([v, label]) => <Segment key={v} ativo={modalidade === v} onClick={() => setModalidade(v)} fullWidth>{label}</Segment>)}</div></fieldset>
         </div>}
       </div>
       <div className="mt-7 flex gap-3">{passo > 0 && <button type="button" onClick={() => ir(passo - 1)} className="btn btn-lg btn-ghost px-4" aria-label="Voltar à etapa anterior"><ArrowLeft className="h-5 w-5" /></button>}
@@ -120,6 +118,6 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
     </form>
   );
 }
-function Segment({ ativo, onClick, children }: { ativo: boolean; onClick: () => void; children: React.ReactNode }) {
-  return <button type="button" onClick={onClick} aria-pressed={ativo} className={cn('rounded-xl px-3 py-2.5 text-sm font-medium transition-colors', ativo ? 'bg-navy-900 text-white' : 'bg-navy-50 text-navy-600 hover:bg-navy-100')}>{children}</button>;
+function Segment({ ativo, onClick, children, fullWidth = false }: { ativo: boolean; onClick: () => void; children: React.ReactNode; fullWidth?: boolean }) {
+  return <button type="button" onClick={onClick} aria-pressed={ativo} className={cn('rounded-xl px-2 py-2.5 text-center text-xs sm:text-sm font-medium transition-colors', fullWidth && 'w-full min-w-0 h-full', ativo ? 'bg-navy-900 text-white' : 'bg-navy-50 text-navy-600 hover:bg-navy-100')}>{children}</button>;
 }
