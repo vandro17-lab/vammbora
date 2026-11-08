@@ -10,6 +10,7 @@ import type { Turno } from '@/types';
 import { useVitrine } from '@/data/VitrineProvider';
 import { capacidadeAlunos, aBordoEm, validarRota, podeFinalizar } from '@/lib/ocupacao-rota';
 import { PlanoMotor } from '@/components/motorista/PlanoMotor';
+import { planejarRotaDoCadastro } from '@/lib/rota-para-motor';
 import { MapaInterativoRota } from '@/components/motorista/MapaInterativoRota';
 import { SeletorPontoMapa } from '@/components/motorista/SeletorPontoMapa';
 import { AutocompleteEndereco } from '@/components/search/AutocompleteEndereco';
@@ -300,7 +301,7 @@ export function VanViz({ capacidade, aBordo, rota, veiculo }: { capacidade: numb
 }
 
 /* ----------------------------- Linha do percurso ----------------------------- */
-export function LinhaPercurso({ rota, setRota }: { rota: Rota; setRota: (r: Rota) => void }) {
+export function LinhaPercurso({ rota, setRota, mostrarHorarios = true }: { rota: Rota; setRota: (r: Rota) => void; mostrarHorarios?: boolean }) {
   if (rota.paradas.length === 0) return null;
   const paradas = [...rota.paradas].sort((a, b) => a.ordem - b.ordem);
 
@@ -341,7 +342,7 @@ export function LinhaPercurso({ rota, setRota }: { rota: Rota; setRota: (r: Rota
                   {descem.length > 0 && `Desce: ${descem.map((x) => x.identificacao).join(', ')}`}
                   {embarcam.length === 0 && descem.length === 0 && (p.confirmado ? 'Confirmada' : 'Sem confirmação')}
                 </p>
-                <label className="mt-2 flex items-center gap-2 text-xs text-navy-600">
+                {mostrarHorarios && <label className="mt-2 flex items-center gap-2 text-xs text-navy-600">
                   <span className="shrink-0">Chegada habitual</span>
                   <input type="time" aria-label={`Horário habitual de chegada: ${p.rotulo}`}
                     className="field-input !w-32 !py-1.5 text-sm"
@@ -356,7 +357,7 @@ export function LinhaPercurso({ rota, setRota }: { rota: Rota; setRota: (r: Rota
                             ? { ...aluno, horarioHabitualMin: minutos } : aluno),
                       });
                     }} />
-                </label>
+                </label>}
               </div>
               {p.tipo !== 'saida' && (
                 <div className="flex shrink-0 items-center gap-1">
@@ -374,11 +375,11 @@ export function LinhaPercurso({ rota, setRota }: { rota: Rota; setRota: (r: Rota
 }
 
 /* ----------------------------- Ação: adicionar parada ----------------------------- */
-export function AcaoParada({ rota, setRota, destinos, locais, aBordo, capacidade }: {
+export function AcaoParada({ rota, setRota, destinos, locais, aBordo, capacidade, escolaFinalObrigatoria = false, compacto = false }: {
   rota: Rota; setRota: (r: Rota) => void;
   destinos: { id: string; nome: string; bairro: string; lat?: number | null; lng?: number | null }[];
   locais: SugestaoEndereco[];
-  aBordo: { id: string; identificacao: string }[]; capacidade: number;
+  aBordo: { id: string; identificacao: string }[]; capacidade: number; escolaFinalObrigatoria?: boolean; compacto?: boolean;
 }) {
   const [modo, setModo] = useState<null | TipoParada>(null);
   const temSaida = rota.paradas.some((p) => p.tipo === 'saida');
@@ -392,14 +393,19 @@ export function AcaoParada({ rota, setRota, destinos, locais, aBordo, capacidade
   }
 
   if (!temSaida) {
-    return <FormEndereco titulo="De onde sua van sai?" dica="Esse endereço fica privado, mesmo que seja sua casa." botao="Confirmar saída" locais={locais} onConfirmar={addSaida} onCancelar={null} />;
+    return <FormEndereco titulo="De onde sua van sai?" dica="Esse endereço fica privado, mesmo que seja sua casa." botao="Confirmar saída" locais={locais} onConfirmar={addSaida} onCancelar={null} compacto={compacto} />;
   }
 
   if (modo === 'casa') {
-    return <FormCasa rota={rota} setRota={setRota} locais={locais} proxOrdem={proxOrdem()} capacidade={capacidade} aBordo={aBordo} onFechar={() => setModo(null)} />;
+    return <FormCasa rota={rota} setRota={setRota} locais={locais} proxOrdem={proxOrdem()} capacidade={capacidade} aBordo={aBordo} onFechar={() => setModo(null)} compacto={compacto} />;
   }
   if (modo === 'escola') {
-    return <FormEscola rota={rota} setRota={setRota} destinos={destinos} proxOrdem={proxOrdem()} aBordo={aBordo} onFechar={() => setModo(null)} />;
+    return <FormEscola rota={rota} setRota={setRota} destinos={destinos} proxOrdem={proxOrdem()} aBordo={aBordo} onFechar={() => setModo(null)} compacto={compacto} />;
+  }
+
+  const alunosPendentes = rota.passageiros.filter((p) => !p.desembarqueParadaId);
+  if (escolaFinalObrigatoria && rota.paradas.some((p) => p.tipo === 'escola') && alunosPendentes.length === 0) {
+    return <div className="card mt-4 border border-mint-200 bg-mint-50 p-5"><p className="font-display font-bold text-mint-900">Escola final cadastrada</p><p className="mt-1 text-sm text-mint-800">A rota termina em {rota.paradas.find((p) => p.tipo === 'escola')?.destinoNome || 'sua escola'}. Revise o percurso e informe somente o horário de chegada final.</p></div>;
   }
 
   return (
@@ -419,10 +425,10 @@ export function AcaoParada({ rota, setRota, destinos, locais, aBordo, capacidade
 
 /* Formulário de endereço com autocomplete + número que GEOCODIFICA com precisão
  * (respeita o número da casa) e deixa o motorista arrastar o alfinete no mapa. */
-function FormEndereco({ titulo, dica, botao, locais, onConfirmar, onCancelar }: {
+function FormEndereco({ titulo, dica, botao, locais, onConfirmar, onCancelar, compacto = false }: {
   titulo: string; dica?: string; botao: string; locais: SugestaoEndereco[];
   onConfirmar: (rotulo: string, coord?: { lat: number; lng: number }) => void;
-  onCancelar: (() => void) | null;
+  onCancelar: (() => void) | null; compacto?: boolean;
 }) {
   const [texto, setTexto] = useState('');
   const [coord, setCoord] = useState<{ lat: number; lng: number } | null>(null);
@@ -447,6 +453,7 @@ function FormEndereco({ titulo, dica, botao, locais, onConfirmar, onCancelar }: 
         const p = await geocodificarPreciso(endereco, '', ctrl.signal);
         if (!vivo) return;
         if (p) { setCoord({ lat: p.lat, lng: p.lng }); setPrecisao(p.precisao); setEnderecoNoMapa(p.rotulo || null); }
+        else { setCoord(null); setPrecisao(undefined); setEnderecoNoMapa(null); }
       } finally {
         if (vivo) setBuscandoExato(false);
       }
@@ -466,7 +473,7 @@ function FormEndereco({ titulo, dica, botao, locais, onConfirmar, onCancelar }: 
   const aviso = buscandoExato
     ? { c: 'bg-navy-50 text-navy-700', t: 'Localizando o número exato no mapa…' }
     : !temPonto
-      ? { c: 'bg-amber-50 text-amber-800', t: 'Informe rua e número no mesmo campo, ou marque o ponto no mapa.' }
+      ? { c: 'bg-amber-50 text-amber-800', t: compacto ? (/(\d{1,6})\s*$/.test(texto.trim()) ? 'Número ainda não localizado. Confira rua e número para posicionar a van corretamente.' : 'Digite rua e número para localizar o ponto no mapa principal.') : 'Informe rua e número no mesmo campo, ou marque o ponto no mapa.' }
       : precisao === 'exato'
         ? { c: 'bg-mint-50 text-mint-800', t: 'Número localizado ✓ — confira no mapa e ajuste se precisar.' }
         : precisao === 'ajustado'
@@ -474,11 +481,11 @@ function FormEndereco({ titulo, dica, botao, locais, onConfirmar, onCancelar }: 
           : { c: 'bg-amber-50 text-amber-800', t: 'Localizamos a rua. Arraste o alfinete até o número certo.' };
 
   return (
-    <div className="card mt-4 p-5">
+    <div className={cn('card mt-0', compacto ? 'p-2.5 shadow-none ring-0' : 'mt-4 p-5')}>
       <h2 className="font-display font-bold">{titulo}</h2>
       {dica && <p className="mt-1 text-sm text-navy-500">{dica}</p>}
 
-      <div className="mt-3">
+      <div className="mt-2">
         <label className="field-label">Endereço (rua e número)</label>
         <AutocompleteEndereco
           value={texto}
@@ -487,29 +494,29 @@ function FormEndereco({ titulo, dica, botao, locais, onConfirmar, onCancelar }: 
           onChange={(t, c) => {
             setTexto(t);
             // Sugestão escolhida: ponto provisório (nível de rua) até a geocodificação precisa.
-            if (c) { setCoord(c); setPrecisao('rua'); setEnderecoNoMapa(null); }
-            else if (!t.trim()) { setCoord(null); setPrecisao(undefined); setEnderecoNoMapa(null); }
+            if (c && !/(\d{1,6})\s*$/.test(t.trim())) { setCoord(c); setPrecisao('rua'); setEnderecoNoMapa(null); }
+            else { setCoord(null); setPrecisao(undefined); setEnderecoNoMapa(null); }
           }}
         />
-        <p className="mt-1 text-xs text-navy-400">Digite rua e número juntos. Confira o ponto localizado no mapa.</p>
+        <p className="mt-1 text-[11px] text-navy-400">Digite rua e número juntos. O mapa principal será atualizado.</p>
       </div>
 
       <p className={cn('mt-3 rounded-xl p-2.5 text-sm', aviso.c)}>{aviso.t}</p>
 
-      <div className="mt-3">
+      {!compacto && <div className="mt-3">
         <SeletorPontoMapa ponto={coord} precisao={precisao} onMover={aoArrastar} />
         {enderecoNoMapa && <p className="mt-1 text-xs text-navy-500">No mapa: {enderecoNoMapa}</p>}
-      </div>
+      </div>}
 
-      <div className="mt-4 flex gap-3">
+      <div className="mt-3 flex gap-2">
         <button
-          className="btn btn-lg btn-primary flex-1"
+          className="btn btn-md btn-primary flex-1"
           disabled={!texto.trim() || !coord}
           onClick={() => onConfirmar(montarRotulo(), coord ?? undefined)}
         >
           {botao}
         </button>
-        {onCancelar && <button className="btn btn-lg btn-ghost" onClick={onCancelar}>Cancelar</button>}
+        {onCancelar && <button className="btn btn-md btn-ghost" onClick={onCancelar}>Cancelar</button>}
       </div>
 
       {texto.trim() && !coord && (
@@ -524,8 +531,8 @@ function FormEndereco({ titulo, dica, botao, locais, onConfirmar, onCancelar }: 
   );
 }
 
-function FormCasa({ rota, setRota, locais, proxOrdem, capacidade, aBordo, onFechar }: {
-  rota: Rota; setRota: (r: Rota) => void; locais: SugestaoEndereco[]; proxOrdem: number; capacidade: number; aBordo: { id: string }[]; onFechar: () => void;
+function FormCasa({ rota, setRota, locais, proxOrdem, capacidade, aBordo, onFechar, compacto = false }: {
+  rota: Rota; setRota: (r: Rota) => void; locais: SugestaoEndereco[]; proxOrdem: number; capacidade: number; aBordo: { id: string }[]; onFechar: () => void; compacto?: boolean;
 }) {
   const [etapa, setEtapa] = useState<'endereco' | 'aluno'>('endereco');
   const [paradaId, setParadaId] = useState<string | null>(null);
@@ -549,28 +556,28 @@ function FormCasa({ rota, setRota, locais, proxOrdem, capacidade, aBordo, onFech
   }
 
   if (etapa === 'endereco') {
-    return <FormEndereco titulo="Onde você busca o aluno?" botao="Confirmar endereço" locais={locais} onConfirmar={confirmarEndereco} onCancelar={onFechar} />;
+    return <FormEndereco titulo="Onde você busca o aluno?" botao="Confirmar endereço" locais={locais} onConfirmar={confirmarEndereco} onCancelar={onFechar} compacto={compacto} />;
   }
   return (
-    <div className="card mt-4 p-5">
+    <div className={cn('card mt-0', compacto ? 'p-2.5 shadow-none ring-0' : 'mt-4 p-5')}>
       <h2 className="font-display font-bold">Como podemos identificar esse aluno?</h2>
       <p className="mt-1 text-sm text-navy-500">Primeiro nome ou apelido curto. Não precisa nome completo nem documento.</p>
       <input className="field-input mt-3" placeholder="Ex.: João, Duda, Pedro…" value={nome} onChange={(e) => setNome(e.target.value)} />
-      <div className="mt-4 flex flex-wrap gap-3">
-        <button className="btn btn-lg btn-primary flex-1" disabled={!nome.trim()} onClick={() => addAluno(false)}>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button className="btn btn-md btn-primary flex-1" disabled={!nome.trim()} onClick={() => addAluno(false)}>
           <Plus className="h-5 w-5" /> Adicionar aluno
         </button>
-        <button className="btn btn-lg btn-ghost" disabled={!nome.trim()} onClick={() => addAluno(true)}>Adicionar outro aqui</button>
+        <button className="btn btn-md btn-ghost" disabled={!nome.trim()} onClick={() => addAluno(true)}>Adicionar outro aqui</button>
       </div>
       <button className="mt-3 w-full text-center text-sm text-navy-500" onClick={onFechar}>Pronto nesta casa</button>
     </div>
   );
 }
 
-function FormEscola({ rota, setRota, destinos, proxOrdem, aBordo, onFechar }: {
+function FormEscola({ rota, setRota, destinos, proxOrdem, aBordo, onFechar, compacto = false }: {
   rota: Rota; setRota: (r: Rota) => void;
   destinos: { id: string; nome: string; bairro: string; lat?: number | null; lng?: number | null }[];
-  proxOrdem: number; aBordo: { id: string; identificacao: string }[]; onFechar: () => void;
+  proxOrdem: number; aBordo: { id: string; identificacao: string }[]; onFechar: () => void; compacto?: boolean;
 }) {
   const [destinoId, setDestinoId] = useState('');
   const [selec, setSelec] = useState<string[]>(aBordo.map((p) => p.id)); // por padrão todos descem
@@ -593,7 +600,7 @@ function FormEscola({ rota, setRota, destinos, proxOrdem, aBordo, onFechar }: {
   }
 
   return (
-    <div className="card mt-4 p-5">
+    <div className={cn('card mt-0', compacto ? 'p-2.5 shadow-none ring-0' : 'mt-4 p-5')}>
       <h2 className="font-display font-bold">Qual escola?</h2>
       <select className="field-input mt-3 appearance-none" value={destinoId} onChange={(e) => setDestinoId(e.target.value)}>
         <option value="">Escolha a escola…</option>
@@ -621,20 +628,22 @@ function FormEscola({ rota, setRota, destinos, proxOrdem, aBordo, onFechar }: {
         <p className="mt-4 rounded-xl bg-navy-50 p-3 text-sm text-navy-500">Nenhum aluno a bordo para descer aqui ainda.</p>
       )}
 
-      <div className="mt-5 flex gap-3">
-        <button className="btn btn-lg btn-primary flex-1" disabled={!destinoId} onClick={confirmar}>
+      <div className="mt-3 flex gap-2">
+        <button className="btn btn-md btn-primary flex-1" disabled={!destinoId} onClick={confirmar}>
           <CheckCircle2 className="h-5 w-5" /> Confirmar parada na escola
         </button>
-        <button className="btn btn-lg btn-ghost" onClick={onFechar}><X className="h-5 w-5" /></button>
+        <button className="btn btn-md btn-ghost" onClick={onFechar}><X className="h-5 w-5" /></button>
       </div>
     </div>
   );
 }
 
 /* ----------------------------- Horários ----------------------------- */
-export function Horarios({ rota, setRota, onConfirmar, salvando }: { rota: Rota; setRota: (r: Rota) => void; onConfirmar: (rotaAtualizada: Rota) => void; salvando: boolean }) {
+export function Horarios({ rota, setRota, veiculo = null, onConfirmar, salvando }: { rota: Rota; setRota: (r: Rota) => void; veiculo?: Veiculo | null; onConfirmar: (rotaAtualizada: Rota) => void; salvando: boolean }) {
   const [hora, setHora] = useState(rota.ultimoDesembarqueMin != null ? minutosParaTextoHora(rota.ultimoDesembarqueMin).replace('h', ':') : '');
   const [antecip, setAntecip] = useState(rota.limiteAntecipacaoMin != null ? String(rota.limiteAntecipacaoMin) : '');
+  const rotaComHorario = useMemo(() => ({ ...rota, ultimoDesembarqueMin: /^\d{1,2}:\d{2}$/.test(hora) ? horaParaMinutos(hora) : null, limiteAntecipacaoMin: antecip ? Number(antecip) : null }), [rota, hora, antecip]);
+  const planejamento = useMemo(() => planejarRotaDoCadastro(rotaComHorario, veiculo), [rotaComHorario, veiculo]);
 
   function confirmar() {
     const min = /^\d{1,2}:\d{2}$/.test(hora) ? horaParaMinutos(hora) : null;
@@ -653,7 +662,21 @@ export function Horarios({ rota, setRota, onConfirmar, salvando }: { rota: Rota;
         <label className="field-label">Se precisar, você pode sair mais cedo? Quantos minutos antes?</label>
         <input className="field-input" inputMode="numeric" placeholder="Ex.: 10" value={antecip} onChange={(e) => setAntecip(e.target.value.replace(/\D/g, ''))} />
       </div>
-      <p className="mt-3 text-xs text-navy-400">A previsão de horário de cada parada é calculada pelo sistema de compatibilidade (em preparação). Sair mais cedo não garante que um novo aluno caiba.</p>
+      {planejamento.plano?.valido ? (
+        <div className="mt-4 rounded-xl bg-mint-50 p-3 text-sm text-mint-900">
+          <p className="font-bold">Rota calculada de trás para frente</p>
+          <p className="mt-1">Para chegar à escola às <strong>{hora}</strong>, a van deve sair às <strong>{minutosParaTextoHora(planejamento.plano.saida ?? 0)}</strong>.</p>
+          <div className="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs text-navy-700">
+            {planejamento.plano.paradas.map((p) => {
+              const parada = rota.paradas.find((x) => x.id === p.id);
+              return <span key={p.id}>{parada?.rotulo || 'Parada'}: <strong>{minutosParaTextoHora(p.chegada)}</strong></span>;
+            })}
+          </div>
+        </div>
+      ) : (
+        <p className="mt-3 rounded-xl bg-amber-50 p-3 text-xs text-amber-800">{planejamento.dadosFaltantes.slice(0, 2).join(' ') || 'Informe o horário final para calcular a saída.'}</p>
+      )}
+      <p className="mt-3 text-xs text-navy-400">O sistema usa o tempo real dos trechos no mapa e calcula os horários anteriores sem exigir que você informe horário em cada parada.</p>
       <button className="btn btn-lg btn-primary mt-5 w-full" onClick={confirmar} disabled={salvando}>
         {salvando ? <><Loader2 className="h-5 w-5 animate-spin" /> Salvando…</> : 'Concluir rota'}
       </button>

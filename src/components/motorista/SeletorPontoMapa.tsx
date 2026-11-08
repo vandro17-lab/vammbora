@@ -80,7 +80,7 @@ export function SeletorPontoMapa({ ponto, precisao, onMover, altura = 'h-60' }: 
       if (cancelado || !elRef.current || mapRef.current) return;
       LRef.current = L;
       const centro: [number, number] = ponto ? [ponto.lat, ponto.lng] : [ARACATUBA.lat, ARACATUBA.lng];
-      const map = L.map(elRef.current, { scrollWheelZoom: false }).setView(centro, ponto ? 17 : 13);
+      const map = L.map(elRef.current, { scrollWheelZoom: false, zoomAnimation: false, fadeAnimation: false, markerZoomAnimation: false }).setView(centro, ponto ? 17 : 13);
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
       map.on('click', (e) => onMoverRef.current(e.latlng.lat, e.latlng.lng));
       mapRef.current = map as unknown as LMap;

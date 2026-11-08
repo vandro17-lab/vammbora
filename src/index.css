@@ -229,6 +229,7 @@ section[id] { scroll-margin-top: 90px; }
 }
 .vm-app { background: var(--vm-surface); min-height: 100dvh; }
 .vm-screen { max-width: 30rem; margin: 0 auto; }
+.vm-screen-wide { max-width: 100%; }
 /* Cabeçalho em gradiente verde/teal (identidade das telas) */
 .vm-grad { background: linear-gradient(145deg, #171717 0%, #292524 55%, #44403c 100%); }
 .vm-grad-soft { background: linear-gradient(140deg, #fef9c3 0%, #fef08a 100%); }
@@ -259,3 +260,18 @@ section[id] { scroll-margin-top: 90px; }
 .vm-ico-teal { background:#d2f3f0; color:#0d9488; }
 .vm-ico-navy { background:#e2e8f5; color:#213d7d; }
 .vm-ico-slate { background:#e6ebf1; color:#475569; }
+
+/* Marcadores da navegação real: a van é um volume simples, legível no celular,
+   e não um emoji que muda de aparência entre plataformas. */
+.vambora-van-icon-wrap,
+.vambora-stop-icon-wrap { background: transparent; border: 0; }
+.vambora-van-icon { position: relative; display: block; width: 36px; height: 23px; margin: 9px 3px; border: 2px solid #0b1f3a; border-radius: 7px 9px 5px 5px; background: #facc15; box-shadow: 0 3px 8px rgb(11 31 58 / 35%); }
+.vambora-van-icon::before { content: ''; position: absolute; left: 8px; top: 3px; width: 14px; height: 7px; border-radius: 2px; background: #dbeafe; border: 1px solid #0b1f3a; }
+.vambora-van-icon::after { content: ''; position: absolute; right: -5px; top: 5px; width: 5px; height: 7px; border-radius: 0 3px 3px 0; background: #facc15; border: 2px solid #0b1f3a; border-left: 0; }
+.vambora-van-icon i,
+.vambora-van-icon b { position: absolute; bottom: -5px; width: 8px; height: 8px; border: 2px solid #0b1f3a; border-radius: 999px; background: #fff; }
+.vambora-van-icon i { left: 5px; }
+.vambora-van-icon b { right: 4px; }
+.vambora-stop-icon { display: grid; place-items: center; width: 28px; height: 28px; border: 3px solid #fff; border-radius: 999px; background: var(--stop-color); color: #fff; font: 700 11px/1 Inter, sans-serif; box-shadow: 0 2px 6px rgb(11 31 58 / 35%); }
+.vambora-route-label-wrap { background: transparent; border: 0; white-space: nowrap; }
+.vambora-route-label { display: inline-flex; align-items: center; gap: 3px; transform: translate(-50%, -50%); border: 1px solid rgb(255 255 255 / 85%); border-radius: 999px; background: rgb(255 255 255 / 92%); padding: 4px 7px; color: #0b1f3a; font: 700 10px/1 Inter, sans-serif; box-shadow: 0 2px 7px rgb(11 31 58 / 22%); }

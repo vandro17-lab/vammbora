@@ -13,6 +13,7 @@ import { useDadosMotorista } from '@/lib/vm/useDadosMotorista';
 import { publicarRota } from '@/data/motorista-store';
 import { distanciaRotaKm } from '@/lib/vm/cenario';
 import { minutosParaTextoHora, cn } from '@/lib/utils';
+import { planejarRotaDoCadastro } from '@/lib/rota-para-motor';
 import type { Rota } from '@/types/motorista';
 
 const tempoMin = (km: number) => Math.max(5, Math.round((km / 35) * 60));
@@ -176,7 +177,8 @@ export function RotaDetalhePage() {
   const paradasVisiveis = paradasOrd.filter((p) => p.tipo !== 'saida');
   const Ico = IconeTurno(rota);
   const lista = todas ? paradasVisiveis : paradasVisiveis.slice(0, 4);
-  let acc = 6 * 60 + 25;
+  const planejamento = planejarRotaDoCadastro(rota, dados.veiculo);
+  const chegadaPorId = new Map((planejamento.plano?.paradas ?? []).map((p) => [p.id, p.chegada]));
 
   return (
     <VMShell nav={false}>
@@ -201,6 +203,12 @@ export function RotaDetalhePage() {
             <span className="inline-flex items-center gap-1.5"><Navigation className="h-4 w-4 text-navy-400" /> {km.toFixed(1).replace('.', ',')} km</span>
             <span className="inline-flex items-center gap-1.5"><Clock className="h-4 w-4 text-navy-400" /> {tempoMin(km)} min</span>
           </div>
+          {planejamento.plano?.valido && <p className="mt-3 rounded-xl bg-mint-50 px-3 py-2 text-xs font-semibold text-mint-800">Saída calculada: {minutosParaTextoHora(planejamento.plano.saida ?? 0).replace(':', 'h')} · chegada final: {horario(rota)}</p>}
+          {!dados.demo && (
+            <Link to={`/painel/rota-real/${rota.id}`} className="btn btn-lg btn-primary mt-4 w-full">
+              <Navigation className="h-5 w-5" /> Iniciar rota
+            </Link>
+          )}
         </Card>
 
         {/* Publicar na busca pública (ação explícita do motorista) */}
@@ -259,8 +267,8 @@ export function RotaDetalhePage() {
           </div>
           <div className="mt-2 divide-y divide-navy-50">
             {lista.map((p, i) => {
-              acc += 7;
-              const hhmm = minutosParaTextoHora(acc).replace(':', 'h');
+              const chegada = chegadaPorId.get(p.id);
+              const hhmm = chegada == null ? '—' : minutosParaTextoHora(chegada).replace(':', 'h');
               const escola = p.tipo === 'escola';
               const Marco = escola ? School : (i === 0 ? Flag : MapPin);
               return (

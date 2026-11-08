@@ -6,6 +6,7 @@ import { ARACATUBA, trajetoOSRM } from '@/lib/geocode';
 /* Tipos mínimos do Leaflet (carregado dinamicamente). */
 type LeafletMap = { setView: (c: [number, number], z: number) => LeafletMap; remove: () => void; fitBounds: (b: unknown, o?: unknown) => void };
 type LeafletNS = typeof import('leaflet');
+type TrechoMapa = { minutos: number; metros: number };
 
 /**
  * Mapa interativo da rota (OpenStreetMap + Leaflet, sem chave).
@@ -14,9 +15,10 @@ type LeafletNS = typeof import('leaflet');
  * e desenha o TRAJETO pelas ruas (OSRM público). Quando todas as paradas estão
  * localizadas, devolve os minutos de cada trecho via `onTempos`.
  */
-export function MapaInterativoRota({ paradas, onTempos, bare = false }: {
+export function MapaInterativoRota({ paradas, onTempos, onTrechos, bare = false }: {
   paradas: ParadaRota[];
   onTempos?: (temposMin: number[]) => void;
+  onTrechos?: (trechos: TrechoMapa[]) => void;
   /** Quando true, renderiza SÓ o mapa (sem card/título/notas), para encaixar em um container próprio. */
   bare?: boolean;
 }) {
@@ -25,8 +27,11 @@ export function MapaInterativoRota({ paradas, onTempos, bare = false }: {
   const mapRef = useRef<LeafletMap | null>(null);
   const layerRef = useRef<ReturnType<LeafletNS['layerGroup']> | null>(null);
   const prontoRef = useRef(false);
+  const desenhoRef = useRef(0);
   const onTemposRef = useRef(onTempos);
   onTemposRef.current = onTempos;
+  const onTrechosRef = useRef(onTrechos);
+  onTrechosRef.current = onTrechos;
 
   // Paradas localizadas, em ordem, e uma assinatura das coordenadas (evita redesenhos à toa).
   const loc = [...paradas]
@@ -36,6 +41,7 @@ export function MapaInterativoRota({ paradas, onTempos, bare = false }: {
   const assinatura = loc.map((p) => `${p.id}:${p.lat.toFixed(5)},${p.lng.toFixed(5)}`).join('|');
 
   async function desenhar() {
+    const desenhoAtual = ++desenhoRef.current;
     const L = LRef.current;
     const map = mapRef.current;
     const layer = layerRef.current;
@@ -57,14 +63,43 @@ export function MapaInterativoRota({ paradas, onTempos, bare = false }: {
     });
 
     let linha: [number, number][] = pts;
+    let trechos: TrechoMapa[] = loc.slice(0, -1).map(() => ({ minutos: 0, metros: 0 }));
     if (loc.length >= 2) {
       const tr = await trajetoOSRM(loc.map((p) => ({ lat: p.lat, lng: p.lng })));
+      if (desenhoAtual !== desenhoRef.current) return;
       if (tr && tr.geometria.length) {
         linha = tr.geometria;
+        trechos = loc.slice(0, -1).map((_, i) => ({ minutos: tr.temposMin[i] ?? 0, metros: tr.distanciasMetros[i] ?? 0 }));
         if (onTemposRef.current && tr.temposMin.length === loc.length - 1) onTemposRef.current(tr.temposMin);
+        onTrechosRef.current?.(trechos);
       }
     }
-    if (linha.length >= 2) L.polyline(linha, { color: '#10b981', weight: 4, opacity: 0.85 }).addTo(layer);
+    if (linha.length >= 2) {
+      const cores = ['#2563eb', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#0f766e'];
+      const indiceMaisProximo = (p: [number, number]) => linha.reduce((best, atual, i) => {
+        const db = (linha[best][0] - p[0]) ** 2 + (linha[best][1] - p[1]) ** 2;
+        const da = (atual[0] - p[0]) ** 2 + (atual[1] - p[1]) ** 2;
+        return da < db ? i : best;
+      }, 0);
+      for (let i = 0; i < pts.length - 1; i += 1) {
+        const inicio = indiceMaisProximo(pts[i]);
+        const fim = Math.max(inicio + 1, indiceMaisProximo(pts[i + 1]));
+        const parte = linha.slice(inicio, fim + 1);
+        if (parte.length >= 2) L.polyline(parte, { color: cores[i % cores.length], weight: 6, opacity: 0.22, lineCap: 'round', lineJoin: 'round' }).addTo(layer);
+        if (parte.length >= 2) L.polyline(parte, { color: cores[i % cores.length], weight: 4, opacity: 0.92, lineCap: 'round', lineJoin: 'round' }).addTo(layer);
+        const meio = parte[Math.floor(parte.length / 2)] ?? pts[i];
+        const trecho = trechos[i];
+        const km = trecho.metros >= 1000 ? `${(trecho.metros / 1000).toFixed(1).replace('.', ',')} km` : `${trecho.metros} m`;
+        const etiqueta = L.divIcon({ className: 'vambora-route-label-wrap', html: `<span class="vambora-route-label"><span>◷</span> ${trecho.minutos || '—'} min · ${km}</span>`, iconSize: [1, 1], iconAnchor: [0, 0] });
+        L.marker(meio, { icon: etiqueta, interactive: false }).addTo(layer as never);
+      }
+    }
+
+    const ultima = pts[pts.length - 1];
+    if (ultima) {
+      const vanIcon = L.divIcon({ className: 'vambora-van-icon-wrap', html: '<span class="vambora-van-icon"><i></i><b></b><b></b></span>', iconSize: [42, 42], iconAnchor: [21, 21] });
+      L.marker(ultima, { icon: vanIcon, zIndexOffset: 900 }).addTo(layer as never).bindTooltip('Van neste ponto', { direction: 'top' });
+    }
 
     if (pts.length === 1) map.setView(pts[0], 15);
     else map.fitBounds(L.latLngBounds(pts).pad(0.25), { maxZoom: 16 });
