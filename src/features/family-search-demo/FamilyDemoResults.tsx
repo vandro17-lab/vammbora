@@ -13,6 +13,10 @@ import { Avatar } from '@/components/brand/Avatar';
 import { Stars } from '@/components/ui/Stars';
 import { DemoBadge } from '@/components/ui/DemoBadge';
 import { cn } from '@/lib/utils';
+import iconeTransporte from '@/assets/icones-recursos/transporte-escolar.svg';
+import iconeDocumentos from '@/assets/icones-recursos/documentos.svg';
+import iconeAr from '@/assets/icones-recursos/ar-condicionado.svg';
+import iconeMonitor from '@/assets/icones-recursos/monitor.svg';
 import ilustracaoSemResultado from '@/assets/ilustracoes/nenhum-resultado.png';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -20,6 +24,14 @@ import 'leaflet/dist/leaflet.css';
 type Props = { ofertas: OfertaDemo[]; carregando: boolean; erro?: string; horario: string; endereco: string; onEditar: () => void };
 type Ordem = 'rapido' | 'preco' | 'vagas' | 'avaliacao';
 type Aba = 'trajeto' | 'perfil' | 'avaliacoes';
+
+// Ícones preservados para os recursos na aba de perfil do motorista.
+const RECURSO_SVG: Record<string, string> = {
+  'Transporte infantil': iconeTransporte,
+  'Documentação': iconeDocumentos,
+  'Ar-condicionado': iconeAr,
+  Monitor: iconeMonitor,
+};
 
 // Documentação do motorista (sub-selo exibido ao abrir o perfil). Todos os
 // perfis demonstrativos exibidos já passaram pela verificação documental.
