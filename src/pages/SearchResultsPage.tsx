@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 import { ArrowLeft } from 'lucide-react';
@@ -7,34 +7,6 @@ import { useVitrine } from '@/data/VitrineProvider';
 import { buscarOfertasDemo, horarioPadrao, type OfertaDemo } from '@/features/family-search-demo/engine';
 import { FamilyDemoResults } from '@/features/family-search-demo/FamilyDemoResults';
 import { SearchLoadingScreen } from '@/components/search/SearchLoadingScreen';
-
-/**
- * Mostra o overlay SOMENTE quando a busca real demora além de um limiar
- * (evita "piscar" em buscas instantâneas) e, uma vez visível, o mantém por um
- * tempo mínimo (evita sumiço brusco). Não adiciona atraso à busca em si: só
- * controla a VISIBILIDADE do indicador. Garante desmontagem quando `ativo`
- * vira falso (sucesso, erro ou cancelamento).
- */
-function useOverlayCarregamento(ativo: boolean) {
-  const [mostrar, setMostrar] = useState(false);
-  const inicio = useRef(0);
-  useEffect(() => {
-    let aparecer: number | undefined;
-    let sumir: number | undefined;
-    if (ativo) {
-      aparecer = window.setTimeout(() => { inicio.current = Date.now(); setMostrar(true); }, 160);
-    } else {
-      setMostrar((visivel) => {
-        if (!visivel) return false;
-        const restante = 450 - (Date.now() - inicio.current);
-        if (restante > 0) { sumir = window.setTimeout(() => setMostrar(false), restante); return true; }
-        return false;
-      });
-    }
-    return () => { if (aparecer) clearTimeout(aparecer); if (sumir) clearTimeout(sumir); };
-  }, [ativo]);
-  return mostrar;
-}
 
 export function SearchResultsPage(){
  const [sp]=useSearchParams();
@@ -45,10 +17,12 @@ export function SearchResultsPage(){
  const horario=sp.get('horario')||horarioPadrao(criterios.turno,criterios.modalidade);
  const [ofertas,setOfertas]=useState<OfertaDemo[]>([]);
  const [carregando,setCarregando]=useState(true);
+ const [mostrarOverlay,setMostrarOverlay]=useState(() => sessionStorage.getItem('vambora.busca.transicao') === '1');
+ const [imagensProntas,setImagensProntas]=useState(false);
  const [erro,setErro]=useState('');
  useEffect(()=>{
   const ctrl=new AbortController();
-  setCarregando(true);setErro('');setOfertas([]);
+  setCarregando(true);setErro('');setOfertas([]);setImagensProntas(false);
   if(!criterios.origemLat||!criterios.origemLng){
    setErro('Selecione um endereço reconhecido pelo mapa para calcular as opções.');
    setCarregando(false);
@@ -65,7 +39,34 @@ export function SearchResultsPage(){
    .finally(()=>{if(!ctrl.signal.aborted)setCarregando(false);});
   return()=>ctrl.abort();
  },[criterios,destino,horario]);
- const mostrarOverlay=useOverlayCarregamento(carregando);
+ useEffect(() => {
+  if (carregando) return;
+  let cancelado = false;
+  const imagens = ofertas.slice(0, 6).flatMap(o => [o.vanImagem, o.imagem]).filter((src): src is string => typeof src === 'string' && src.length > 0);
+  Promise.all(imagens.map(src => new Promise<void>(resolve => {
+   const img = new Image();
+   const done = () => resolve();
+   img.onload = done; img.onerror = done; img.src = src;
+   if (img.complete) done();
+  }))).then(() => { if (!cancelado) setImagensProntas(true); });
+  return () => { cancelado = true; };
+ }, [carregando, ofertas]);
+ useEffect(() => {
+  if (!mostrarOverlay) return;
+  const previous = document.body.style.overflow;
+  document.body.style.overflow = 'hidden';
+  window.scrollTo({top:0,left:0,behavior:'instant'});
+  return () => { document.body.style.overflow = previous; };
+ }, [mostrarOverlay]);
+ useEffect(() => {
+  if (carregando || !imagensProntas || !mostrarOverlay) return;
+  const id = requestAnimationFrame(() => {
+   window.scrollTo({top:0,left:0,behavior:'instant'});
+   sessionStorage.removeItem('vambora.busca.transicao');
+   setMostrarOverlay(false);
+  });
+  return () => cancelAnimationFrame(id);
+ }, [carregando, imagensProntas, mostrarOverlay]);
  return <main className="container-page py-8">
   <AnimatePresence>{mostrarOverlay&&<SearchLoadingScreen key="busca-loading" totalConsultados={0} cidade="Araçatuba" />}</AnimatePresence>
   <Link to="/" className="inline-flex items-center gap-2 text-sm font-semibold text-navy-700 hover:text-navy-900"><ArrowLeft size={17}/> Nova busca</Link>
