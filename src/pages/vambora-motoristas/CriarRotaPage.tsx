@@ -149,12 +149,12 @@ function CadastroParadasPremium({ rota, setRota, destinos, locais, aBordo, capac
           </div>
           <div className="pointer-events-none absolute bottom-3 left-3 rounded-full bg-white/95 px-3 py-1.5 text-[10px] font-bold text-navy-900 shadow-xl sm:bottom-4 sm:left-4">A van acompanha o último ponto</div>
         </section>
-        <aside className="flex min-h-0 flex-col overflow-hidden rounded-[1.2rem] bg-white shadow-xl">
+        <aside className="relative z-30 flex min-h-0 flex-col overflow-visible rounded-[1.2rem] bg-white shadow-xl">
           <div className="shrink-0 border-b border-navy-100 bg-gradient-to-r from-navy-950 to-navy-800 px-4 py-3 text-white sm:px-5">
             <div className="flex items-center justify-between gap-2"><div><p className="text-[9px] font-bold uppercase tracking-[0.18em] text-mint-300">Próximo ponto</p><h2 className="font-display text-lg font-extrabold">{ultima ? (ultima.tipo === 'escola' ? 'Escola final' : 'Adicionar endereço') : 'Endereço de saída'}</h2></div><Navigation className="h-5 w-5 text-mint-300" /></div>
             <div className="mt-2 flex gap-2 text-[10px] font-semibold text-white/70"><span className="rounded-full bg-white/10 px-2 py-1">{rota.passageiros.length} aluno(s)</span><span className="rounded-full bg-white/10 px-2 py-1">{aBordo.length}/{capacidade} a bordo</span></div>
           </div>
-          <div className="min-h-0 flex-1 overflow-hidden p-2 sm:p-3">
+          <div className="relative z-40 min-h-0 flex-1 overflow-visible p-2 sm:p-3">
             <AcaoParada rota={rota} setRota={setRota} destinos={destinos} locais={locais} aBordo={aBordo} capacidade={capacidade} escolaFinalObrigatoria compacto />
           </div>
           <div className="shrink-0 border-t border-navy-100 bg-navy-50 p-2 sm:p-3">

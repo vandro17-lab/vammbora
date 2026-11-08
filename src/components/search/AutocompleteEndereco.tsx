@@ -79,18 +79,16 @@ export function AutocompleteEndereco({
   }, [value, locais]);
 
   function escolher(s: SugestaoEndereco) {
-    // Preserva o NÚMERO da casa digitado pelo usuário (ex.: "Rua X, 450")
-    // quando a sugestão escolhida é só a rua (sem número). Sem isso, tocar numa
-    // sugestão apagava o número e a busca ficava só no nível da rua.
+    // Se o usuário informou um número, preserva exatamente o texto digitado.
+    // Sugestões de rua frequentemente vêm com outro número (ou sem número) e
+    // não podem substituir o endereço solicitado.
     const numeroDigitado = (value.match(/(\d{1,6})\s*$/) || [])[1] || '';
-    const sugestaoTemNumero = /\d/.test(s.rotulo);
-    const manterNumero = numeroDigitado && !sugestaoTemNumero;
-    const texto = manterNumero ? `${s.rotulo}, ${numeroDigitado}` : s.rotulo;
+    const texto = numeroDigitado ? value.trim() : s.rotulo;
     ignorar.current = texto;
     // Se mantivemos um número que a sugestão não tinha, a coordenada da sugestão
     // é só da RUA — não a usamos; deixamos o formulário geocodificar o texto COM
     // número na hora de buscar (geocodificarPreciso trata "Rua X, 123").
-    if (manterNumero) onChange(texto);
+    if (numeroDigitado) onChange(texto);
     else onChange(texto, { lat: s.lat, lng: s.lng });
     setSugestoes([]);
     setAberto(false);
@@ -117,7 +115,7 @@ export function AutocompleteEndereco({
         </span>
       </div>
       {aberto && sugestoes.length > 0 && (
-        <ul className="absolute z-20 mt-1 w-full overflow-hidden rounded-xl border border-navy-100 bg-white shadow-float" role="listbox">
+        <ul className="absolute z-50 mt-1 max-h-52 w-full overflow-y-auto rounded-xl border border-navy-100 bg-white shadow-float" role="listbox">
           {sugestoes.map((s, i) => (
             <li key={`${s.rotulo}-${i}`} role="option" aria-selected={false}>
               <button

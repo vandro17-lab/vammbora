@@ -403,7 +403,8 @@ export function AcaoParada({ rota, setRota, destinos, locais, aBordo, capacidade
     return <FormEscola rota={rota} setRota={setRota} destinos={destinos} proxOrdem={proxOrdem()} aBordo={aBordo} onFechar={() => setModo(null)} compacto={compacto} />;
   }
 
-  if (escolaFinalObrigatoria && rota.paradas.some((p) => p.tipo === 'escola')) {
+  const alunosPendentes = rota.passageiros.filter((p) => !p.desembarqueParadaId);
+  if (escolaFinalObrigatoria && rota.paradas.some((p) => p.tipo === 'escola') && alunosPendentes.length === 0) {
     return <div className="card mt-4 border border-mint-200 bg-mint-50 p-5"><p className="font-display font-bold text-mint-900">Escola final cadastrada</p><p className="mt-1 text-sm text-mint-800">A rota termina em {rota.paradas.find((p) => p.tipo === 'escola')?.destinoNome || 'sua escola'}. Revise o percurso e informe somente o horário de chegada final.</p></div>;
   }
 
