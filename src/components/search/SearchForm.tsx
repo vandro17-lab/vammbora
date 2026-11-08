@@ -74,6 +74,7 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
     const paramsBase = criteriosParaParams({ cidadeId: CIDADE_PADRAO.id, endereco: texto, destinoId: destinoId || null, turno: null, contratacao, dataAvulso: contratacao === 'avulso' ? dataAvulso : undefined, modalidade, origemLat: coord?.lat, origemLng: coord?.lng });
     const params = new URLSearchParams(paramsBase);
     params.set('horario', horario);
+    try { sessionStorage.setItem('vambora.busca.transicao', '1'); } catch { /* armazenamento indisponivel */ }
     navigate(`/resultados?${params.toString()}`);
   }
   return (
