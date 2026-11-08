@@ -21,9 +21,9 @@ Admin (fora do layout): `/admin/login`, `/admin`.
 - `/painel/veiculos` `VeiculosPage` · `/painel/perfil` `PerfilMotoristaPage`
 - `/painel/documentos` `DocumentosMotoristaPage` · `/painel/procura` `ProcuraMotoristaPage`
 - `/painel/rotas` `RotasListPage` · `/painel/rota/:id` `RotaBuilderPage` · `/painel/simulador` `SimuladorEncaixePage`
-**Vambora Pro (demonstrativo):** `/pro` `VamboraProPage`, `/pro/encaixe` `LaboratorioEncaixePage`.
+**VanBora Pro (demonstrativo):** `/pro` `VamboraProPage`, `/pro/encaixe` `LaboratorioEncaixePage`.
 
-> Observação de produto: existem **duas** experiências de motorista (real em `/painel/*`, visual em `/pro`). A unificação "Vambora Motoristas" precisa fundir as duas sem perder a lógica do `/painel`.
+> Observação de produto: existem **duas** experiências de motorista (real em `/painel/*`, visual em `/pro`). A unificação "VanBora Motoristas" precisa fundir as duas sem perder a lógica do `/painel`.
 
 ## Diretórios principais
 - `src/pages/` — páginas por área (`motorista/`, `vambora-pro/`, `admin/`, raiz pública).
@@ -47,4 +47,4 @@ Admin (fora do layout): `/admin/login`, `/admin`.
 - Mapeadores `rotaParaBanco`/`mapRotaDoBanco` já incluem os 5 campos de compromisso da Fase 2 (dependem da migração 0010 para existirem no banco).
 
 ## PWA
-Configurado para o domínio único. Uma eventual "identidade PWA própria" do Vambora Motoristas precisa ser avaliada sem quebrar o manifest do marketplace (ver fase de unificação em `05`).
+Configurado para o domínio único. Uma eventual "identidade PWA própria" do VanBora Motoristas precisa ser avaliada sem quebrar o manifest do marketplace (ver fase de unificação em `05`).

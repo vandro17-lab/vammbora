@@ -1,4 +1,4 @@
-# Editar aparência — editor visual integrado (Vambora Motoristas)
+# Editar aparência — editor visual integrado (VanBora Motoristas)
 
 Modo administrador que permite personalizar as imagens do app **direto nas telas
 reais**, em vez de uma página separada com uma lista de uploads.

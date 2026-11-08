@@ -1,8 +1,8 @@
-# 10 — Auditoria de Dados × 10 Telas (Vambora Motoristas)
+# 10 — Auditoria de Dados × 10 Telas (VanBora Motoristas)
 
 > Base: `main` `01b8dd9` (Fases 1+2 incorporadas). Banco reauditado em
 > **2026-11-06** (projeto `rnulmjdsvvuirqijemzy`, modo leitura). Objetivo: construir
-> a aparência das imagens **sobre a inteligência real que o Vambora já tem**, sem
+> a aparência das imagens **sobre a inteligência real que o VanBora já tem**, sem
 > inventar número que possa ser calculado e sem duplicar lógica.
 
 ## ⚠️ Impedimento: imagens não recebidas

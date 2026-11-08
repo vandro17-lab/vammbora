@@ -41,7 +41,7 @@ export function Benefits() {
   return (
     <section className="container-page py-20">
       <Reveal>
-        <h2 className="font-display text-3xl font-bold sm:text-4xl">Por que o Vambora é diferente</h2>
+        <h2 className="font-display text-3xl font-bold sm:text-4xl">Por que o VanBora é diferente</h2>
         <p className="mt-2 max-w-xl text-navy-600">
           Procurar van não precisa ser um sufoco de grupos de WhatsApp e tentativa e erro.
         </p>
@@ -108,9 +108,8 @@ export function Trust() {
           <div>
             <h2 className="font-display text-3xl font-bold sm:text-4xl">Transparência em primeiro lugar</h2>
             <p className="mt-3 text-navy-600">
-              Preferimos um protótipo honesto a promessas vazias. Só marcamos “documentação
-              verificada” quando existe verificação de verdade — e dados de exemplo são sempre
-              identificados.
+              Preferimos clareza a promessas vazias. Só marcamos “documentação verificada”
+              quando existe verificação de verdade.
             </p>
             <ul className="mt-6 space-y-4">
               <li className="flex items-start gap-3">
@@ -140,7 +139,7 @@ export function Trust() {
               “Quero preencher assentos sem destruir a rota de quem já está na van.”
             </p>
             <p className="relative mt-3 text-sm text-navy-200">
-              É isso que o motor de compatibilidade do Vambora protege — para a família e para o
+              É isso que o motor de compatibilidade do VanBora protege — para a família e para o
               motorista.
             </p>
           </div>
@@ -157,7 +156,7 @@ const PERGUNTAS = [
     a: 'Não. Você pode pesquisar e conhecer os perfis sem criar uma conta.',
   },
   {
-    q: 'O Vambora cobra pela viagem?',
+    q: 'O VanBora cobra pela viagem?',
     a: 'Não. Neste momento a negociação e o pagamento acontecem direto entre você e o motorista, pelo WhatsApp.',
   },
   {

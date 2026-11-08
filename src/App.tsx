@@ -69,7 +69,7 @@ export default function App() {
             <Route path="/painel/rota/:id" element={<RotaBuilderPage />} />
             <Route path="/painel/rota-real/:id" element={<NavegacaoRotaRealPage />} />
             <Route path="/painel/simulador" element={<SimuladorEncaixePage />} />
-            {/* Vambora Motoristas — app visual (dados reais + cenário demo) */}
+            {/* VanBora Motoristas — app visual (dados reais + cenário demo) */}
             <Route path="/app" element={<ExigirMotorista><Outlet /></ExigirMotorista>}>
               <Route index element={<DashboardPage />} />
               <Route path="rotas" element={<RotasPage />} />
@@ -85,10 +85,10 @@ export default function App() {
               <Route path="mais/:modulo" element={<ModuloPage />} />
               <Route path="admin/aparencia" element={<AparenciaPage />} />
             </Route>
-            {/* Vambora Pro — PRÉVIA demonstrativa anterior (preservada como referência) */}
+            {/* VanBora Pro — PRÉVIA demonstrativa anterior (preservada como referência) */}
             <Route path="/pro" element={<VamboraProPage />} />
             <Route path="/pro/encaixe" element={<LaboratorioEncaixePage />} />
-            {/* Aliases canônicos "Vambora Motoristas" (aditivos; preservam links antigos) */}
+            {/* Aliases canônicos "VanBora Motoristas" (aditivos; preservam links antigos) */}
             {rotasRedirecionamentoMotorista()}
           </Routes>
           </StartupExperience>

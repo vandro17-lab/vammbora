@@ -1,5 +1,5 @@
 /**
- * Tipos de domínio do Vambora.
+ * Tipos de domínio do VanBora.
  *
  * Estes tipos refletem o núcleo do modelo de dados (ver docs/MODELO-DE-DADOS.md)
  * e já foram pensados para evoluir até o Supabase sem reescrita das telas.

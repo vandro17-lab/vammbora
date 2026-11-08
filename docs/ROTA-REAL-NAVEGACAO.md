@@ -40,7 +40,7 @@ No celular, o modo operação é um viewport fixo: mapa superior, cartões compa
 ## Como abrir
 
 1. Entrar como motorista.
-2. Abrir **Vambora Motoristas → Minhas rotas → uma rota → Iniciar rota**.
+2. Abrir **VanBora Motoristas → Minhas rotas → uma rota → Iniciar rota**.
 3. Usar **Expandir mapa** para entrar na navegação.
 4. Ou acessar diretamente `/painel/rota-real/<id-da-rota>`.
 

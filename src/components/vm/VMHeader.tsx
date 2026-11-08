@@ -8,9 +8,9 @@ import { TextoEditavel } from '@/components/vm/TextoEditavel';
 import type { TextoDef } from '@/data/ui-config';
 
 /**
- * Cabeçalho premium de seção do app Vambora Motoristas (fiel à referência):
+ * Cabeçalho premium de seção do app VanBora Motoristas (fiel à referência):
  * faixa em gradiente verde/teal com borda inferior em CURVA orgânica, linha da
- * marca (check + "Vambora Motoristas") e sino à direita, van escolar ao fundo,
+ * marca (check + "VanBora Motoristas") e sino à direita, van escolar ao fundo,
  * e o título com ícone + subtítulo. Reutilizável pelas telas de aba.
  */
 export function VMSectionHeader({
@@ -48,7 +48,7 @@ export function VMSectionHeader({
               <Check size={16} weight="bold" className="text-mint-600" />
             </span>
             <span className="font-display text-[15px] font-extrabold leading-[1.04] tracking-tight">
-              Vambora<br />Motoristas
+              VanBora<br />Motoristas
             </span>
           </div>
           {acao ?? (

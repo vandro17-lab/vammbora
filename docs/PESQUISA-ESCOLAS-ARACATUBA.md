@@ -2,7 +2,7 @@
 
 > Objetivo: montar o cadastro **real** de destinos (escolas e faculdades) de
 > Araçatuba, com **endereço verdadeiro**, separados por **nível de ensino**.
-> O resultado será usado pelo motor de rotas do Vambora — por isso cada destino
+> O resultado será usado pelo motor de rotas do VanBora — por isso cada destino
 > precisa de **endereço real** (e, de preferência, coordenadas) para calcular
 > horários de verdade.
 

@@ -4,7 +4,7 @@ import { VanEscolar } from '@/components/vm/VanEscolar';
 import { LINKS_ENTRADA_MOTORISTA } from '@/app/navegacao-motorista';
 
 /**
- * TELA 1 — Boas-vindas do Vambora Motoristas.
+ * TELA 1 — Boas-vindas do VanBora Motoristas.
  * Entrada única "Sou motorista": Marketplace → aqui → autenticação existente
  * (`/motorista/conta`) → app real (`/app`). Preserva o login Google/e-mail.
  */
@@ -22,7 +22,7 @@ export function DriverLandingPage() {
           <span className="grid h-10 w-10 place-items-center rounded-2xl bg-white/15 ring-1 ring-white/25">
             <Check className="h-5 w-5 text-white" strokeWidth={3} />
           </span>
-          <span className="font-display text-2xl font-extrabold tracking-tight">Vambora <span className="text-mint-200">Motoristas</span></span>
+          <span className="font-display text-2xl font-extrabold tracking-tight">VanBora <span className="text-mint-200">Motoristas</span></span>
         </div>
 
         <p className="mt-4 max-w-xs text-lg font-medium text-mint-50/90">

@@ -1,20 +1,20 @@
-# 00 — LEIA PRIMEIRO (Vambora Motoristas)
+# 00 — LEIA PRIMEIRO (VanBora Motoristas)
 
 > Documento de orientação. Leia isto antes de qualquer fase. Tudo aqui foi
 > **verificado no código e no banco** (projeto Supabase `rnulmjdsvvuirqijemzy`),
 > não presumido. Data da auditoria: 2026-11-05.
 
 ## O que é o projeto
-Vambora é um **marketplace de transporte escolar recorrente** em Araçatuba/SP.
+VanBora é um **marketplace de transporte escolar recorrente** em Araçatuba/SP.
 Duas experiências no **mesmo projeto React (Vite + PWA) e mesmo banco Supabase**:
-- **Vambora** (famílias): marketplace público — `/`, `/resultados`, `/van/:slug`.
-- **Vambora Motoristas** (motorista): hoje dividido em dois lugares:
+- **VanBora** (famílias): marketplace público — `/`, `/resultados`, `/van/:slug`.
+- **VanBora Motoristas** (motorista): hoje dividido em dois lugares:
   - **`/painel/*`** — app operacional **real** (conta, veículos, rotas, construtor, simulador). É aqui que a lógica verdadeira vive.
-  - **`/pro` e `/pro/encaixe`** — **Vambora Pro**, uma vitrine **demonstrativa** (16 módulos com dados fixos).
+  - **`/pro` e `/pro/encaixe`** — **VanBora Pro**, uma vitrine **demonstrativa** (16 módulos com dados fixos).
 - **Admin**: `/admin/*`.
 
 ## Objetivo desta linha de trabalho
-Modernizar e **unificar** a experiência do motorista sob o nome **"Vambora Motoristas"**, com fidelidade às imagens de referência, **sem reconstruir do zero** e **sem perder nenhuma lógica/integração já existente**.
+Modernizar e **unificar** a experiência do motorista sob o nome **"VanBora Motoristas"**, com fidelidade às imagens de referência, **sem reconstruir do zero** e **sem perder nenhuma lógica/integração já existente**.
 
 ## Arquitetura em uma frase
 Telas React → serviços em `src/data/*` e `src/lib/*` → Supabase (tabelas + RPCs + view `public_listings`) → o mesmo núcleo de cálculo em `src/engine/*` atende simulador do motorista e (no futuro) a busca do marketplace.
@@ -28,10 +28,10 @@ Telas React → serviços em `src/data/*` e `src/lib/*` → Supabase (tabelas + 
 
 ## Branches e trabalho em andamento (NÃO é tudo na `main`)
 > ATUALIZAÇÃO 2026-11-06: a `main` avançou para **`3965b73`** — o **PR #14 foi MERGEADO**. A consolidação + geolocalização já estão na `main`. A migração 0010 e a correção da RPC continuam pendentes (ver `09`).
-- **`main`** (antes `011fb14`): marketplace, painel real, Vambora Pro demo, login Google, 6 motoristas-demo no banco.
+- **`main`** (antes `011fb14`): marketplace, painel real, VanBora Pro demo, login Google, 6 motoristas-demo no banco.
 - **PR #14** (branch `ccr-f18e6a2b-a7ex08`): consolidação do Algoritmo Supremo (Fases 1, 2, 4) + geolocalização (geocodificação por número + alfinete arrastável). **MERGEADO na `main` (`3965b73`).**
 - **Fase 1** (branch `fase1/protecao-testes-vambora-motoristas`, PR #15): testes de proteção adicionados (ver `09`).
-- **Fase 2** (branch `fase2/unificacao-vambora-motoristas`): entrada unificada "Vambora Motoristas" leva ao app real `/painel`; `/pro` vira prévia demonstrativa; aliases aditivos (ver `09`).
+- **Fase 2** (branch `fase2/unificacao-vambora-motoristas`): entrada unificada "VanBora Motoristas" leva ao app real `/painel`; `/pro` vira prévia demonstrativa; aliases aditivos (ver `09`).
 - **Migração 0010** (compromissos individuais por aluno): escrita, **NÃO aplicada** ao Supabase.
 - **Pendência da RPC `salvar_rota_completa`**: apaga e recria paradas/passageiros (risco a IDs e vínculos) — correção recomendada, **não aplicada**.
 - Estas três são **dependências arquiteturais** das telas de rotas/passageiros/oportunidades/encaixe. Ver `08-RISCOS-E-RECUPERACAO.md`.

@@ -1,5 +1,5 @@
 /**
- * Camada ÚNICA de encaixe do Vambora.
+ * Camada ÚNICA de encaixe do VanBora.
  *
  * Tanto a demonstração quanto a busca das famílias usam ESTE módulo, que por sua
  * vez chama SEMPRE o mesmo motor real (`src/engine/encaixe-geografico`). Quando os

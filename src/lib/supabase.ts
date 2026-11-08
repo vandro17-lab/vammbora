@@ -12,7 +12,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
  * A segurança real vem das políticas RLS no banco, não de esconder a chave anon.
  */
 /**
- * PADRÃO do projeto Supabase do Vambora (para o app já nascer conectado sem
+ * PADRÃO do projeto Supabase do VanBora (para o app já nascer conectado sem
  * depender de variáveis de ambiente no provedor de deploy).
  *
  * A chave abaixo é a ANON/pública (role "anon"): ela já vai embutida no bundle

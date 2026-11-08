@@ -18,7 +18,7 @@ import type {
 /**
  * ADAPTADOR DE COMPATIBILIDADE — VERSÃO SIMULADA (Etapa 1).
  * ------------------------------------------------------------------
- * ATENÇÃO: isto NÃO é o motor de encaixe real do Van Bora.
+ * ATENÇÃO: isto NÃO é o motor de encaixe real do VanBora.
  * O motor real (`motor/` + `motor-van-bora.md`) não está no repositório
  * nesta fase, e a regra do projeto proíbe reimplementá-lo às cegas.
  *

@@ -49,7 +49,7 @@ export function SearchLoadingScreen({ cidade }: Props) {
             </svg>
           </span>
           <span className="vb-search-brandtext">
-            <span className="vb-search-brandname">Vam<span>Bora</span></span>
+            <span className="vb-search-brandname">Van<span>Bora</span></span>
             <small className="vb-search-sub">Transporte Escolar Inteligente</small>
           </span>
         </header>

@@ -43,7 +43,7 @@ Checkpoint · Recuperação · Pendências.**
 
 ---
 
-## Fase 2 — Unificação do app "Vambora Motoristas" (rotas/entrada, sem redesenho)
+## Fase 2 — Unificação do app "VanBora Motoristas" (rotas/entrada, sem redesenho)
 - **Objetivo:** definir a casca única do app do motorista e os redirecionamentos, unificando `/painel/*` (real) e `/pro` (visual) sob uma identidade só, **sem** perder lógica.
 - **Estado atual:** duas experiências separadas (`MotoristaShell` real; `VamboraProPage` demo). `/motorista` é landing pública "sou motorista".
 - **Dependências:** Fase 1; decisão de URLs.
@@ -54,7 +54,7 @@ Checkpoint · Recuperação · Pendências.**
 - **Riscos:** quebrar deep links e PWA; loops de redirect.
 - **Testes:** navegação manual + testes de rota; redirecionamentos antigos respondem; build.
 - **Critério:** uma navegação única acessa todos os módulos sem duplicar telas; links antigos funcionam.
-- **Checkpoint:** commit `feat(fase2): casca única Vambora Motoristas + redirects`.
+- **Checkpoint:** commit `feat(fase2): casca única VanBora Motoristas + redirects`.
 - **Recuperação:** reverter; rotas antigas continuam no histórico.
 - **Pendências:** identidade PWA própria avaliada, não necessariamente implementada.
 
@@ -70,7 +70,7 @@ Checkpoint · Recuperação · Pendências.**
 - **Modificar:** adicionar tokens/componentes sem quebrar classes existentes.
 - **Testes:** build; checagem visual em viewport mobile; sem erros de console.
 - **Critério:** componentes base batem com as imagens; reaproveitáveis.
-- **Checkpoint:** commit `feat(fase3): design system Vambora Motoristas`.
+- **Checkpoint:** commit `feat(fase3): design system VanBora Motoristas`.
 - **Bloqueio:** **não inicia sem as imagens.**
 
 ---
@@ -86,7 +86,7 @@ Checkpoint · Recuperação · Pendências.**
 - **Riscos:** quebrar callback OAuth/redirect pós-login.
 - **Testes:** login Google (ambiente com provider habilitado) — senão **não verificado**; navegação de entrada; build.
 - **Critério:** fluxo de entrada fiel à imagem; login intacto.
-- **Checkpoint:** commit `feat(fase4): entrada Vambora Motoristas`.
+- **Checkpoint:** commit `feat(fase4): entrada VanBora Motoristas`.
 
 ---
 

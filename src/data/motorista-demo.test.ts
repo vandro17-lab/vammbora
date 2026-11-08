@@ -13,7 +13,7 @@ function baseOperacional() {
   return { matriz, base: { ...base0, partidaMin: latest - FOLGA } };
 }
 
-describe('dados demonstrativos do Vambora Pro (motor viário #7)', () => {
+describe('dados demonstrativos do VanBora Pro (motor viário #7)', () => {
   it('os indicadores batem com as listas (sem números soltos)', () => {
     expect(INDICADORES_DEMO.alunos).toBe(ALUNOS_DEMO.length);
     expect(INDICADORES_DEMO.capacidade).toBe(VAN_DEMO.lugares);

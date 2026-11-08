@@ -26,7 +26,7 @@ Para novos dados ilustrativos, padronizar:
 - **Geocodificação**: `api/mapas.ts` + `src/lib/geocode.ts` (real com `GEOAPIFY_API_KEY`; fallback Photon sem chave).
 
 ## DEMONSTRATIVO (substituível, mas com interações convincentes)
-- **Vambora Pro `/pro` (`VamboraProPage`)**: 16 módulos com dados fixos (Início, Vagas, Financeiro, Passageiros, Vagas por trecho, Calendário, Avisos, Combustível, Manutenção, Documentação, Relatórios, Clube do Motorista, AlugaVan, Perfil, Rotas, Mais). Hoje **desconectado** do real.
+- **VanBora Pro `/pro` (`VamboraProPage`)**: 16 módulos com dados fixos (Início, Vagas, Financeiro, Passageiros, Vagas por trecho, Calendário, Avisos, Combustível, Manutenção, Documentação, Relatórios, Clube do Motorista, AlugaVan, Perfil, Rotas, Mais). Hoje **desconectado** do real.
 - **Clube do Motorista**: inexistente como feature; será vitrine demo substituível (Fase 10).
 - **AlugaVan**: apresentação demo (Fase 11).
 - **Financeiro/Combustível/Inteligência/Oportunidades**: cenários demo até ligarem aos motores/`consumo_kml` (Fases 8/9).

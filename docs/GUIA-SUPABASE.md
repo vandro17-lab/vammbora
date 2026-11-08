@@ -1,6 +1,6 @@
 # Guia do Supabase — passo a passo para iniciante
 
-Este guia liga o Vambora a um banco de dados real e seguro (Supabase), **de graça**.
+Este guia liga o VanBora a um banco de dados real e seguro (Supabase), **de graça**.
 A vitrine da demonstração **continua funcionando sem isso** — este passo é para ter
 **persistência de verdade** (salvar leads/lista de interesse, cadastros, admin).
 

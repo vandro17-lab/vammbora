@@ -22,7 +22,7 @@ export function montarMensagemWhatsApp(
   destino: Destino | null,
 ): string {
   const linhas: string[] = [];
-  linhas.push(`Olá, ${motorista.nome.split(' ')[0]}! Encontrei sua van no Vambora.`);
+  linhas.push(`Olá, ${motorista.nome.split(' ')[0]}! Encontrei sua van no VanBora.`);
 
   if (destino) {
     linhas.push(`Preciso de transporte para: ${destino.nome}.`);

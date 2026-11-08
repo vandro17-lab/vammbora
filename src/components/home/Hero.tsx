@@ -31,7 +31,7 @@ export function Hero() {
       <div className="border-t border-white/10 bg-white/[0.03]">
         <div className="container-page flex flex-wrap items-center justify-between gap-3 py-5 text-xs text-navy-100 sm:text-sm">
           <span>Mais clareza para escolher. Mais leveza para ir.</span>
-          <a href="#como-funciona" className="inline-flex items-center gap-2 font-semibold text-mint-300">Conheça o Vambora <ArrowUpRight className="h-4 w-4" /></a>
+          <a href="#como-funciona" className="inline-flex items-center gap-2 font-semibold text-mint-300">Conheça o VanBora <ArrowUpRight className="h-4 w-4" /></a>
         </div>
       </div>
     </section>

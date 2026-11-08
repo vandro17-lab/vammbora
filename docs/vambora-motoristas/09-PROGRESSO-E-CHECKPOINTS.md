@@ -3,7 +3,7 @@
 Atualizar ao fim de cada fase. Fonte de verdade da continuidade (não depender do chat).
 
 ## Estado atual
-- **Fase atual:** Fase 2 — Unificação da experiência Vambora Motoristas → **CONCLUÍDA**.
+- **Fase atual:** Fase 2 — Unificação da experiência VanBora Motoristas → **CONCLUÍDA**.
 - **Próxima fase:** Fase 3 — Design system (**aguardando aprovação E imagens**).
 - **Branch da documentação (plano):** `docs/plano-vambora-motoristas` (commit `7800374`, base `011fb14`).
 - **Branch da Fase 1:** `fase1/protecao-testes-vambora-motoristas` (base `3965b73`) — PR **#15** (draft, revisão, sem merge).
@@ -62,7 +62,7 @@ Atualizar ao fim de cada fase. Fonte de verdade da continuidade (não depender d
 
 ## Fase 3 (implementação visual) — BLOCO F CONCLUÍDO
 - **Branch:** `feat/vambora-motoristas-10-telas` (base = audit branch, que tem main `01b8dd9` + doc 10). Blocos A–E: `f332707`.
-- **Feito (blocos A–E):** app "Vambora Motoristas" em `/app` com as 10 telas navegáveis e responsáveis; indicadores calculados por funções reais (`src/lib/vm/*`), cenário demo como fallback; `/painel`, login, motores e marketplace preservados; entrada e pós-login → `/app`. tsc 0, build ok, 225 testes + 8 todo.
+- **Feito (blocos A–E):** app "VanBora Motoristas" em `/app` com as 10 telas navegáveis e responsáveis; indicadores calculados por funções reais (`src/lib/vm/*`), cenário demo como fallback; `/painel`, login, motores e marketplace preservados; entrada e pós-login → `/app`. tsc 0, build ok, 225 testes + 8 todo.
 - **Feito (bloco F — acabamento):** 4 commits temáticos — (1) fidelidade visual: identidade verde/teal em tokens CSS, cartões com hairline+sombra, feedback de toque; (2) estados vazios reais (Dashboard/Minha Van/Rotas/Oportunidades) + responsividade (abas com wrap) + identidade do cabeçalho vinda da sessão real; (3) 5º item da nav resolvido como **"Mais"** (hub, como no `/pro`), corrigindo a página Mais que estava órfã, com Minha Van em destaque dentro do hub; (4) tipografia (`tabular-nums`) e ícone "Voltar" via lucide. Novo teste `src/components/vm/VMShell.test.tsx` (5). tsc 0, build ok, **230 testes + 8 todo**.
 - **⚠️ Imagens de referência:** continuam **não recebidas** (ver doc `04`). A "fidelidade" do bloco F foi contra a linguagem visual existente e o app `/pro` (referência mais próxima), não contra imagens. Quando as imagens chegarem, só ajuste de layout/estilo (o mapa de dados do doc `10` não muda).
 - **Pendências de dado (não bloqueiam o visual):** GAP-1/1b (van/perfil ↔ marketplace), migração 0010 + correção da RPC `salvar_rota_completa` (Fases 5/7) — **não aplicadas** nesta execução. Ver doc `10`.

@@ -17,7 +17,7 @@ export function ReloadPrompt() {
     <div className="fixed inset-x-0 bottom-4 z-50 mx-auto w-[min(92%,26rem)] animate-fade-up">
       <div className="card flex items-center gap-3 p-4">
         <RefreshCw className="h-5 w-5 shrink-0 text-mint-600" />
-        <p className="flex-1 text-sm text-navy-700">Há uma nova versão do Vambora disponível.</p>
+        <p className="flex-1 text-sm text-navy-700">Há uma nova versão do VanBora disponível.</p>
         <button className="btn btn-sm btn-primary" onClick={() => updateServiceWorker(true)}>
           Atualizar
         </button>

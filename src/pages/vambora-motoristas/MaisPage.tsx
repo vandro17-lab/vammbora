@@ -153,7 +153,7 @@ export function MaisPage() {
         {/* Acesso DISFARÇADO ao editor de motoristas da demonstração (admin). */}
         <button
           onClick={() => navigate('/app/mais/motoristas')}
-          aria-label="Editar motoristas (demonstração)"
+          aria-label="Editar motoristas"
           title="Editar motoristas"
           className="mx-auto mt-2 flex h-8 w-8 items-center justify-center rounded-full text-navy-200 transition hover:text-navy-500 active:scale-90"
         >
@@ -308,7 +308,7 @@ function Clube() {
           </div>
         );
       })}
-      <p className="text-center text-[11px] text-navy-400">Ofertas ilustrativas — parcerias comerciais a confirmar. Estrutura pronta para ofertas reais.</p>
+      <p className="text-center text-[11px] text-navy-400">Parcerias comerciais a confirmar. Estrutura pronta para ofertas reais.</p>
     </>
   );
 }
@@ -363,7 +363,7 @@ function Config() {
         className="mx-auto mt-5 block w-full select-none py-3 text-center text-[11px] text-navy-400"
         aria-label="Versão do aplicativo"
       >
-        Vambora Motoristas · versão 0.1.0
+        VanBora Motoristas · versão 0.1.0
       </button>
     </>
   );

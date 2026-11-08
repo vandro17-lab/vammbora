@@ -2,13 +2,11 @@ import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import { ChevronLeft, type LucideIcon } from 'lucide-react';
 
-/** Chip "demonstração" discreto (quando a tela usa o cenário de exemplo). */
-export function DemoChip({ className }: { className?: string }) {
-  return (
-    <span className={cn('chip bg-amber-100/90 py-0.5 text-[10px] font-semibold text-amber-800 ring-1 ring-amber-200', className)}>
-      demonstração
-    </span>
-  );
+/** Antigo selo "demonstração" das telas do app de motoristas. Mantido como
+ *  no-op para não exibir mais esse rótulo (a natureza da versão é informada
+ *  num único lugar). As chamadas existentes continuam válidas. */
+export function DemoChip(_props: { className?: string }) {
+  return null;
 }
 
 /** Tile de indicador (número grande + rótulo + ícone colorido). */

@@ -1,5 +1,5 @@
 /**
- * Dados DEMONSTRATIVOS e consistentes de um motorista fictício para o Vambora Pro.
+ * Dados DEMONSTRATIVOS e consistentes de um motorista fictício para o VanBora Pro.
  * Tudo aqui é exemplo (protótipo acadêmico). Os números batem entre as telas:
  * se o painel diz "12 alunos", a lista tem 12. Nenhum dado real de criança.
  */

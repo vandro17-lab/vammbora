@@ -27,5 +27,5 @@ describe('LACUNAS CONHECIDAS — a corrigir em fases futuras (não na Fase 1)', 
   it.todo('GAP-3: aplicar/confirmar a RPC confirmar_encaixe_rota (confirmação atômica de encaixe) — ainda não existe no banco');
 
   // GAP-4 — Fases 2/6
-  it.todo('GAP-4: unificar /pro (demonstrativo) e /painel (real) numa única experiência Vambora Motoristas, sem perder lógica');
+  it.todo('GAP-4: unificar /pro (demonstrativo) e /painel (real) numa única experiência VanBora Motoristas, sem perder lógica');
 });

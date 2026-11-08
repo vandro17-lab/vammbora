@@ -280,7 +280,7 @@ function Rotas() {
       <Link to="/painel/rota/nova" className="btn btn-lg btn-navy flex w-full">
         <Plus className="h-5 w-5" /> Montar uma rota de verdade
       </Link>
-      <p className="text-center text-xs text-navy-400">As rotas acima são demonstrativas. O construtor visual grava uma rota real.</p>
+      <p className="text-center text-xs text-navy-400">O construtor visual grava uma rota real.</p>
     </div>
   );
 }
@@ -306,7 +306,7 @@ function Oportunidades() {
           </motion.button>
         ))}
       </div>
-      <p className="text-center text-xs text-navy-400">Procura demonstrativa, sem dados pessoais das famílias.</p>
+      <p className="text-center text-xs text-navy-400">Sem dados pessoais das famílias.</p>
       <AnimatePresence>
         {sel && <SimuladorImpacto op={sel} onFechar={() => setSel(null)} />}
       </AnimatePresence>
@@ -495,7 +495,7 @@ function Passageiros() {
           </motion.div>
         ))}
       </div>
-      <p className="mt-3 text-xs text-navy-400">Identificações curtas (apelidos). Dados demonstrativos, sem informações pessoais reais.</p>
+      <p className="mt-3 text-xs text-navy-400">Identificações curtas (apelidos), sem informações pessoais reais.</p>
     </div>
   );
 }

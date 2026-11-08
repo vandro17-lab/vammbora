@@ -28,7 +28,7 @@ export function AparenciaPage() {
 
   if (!USE_SUPABASE)
     return <Aviso icon={Info} titulo="Aparência"
-      texto="O gerenciador de artes precisa do Supabase configurado. Neste ambiente de demonstração ele está desligado." />;
+      texto="O gerenciador de artes precisa do Supabase configurado. Nesta versão ele está desligado." />;
   if (carregando)
     return <Aviso icon={LockKey} titulo="Aparência" texto="Verificando permissão de administrador…" />;
   if (!session) return <Navigate to="/motorista/conta" replace />;

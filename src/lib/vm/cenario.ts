@@ -2,7 +2,7 @@ import type { Rota, Veiculo, ParadaRota, PassageiroRota } from '@/types/motorist
 import { capacidadeAlunos, picoOcupacao, ocupacaoPorTrecho } from '@/lib/ocupacao-rota';
 
 /**
- * Vambora Motoristas — CENÁRIO DEMONSTRATIVO coerente com as telas de referência.
+ * VanBora Motoristas — CENÁRIO DEMONSTRATIVO coerente com as telas de referência.
  *
  * Todos os indicadores abaixo são CALCULADOS pelas funções reais (ocupacao-rota,
  * aritmética de combustível/financeiro), nunca "chumbados". O cenário só fornece

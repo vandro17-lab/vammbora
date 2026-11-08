@@ -66,6 +66,6 @@ describe('montarMensagemWhatsApp', () => {
   it('funciona sem critérios (perfil direto)', () => {
     const msg = montarMensagemWhatsApp(motorista, null, null);
     expect(msg.length).toBeGreaterThan(0);
-    expect(msg).toContain('Vambora');
+    expect(msg).toContain('VanBora');
   });
 });

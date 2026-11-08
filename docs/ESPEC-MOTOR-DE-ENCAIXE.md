@@ -1,4 +1,4 @@
-# Motor de encaixe do Vambora — contrato implementado
+# Motor de encaixe do VanBora — contrato implementado
 
 Módulo isolado em `src/engine/`, TypeScript strict, funções puras e determinísticas,
 sem rede, mapas, relógio, aleatoriedade ou dependências de produção.

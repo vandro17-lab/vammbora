@@ -16,7 +16,7 @@ export const TABS = [
   { to: '/app/mais', end: false, label: 'Mais', Icon: LayoutGrid },
 ] as const;
 
-/** Casca do app Vambora Motoristas: fundo + conteúdo + navegação inferior. */
+/** Casca do app VanBora Motoristas: fundo + conteúdo + navegação inferior. */
 export function VMShell({ children, nav = true, className, wide = false }: { children: ReactNode; nav?: boolean; className?: string; wide?: boolean }) {
   return (
     <div className={cn('vm-app pb-24', className)}>

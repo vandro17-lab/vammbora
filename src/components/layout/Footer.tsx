@@ -52,7 +52,7 @@ export function Footer() {
         <div>
           <h3 className="text-sm font-semibold text-white">Projeto</h3>
           <ul className="mt-4 space-y-2.5 text-sm text-navy-300">
-            <li>Van Bora · Fatec Araçatuba</li>
+            <li>VanBora · Fatec Araçatuba</li>
             <li>Ideathon Fatec 2026</li>
             <li>Cidade piloto: Araçatuba/SP</li>
           </ul>
@@ -61,10 +61,10 @@ export function Footer() {
 
       <div className="border-t border-navy-800">
         <div className="container-page flex flex-col items-center justify-between gap-2 py-6 text-xs text-navy-400 sm:flex-row">
-          <p>© {new Date().getFullYear()} Vambora · Feito em Araçatuba.</p>
+          <p>© {new Date().getFullYear()} VanBora · Feito em Araçatuba.</p>
           <details className="max-w-sm text-center sm:text-right">
             <summary className="cursor-pointer text-navy-200">Sobre esta versão</summary>
-            <p className="mt-2 leading-relaxed">Protótipo acadêmico · Fatec Araçatuba. Perfis e informações ilustrativos, sem contratação disponível nesta versão.</p>
+            <p className="mt-2 leading-relaxed">Projeto acadêmico da Fatec Araçatuba. A contratação ainda não está disponível nesta versão.</p>
           </details>
         </div>
       </div>

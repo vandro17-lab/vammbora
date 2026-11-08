@@ -7,7 +7,7 @@ import { TABS } from './VMShell';
  * em /pro, mantendo Minha Van (/app/van) acessível de dentro do hub. Este teste
  * protege a decisão: 5 abas, a última é "Mais" → /app/mais, e todas vivem em /app.
  */
-describe('BLOCO F — navegação inferior do app Vambora Motoristas', () => {
+describe('BLOCO F — navegação inferior do app VanBora Motoristas', () => {
   it('tem exatamente 5 abas', () => {
     expect(TABS).toHaveLength(5);
   });

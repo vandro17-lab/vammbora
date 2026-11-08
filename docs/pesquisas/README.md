@@ -1,4 +1,4 @@
-# Pesquisas do Grupo — Vambora
+# Pesquisas do Grupo — VanBora
 
 Esta pasta guarda a pesquisa real da equipe. **Cada colega preenche e faz commit com a própria
 conta** — isso conta como contribuição autêntica no Ideathon (código não é a única forma de

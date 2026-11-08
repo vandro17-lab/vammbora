@@ -1,5 +1,5 @@
 /**
- * Registro de ESPAÇOS EDITÁVEIS (slots) de arte do app Vambora Motoristas.
+ * Registro de ESPAÇOS EDITÁVEIS (slots) de arte do app VanBora Motoristas.
  *
  * Cada slot é um lugar da interface onde o admin pode publicar uma imagem
  * profissional (ilustração, render ou ícone com fundo transparente). Enquanto

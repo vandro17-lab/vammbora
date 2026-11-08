@@ -1,4 +1,4 @@
-# Diário de Desenvolvimento — Vambora
+# Diário de Desenvolvimento — VanBora
 
 Registro cronológico, honesto, do que foi feito.
 

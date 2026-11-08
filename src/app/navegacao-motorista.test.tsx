@@ -16,7 +16,7 @@ import {
  * neste projeto; por isso o fluxo visual completo fica "não verificado" aqui.)
  */
 
-describe('FASE 2 — entrada do Vambora Motoristas leva ao app real (não à demo)', () => {
+describe('FASE 2 — entrada do VanBora Motoristas leva ao app real (não à demo)', () => {
   it('o botão principal "Entrar" aponta para a autenticação existente', () => {
     expect(LINKS_ENTRADA_MOTORISTA.entrar).toBe('/motorista/conta');
   });
@@ -40,7 +40,7 @@ describe('FASE 2 — redirecionamentos canônicos (aditivos, sem quebrar links a
     }
   });
 
-  it('inclui os aliases esperados do Vambora Motoristas', () => {
+  it('inclui os aliases esperados do VanBora Motoristas', () => {
     const mapa = Object.fromEntries(REDIRECIONAMENTOS_MOTORISTA.map((r) => [r.de, r.para]));
     expect(mapa['/motoristas']).toBe('/motorista');
     expect(mapa['/vambora-motoristas']).toBe('/motorista');

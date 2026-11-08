@@ -34,7 +34,7 @@ export function EditorMotoristasPage() {
       <SubHeader titulo="Editar motoristas" onVoltar={() => navigate('/app/mais')} />
       <div className="px-4 pb-16 pt-4">
         <p className="mb-3 text-sm text-navy-500">
-          Corrija o <b className="font-semibold text-navy-700">nome</b> e a <b className="font-semibold text-navy-700">foto</b> dos motoristas da demonstração.
+          Corrija o <b className="font-semibold text-navy-700">nome</b> e a <b className="font-semibold text-navy-700">foto</b> dos motoristas.
           As alterações ficam só neste navegador e aparecem nos resultados da busca.
         </p>
         <ul className="space-y-2">

@@ -59,9 +59,9 @@ export function LaboratorioEncaixePage() {
   const { ida, volta, completo } = resultado;
   return <div className="min-h-dvh bg-navy-50 pb-16">
     <header className="bg-navy-900 text-white"><div className="container-page max-w-2xl py-6">
-      <Link to="/pro" className="inline-flex items-center gap-2 text-sm text-navy-200"><ArrowLeft className="h-4 w-4"/> Voltar ao Vambora Pro</Link>
+      <Link to="/pro" className="inline-flex items-center gap-2 text-sm text-navy-200"><ArrowLeft className="h-4 w-4"/> Voltar ao VanBora Pro</Link>
       <div className="mt-5 flex items-center gap-3"><span className="rounded-2xl bg-white/10 p-3"><Route className="h-7 w-7"/></span><div><p className="text-xs font-bold uppercase tracking-wider text-mint-300">Laboratório do motor</p><h1 className="font-display text-2xl font-extrabold">Encaixe inteligente</h1></div></div>
-      <p className="mt-3 text-sm text-navy-200">Veja como o Vambora testa o encaixe sem ultrapassar os horários das famílias existentes.</p>
+      <p className="mt-3 text-sm text-navy-200">Veja como o VanBora testa o encaixe sem ultrapassar os horários das famílias existentes.</p>
     </div></header>
     <main className="container-page max-w-2xl space-y-5 py-6">
       <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><div className="flex items-start gap-2"><AlertTriangle className="mt-0.5 h-5 w-5 shrink-0"/><p><strong>Simulação acadêmica.</strong> Todos os endereços, trajetos e horários são fictícios. A integração com mapas rodoviários e a confirmação de vagas ainda não estão ativas.</p></div></div>
