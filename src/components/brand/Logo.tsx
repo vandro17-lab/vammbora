@@ -14,7 +14,7 @@ export function VanMark({ className }: { className?: string }) {
       viewBox="0 0 48 48"
       className={className}
       role="img"
-      aria-label="Vambora"
+      aria-label="VanBora"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
     >

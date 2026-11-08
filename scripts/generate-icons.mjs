@@ -1,4 +1,4 @@
-// Gera os ícones PNG do PWA a partir de SVGs definidos aqui.
+// Gera os ícones PNG do PWA a partir da logo oficial VanBora.
 // Uso: npm run icons  (requer "sharp", já em devDependencies)
 import sharp from 'sharp';
 import { mkdir } from 'node:fs/promises';
@@ -6,50 +6,41 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const OUT = path.resolve(__dirname, '../public/icons');
+const ROOT = path.resolve(__dirname, '..');
+const SOURCE = path.join(ROOT, 'public/brand/vanbora-logo.png');
+const OUT = path.join(ROOT, 'public/icons');
 
-// Ícone "any": van sobre fundo arredondado.
-const iconeAny = (size) => `
-<svg width="${size}" height="${size}" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
-  <rect width="512" height="512" rx="112" fill="#0b1f3a"/>
-  ${vanPath(1)}
-</svg>`;
-
-// Ícone maskable: mesma arte, fundo cheio e mais respiro (área de segurança ~20%).
-const iconeMaskable = (size) => `
-<svg width="${size}" height="${size}" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
-  <rect width="512" height="512" fill="#0b1f3a"/>
-  <g transform="translate(51.2 51.2) scale(0.8)">
-    ${vanPath(1)}
-  </g>
-</svg>`;
-
-function vanPath() {
-  // Van centralizada na viewBox 512, desenhada em coordenadas simples.
-  return `
-  <g transform="translate(96 150)">
-    <rect x="0" y="40" width="320" height="150" rx="34" fill="#2f52a0"/>
-    <rect x="22" y="66" width="92" height="64" rx="14" fill="#eef3fb"/>
-    <rect x="126" y="66" width="76" height="64" rx="14" fill="#eef3fb"/>
-    <rect x="214" y="66" width="70" height="64" rx="14" fill="#eef3fb"/>
-    <rect x="0" y="150" width="320" height="22" fill="#3cc394"/>
-    <circle cx="82" cy="196" r="34" fill="#07132a"/>
-    <circle cx="82" cy="196" r="14" fill="#eef3fb"/>
-    <circle cx="238" cy="196" r="34" fill="#07132a"/>
-    <circle cx="238" cy="196" r="14" fill="#eef3fb"/>
-  </g>`;
+async function logo(size) {
+  return sharp(SOURCE).resize(size, size, { fit: 'cover' }).png();
 }
 
-async function png(svg, file, size) {
-  const out = path.join(OUT, file);
-  await sharp(Buffer.from(svg)).resize(size, size).png().toFile(out);
-  console.log('gerado:', path.relative(process.cwd(), out));
+async function writeLogo(file, size) {
+  await (await logo(size)).toFile(path.join(OUT, file));
+  console.log('gerado:', path.relative(process.cwd(), path.join(OUT, file)));
+}
+
+async function writeMaskable(file, size) {
+  const safeSize = Math.round(size * 0.8);
+  const foreground = await (await logo(safeSize)).toBuffer();
+  await sharp({
+    create: {
+      width: size,
+      height: size,
+      channels: 4,
+      background: { r: 0, g: 0, b: 0, alpha: 1 },
+    },
+  })
+    .composite([{ input: foreground, left: Math.round((size - safeSize) / 2), top: Math.round((size - safeSize) / 2) }])
+    .png()
+    .toFile(path.join(OUT, file));
+  console.log('gerado:', path.relative(process.cwd(), path.join(OUT, file)));
 }
 
 await mkdir(OUT, { recursive: true });
-await png(iconeAny(192), 'icon-192.png', 192);
-await png(iconeAny(512), 'icon-512.png', 512);
-await png(iconeMaskable(192), 'maskable-192.png', 192);
-await png(iconeMaskable(512), 'maskable-512.png', 512);
-await png(iconeAny(180), 'apple-touch-icon.png', 180);
-console.log('Ícones do PWA gerados com sucesso.');
+await writeLogo('icon-192.png', 192);
+await writeLogo('icon-512.png', 512);
+await writeMaskable('maskable-192.png', 192);
+await writeMaskable('maskable-512.png', 512);
+await writeLogo('apple-touch-icon.png', 180);
+await writeLogo('favicon.png', 64);
+console.log('Ícones oficiais da VanBora gerados com sucesso.');

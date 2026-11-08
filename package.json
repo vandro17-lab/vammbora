@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Vambora — marketplace premium de transporte escolar e universitário (Van Bora / Fatec Ideathon 2026).",
+  "description": "VanBora — porque cada caminho importa.",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",

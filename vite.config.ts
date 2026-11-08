@@ -15,12 +15,11 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'prompt',
-      includeAssets: ['favicon.svg', 'robots.txt', 'icons/apple-touch-icon.png'],
+      includeAssets: ['favicon.png', 'robots.txt', 'icons/apple-touch-icon.png'],
       manifest: {
-        name: 'Vambora — transporte escolar e universitário',
-        short_name: 'Vambora',
-        description:
-          'Encontre a van escolar ou universitária certa em Araçatuba: rota compatível, horário, vagas e contato direto pelo WhatsApp.',
+        name: 'VanBora',
+        short_name: 'VanBora',
+        description: 'Porque cada caminho importa.',
         lang: 'pt-BR',
         dir: 'ltr',
         start_url: '/',

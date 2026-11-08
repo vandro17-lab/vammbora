@@ -17,7 +17,7 @@ export function Header() {
   return (
     <header className="sticky top-0 z-40 border-b border-navy-100/70 bg-white/95 backdrop-blur-md">
       <div className="container-page flex h-20 items-center justify-between gap-4">
-        <Link to="/" aria-label="Página inicial Vambora">
+        <Link to="/" aria-label="Página inicial VanBora">
           <Logo />
         </Link>
 
@@ -37,7 +37,7 @@ export function Header() {
           {podeInstalar && (
             <button className="btn btn-sm btn-ghost" onClick={instalar}>
               <Download className="h-4 w-4" />
-              Instalar app
+              Instalar VanBora
             </button>
           )}
           <NavLink to="/motorista" className="btn btn-sm btn-navy">
@@ -82,7 +82,7 @@ export function Header() {
               }}
             >
               <Download className="h-4 w-4" />
-              Instalar app
+              Instalar VanBora
             </button>
           )}
           <Link to="/motorista" onClick={() => setAberto(false)} className="btn btn-md btn-navy mt-1">
