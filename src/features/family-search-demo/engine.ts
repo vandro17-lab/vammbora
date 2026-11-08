@@ -11,7 +11,7 @@ export type OfertaDemo = {
   paradas: ParadaDemo[]; geometria: [number, number][] | null;
   distanciaAproximadaKm: number; rotaConfirmada: boolean;
 };
-const NOMES = ['Tio João','Tia Ana','José','Maria','Carlos','Tio Paulo','Fernanda','Tia Márcia','Antônio','Luciana','Tio Roberto','Patrícia','Tia Sandra','Marcos','Adriana','Tio Beto','Cláudia','Ricardo','Tia Cida','Eduardo','Rosana','Tio Luiz','Simone','Marcelo','Tia Neide','Juliana','Tio Chico','Renata','Sérgio','Tia Vera'];
+const NOMES = ['Tio João','Tia Ana','José','Maria','Carlos','Tia Camila','Bruno','Tia Márcia','Antônio','Luciana','Tio Roberto','Patrícia','Tio Lucas','Carolina','Fernando','Tia Denise','André','Vanessa','Seu Joaquim','Beatriz','Rafael','Tia Daniela','Roberto Carlos','Helena','Paulo César','Juliana','Tio Chico','Renata','Sérgio','Tia Vera'];
 const SLUGS = ['tio-joao','tia-ana','jose','maria','carlos','tio-paulo','fernanda','tia-marcia','antonio','luciana','tio-roberto','patricia','tia-sandra','marcos','adriana','tio-beto','claudia','ricardo','tia-cida','eduardo','rosana','tio-luiz','simone','marcelo','tia-neide','juliana','tio-chico','renata','sergio','tia-vera'];
 const MODELOS = ['Van escolar grande','Van escolar média','Van escolar compacta','Micro-ônibus escolar'];
 const TURNOS: Turno[] = ['manha','tarde','noite','integral'];
