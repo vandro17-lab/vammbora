@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft, Heart, Star, SlidersHorizontal, X, Play, Pause, RotateCcw,
-  ShieldCheck, Check, Clock3, Ruler, Map as MapIcon,
+  ShieldCheck, Check, Clock3, Ruler, Map as MapIcon, Snowflake, UserRoundCheck, RadioTower, Wrench, Baby,
   ListChecks, Users, GraduationCap, ChevronRight, ChevronDown, BadgeCheck,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -49,6 +49,26 @@ const BADGE_ORDEM: Record<Ordem, string> = {
   vagas: 'Mais vagas',
   avaliacao: 'Melhor avaliada',
 };
+
+
+/** Selos ilustrativos: distribuídos de forma estável por ID, sem afirmar verificação real. */
+const SELOS_DEMO = [
+  { nome: 'Documentação verificada', Icone: ShieldCheck, estilo: 'bg-emerald-50 text-emerald-800 ring-emerald-100' },
+  { nome: 'Transporte infantil', Icone: Baby, estilo: 'bg-purple-50 text-purple-800 ring-purple-100' },
+  { nome: 'Ar-condicionado', Icone: Snowflake, estilo: 'bg-sky-50 text-sky-800 ring-sky-100' },
+  { nome: 'Monitor acompanhante', Icone: UserRoundCheck, estilo: 'bg-amber-50 text-amber-900 ring-amber-100' },
+  { nome: 'Acompanhamento', Icone: RadioTower, estilo: 'bg-violet-50 text-violet-800 ring-violet-100' },
+  { nome: 'Manutenção periódica', Icone: Wrench, estilo: 'bg-yellow-50 text-yellow-900 ring-yellow-100' },
+] as const;
+function selosParaOferta(o: OfertaDemo) {
+  const numero = Number(o.id.replace(/\\D/g, '')) || 1;
+  return SELOS_DEMO.filter((s, i) => {
+    if (i === 0 || i === 5) return true;
+    if (i === 2) return o.recursos.includes('Ar-condicionado');
+    if (i === 3) return o.recursos.includes('Monitor');
+    return (numero + i) % 3 === 0;
+  });
+}
 
 /** Foto do motorista (recorte circular). Volta às iniciais se a foto faltar. */
 function FotoMotorista({ src, nome, className }: { src?: string; nome: string; className?: string }) {
@@ -206,16 +226,16 @@ export function FamilyDemoResults({ ofertas, carregando, erro, horario, endereco
       )}
 
       {/* Grade de cards (marketplace) */}
-      <div className="mt-5 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+      <div className="mt-5 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
         {lista.map((o, i) => {
           const destaque = i === 0 && lista.length > 1 && !carregando;
           return (
-            <article key={o.id} className="group flex flex-col overflow-hidden rounded-3xl bg-white shadow-card ring-1 ring-navy-100/70 transition-shadow hover:shadow-card-hover">
+            <article key={o.id} className="group flex min-w-0 flex-col overflow-hidden rounded-3xl bg-white shadow-card ring-1 ring-navy-100/70 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-card-hover">
               {/* Capa vetorial da van (segura de licença; sem depender de fotos externas) */}
               <div className="relative">
-                <FotoVan src={o.vanImagem} seed={o.slug} alt={`Van de ${o.nome}`} className="h-40 w-full" />
+                <FotoVan src={o.vanImagem} seed={o.slug} alt={`Van de ${o.nome}`} className="h-44 w-full sm:h-48" />
                 {destaque && (
-                  <span className="absolute left-3 top-3 inline-flex items-center gap-1 rounded-full bg-mint-400 px-3 py-1 text-xs font-bold text-navy-950 shadow">
+                  <span className="absolute left-3 top-3 inline-flex max-w-[75%] items-center gap-1 rounded-full bg-[#FFC700] px-3 py-1 text-[11px] font-bold text-[#151515] shadow">
                     <Star size={13} className="fill-navy-950" /> {BADGE_ORDEM[ordenacao]}
                   </span>
                 )}
@@ -230,7 +250,7 @@ export function FamilyDemoResults({ ofertas, carregando, erro, horario, endereco
                 </button>
               </div>
 
-              <div className="flex flex-1 flex-col p-5">
+              <div className="flex flex-1 flex-col p-4 sm:p-5">
                 <button onClick={() => abrir(o, 'perfil')} className="flex items-center gap-3 text-left">
                   <FotoMotorista src={o.imagem} nome={o.nome} className="h-11 w-11 text-sm" />
                   <span className="min-w-0">
@@ -251,26 +271,20 @@ export function FamilyDemoResults({ ofertas, carregando, erro, horario, endereco
                   <Metrica rotulo="A bordo" valor={`${o.duracaoMin} min`} />
                 </div>
 
-                {/* Recursos com ícones */}
-                {o.recursos.length > 0 && (
-                  <div className="mt-3 flex flex-wrap gap-1.5">
-                    {o.recursos.map((r) => {
-                      const ico = RECURSO_SVG[r];
-                      return (
-                        <span key={r} className="chip bg-navy-50 text-navy-700">
-                          {ico ? <img src={ico} alt="" className="h-4 w-4" /> : <Check size={13} className="text-mint-700" />} {r}
-                        </span>
-                      );
-                    })}
-                  </div>
-                )}
-
+                {/* Selos de demonstração — recursos e verificações são ilustrativos. */}
+                <div className="mt-3 flex flex-wrap gap-1.5" aria-label="Características ilustrativas do serviço">
+                  {selosParaOferta(o).map(({ nome, Icone, estilo }) => (
+                    <span key={nome} className={cn('inline-flex max-w-full items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold leading-tight ring-1', estilo)}>
+                      <Icone size={13} className="shrink-0" aria-hidden="true" /> {nome}
+                    </span>
+                  ))}
+                </div>
                 <div className="mt-4 flex items-center justify-between border-t border-navy-100 pt-3 text-sm">
                   <span className="text-navy-500">{o.vagas} {o.vagas === 1 ? 'vaga' : 'vagas'} · {o.paradas.length - 2} {o.paradas.length - 2 === 1 ? 'parada' : 'paradas'}</span>
                   <b className="font-display text-navy-900">R$ {o.precoMensal}<span className="text-xs font-medium text-navy-400">/mês</span></b>
                 </div>
 
-                <button onClick={() => abrir(o, 'trajeto')} className="btn btn-md btn-primary mt-4 w-full">
+                <button onClick={() => abrir(o, 'trajeto')} className="btn btn-md btn-primary mt-4 w-full bg-[#FFC700] text-[#151515] hover:bg-[#FFD84D]">
                   Ver trajeto completo <ChevronRight size={16} />
                 </button>
               </div>
