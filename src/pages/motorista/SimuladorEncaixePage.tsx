@@ -1,35 +1,21 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Loader2, MapPin, School, Home, Clock, Users, Route as RouteIcon, ShieldCheck, AlertTriangle,
-  CheckCircle2, ArrowRight, Lock, Search,
+  Loader2, School, Home, Clock, Users, Route as RouteIcon, ShieldCheck, AlertTriangle,
+  CheckCircle2, ArrowRight, Lock,
 } from 'lucide-react';
 import { MotoristaShell, ExigirMotorista } from './MotoristaShell';
 import { listarRotas, listarVeiculos } from '@/data/motorista-store';
 import type { Rota, Veiculo } from '@/types/motorista';
 import type { PontoGeo, MatrizViaria } from '@/engine/encaixe-geografico';
-import { supabase } from '@/lib/supabase';
+import { AutocompleteEndereco } from '@/components/search/AutocompleteEndereco';
+import { geocodificarPreciso, locaisDeDestinos } from '@/lib/geocode';
+import { useVitrine } from '@/data/VitrineProvider';
 import {
   simularEncaixeRota, coletarPontos, limitePadraoDoTurno, MARGEM_OPERACIONAL_MIN,
   type ResultadoSimulacao, type AlunoNovo,
 } from '@/lib/rota-para-encaixe';
 import { obterMatrizViaria, FalhaMatriz } from '@/lib/matriz-viaria';
 import { minutosParaTextoHora, horaParaMinutos, TURNO_LABEL, nomeDestinoParaExibicao } from '@/lib/utils';
-
-type Sugestao = { rotulo: string; lat: number; lng: number };
-
-/** Geocodificação via proxy privado (/api/mapas). Restrita a Araçatuba. */
-async function buscarEndereco(texto: string): Promise<Sugestao[]> {
-  const sessao = (await supabase?.auth.getSession())?.data.session ?? null;
-  const resp = await fetch('/api/mapas', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...(sessao?.access_token ? { Authorization: 'Bearer ' + sessao.access_token } : {}) },
-    body: JSON.stringify({ operacao: 'buscar', texto }),
-    cache: 'no-store',
-  });
-  const data = (await resp.json().catch(() => ({}))) as { resultados?: Sugestao[]; erro?: string };
-  if (!resp.ok) throw new Error(data.erro ?? 'Não foi possível buscar o endereço.');
-  return data.resultados ?? [];
-}
 
 function escolasDaRota(rota: Rota): { id: string; nome: string }[] {
   const vistos = new Map<string, string>();
@@ -50,6 +36,9 @@ export function SimuladorEncaixePage() {
 }
 
 function Simulador() {
+  const { destinos } = useVitrine();
+  const locais = useMemo(() => locaisDeDestinos(destinos), [destinos]);
+
   const [rotas, setRotas] = useState<Rota[]>([]);
   const [veiculos, setVeiculos] = useState<Veiculo[]>([]);
   const [carregando, setCarregando] = useState(true);
@@ -57,11 +46,9 @@ function Simulador() {
   const [rotaId, setRotaId] = useState('');
   const [nomeAluno, setNomeAluno] = useState('');
   const [enderecoTexto, setEnderecoTexto] = useState('');
-  const [sugestoes, setSugestoes] = useState<Sugestao[]>([]);
   const [casa, setCasa] = useState<PontoGeo | null>(null);
   const [escolaId, setEscolaId] = useState('');
   const [horario, setHorario] = useState('');
-  const [buscando, setBuscando] = useState(false);
   const [simulando, setSimulando] = useState(false);
   const [erro, setErro] = useState('');
   const [resultado, setResultado] = useState<ResultadoSimulacao | null>(null);
@@ -98,35 +85,29 @@ function Simulador() {
     setHorario(min != null ? minutosParaTextoHora(min).replace('h', ':') : '');
   }, [rota]);
 
-  async function onBuscar() {
-    if (enderecoTexto.trim().length < 5) return;
-    setBuscando(true); setErro(''); setSugestoes([]);
-    try {
-      const r = await buscarEndereco(enderecoTexto.trim());
-      setSugestoes(r);
-      if (r.length === 0) setErro('Nenhum endereço encontrado. Informe rua, número e bairro.');
-    } catch (e) {
-      setErro((e as Error).message);
-    } finally {
-      setBuscando(false);
-    }
-  }
-
-  function selecionarEndereco(s: Sugestao) {
-    setCasa({ id: 'novo-aluno-casa', nome: s.rotulo, lat: s.lat, lng: s.lng });
-    setEnderecoTexto(s.rotulo);
-    setSugestoes([]);
-    setResultado(null);
-  }
-
   const horarioMin = /^\d{1,2}:\d{2}$/.test(horario) ? horaParaMinutos(horario) : null;
-  const prontoParaSimular = !!rota && !!casa && !!escolaId && horarioMin != null && nomeAluno.trim().length > 0;
+  const prontoParaSimular = !!rota && enderecoTexto.trim().length >= 3 && !!escolaId && horarioMin != null && nomeAluno.trim().length > 0;
 
   async function onSimular() {
-    if (!rota || !casa || horarioMin == null) return;
+    if (!rota || horarioMin == null) return;
     setSimulando(true); setErro(''); setResultado(null);
     try {
-      const aluno: AlunoNovo = { alunoId: 'novo-aluno', nome: nomeAluno.trim(), casa, escolaId };
+      // Resolve a coordenada do endereço do aluno com a MESMA regra da busca do
+      // passageiro: usa a coordenada já escolhida numa sugestão e, quando o
+      // texto traz número a refinar (ou ainda não há coordenada), geocodifica.
+      let casaResolvida = casa;
+      if ((!casaResolvida || /\d/.test(enderecoTexto)) && enderecoTexto.trim().length >= 3) {
+        const ponto = await geocodificarPreciso(enderecoTexto.trim(), '');
+        if (ponto && Number.isFinite(ponto.lat) && Number.isFinite(ponto.lng)) {
+          casaResolvida = { id: 'novo-aluno-casa', nome: ponto.rotulo || enderecoTexto.trim(), lat: ponto.lat, lng: ponto.lng };
+          setCasa(casaResolvida);
+        }
+      }
+      if (!casaResolvida) {
+        setErro('Não foi possível localizar o endereço do aluno. Confira a rua e o número.');
+        return;
+      }
+      const aluno: AlunoNovo = { alunoId: 'novo-aluno', nome: nomeAluno.trim(), casa: casaResolvida, escolaId };
       // Pontos reais -> matriz viária real (nunca linha reta).
       const { pontos, faltamCoordenadas } = coletarPontos(rota, aluno);
       if (faltamCoordenadas.length > 0) {
@@ -200,29 +181,21 @@ function Simulador() {
             <label className="field-label">Como identificar o novo aluno?</label>
             <input className="field-input" placeholder="Ex.: João, Duda…" value={nomeAluno} onChange={(e) => setNomeAluno(e.target.value)} />
 
-            <label className="field-label mt-4">Endereço de casa do novo aluno</label>
-            <div className="flex gap-2">
-              <input
-                className="field-input flex-1" placeholder="Rua, número e bairro — Araçatuba"
-                value={enderecoTexto} autoComplete="street-address"
-                onChange={(e) => { setEnderecoTexto(e.target.value); setCasa(null); }}
-                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); onBuscar(); } }}
-              />
-              <button type="button" className="btn btn-primary" disabled={buscando || enderecoTexto.trim().length < 5} onClick={onBuscar}>
-                {buscando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-              </button>
-            </div>
-            {sugestoes.length > 0 && (
-              <div className="mt-2 space-y-2">
-                {sugestoes.map((s, i) => (
-                  <button key={i} type="button" onClick={() => selecionarEndereco(s)}
-                    className="w-full rounded-lg border border-navy-200 p-3 text-left text-sm hover:bg-mint-50">
-                    <MapPin className="mr-1 inline h-4 w-4 text-mint-600" />{s.rotulo}
-                    <span className="mt-1 block text-xs text-navy-500">Usar este endereço</span>
-                  </button>
-                ))}
-              </div>
-            )}
+            <label className="field-label mt-4" htmlFor="endereco-aluno">Endereço de casa do novo aluno</label>
+            <AutocompleteEndereco
+              id="endereco-aluno"
+              value={enderecoTexto}
+              locais={locais}
+              placeholder="Ex.: Rua José Geraldo, 450 — Araçatuba"
+              onChange={(t, c) => {
+                setEnderecoTexto(t);
+                // Sugestão com coordenada fixa a casa na hora; se o texto tem
+                // número a refinar, a geocodificação ocorre ao simular.
+                setCasa(c ? { id: 'novo-aluno-casa', nome: t, lat: c.lat, lng: c.lng } : null);
+                setResultado(null);
+              }}
+            />
+            <p className="mt-1 text-xs text-navy-500">Digite rua e número juntos, ou escolha uma sugestão.</p>
             {casa && (
               <p className="mt-2 inline-flex items-center gap-1.5 text-sm text-mint-700">
                 <CheckCircle2 className="h-4 w-4" /> Endereço localizado no mapa
