@@ -15,8 +15,8 @@ export function ContaMotoristaPage() {
   const [modo, setModo] = useState<'entrar' | 'criar'>('criar');
   const [nome, setNome] = useState('');
   // No modo demo já vem preenchido com um e-mail/senha de fachada.
-  const [email, setEmail] = useState(DEMO_LOGIN ? 'motoristaesperto@vambora.com' : '');
-  const [senha, setSenha] = useState(DEMO_LOGIN ? 'vambora2026' : '');
+  const [email, setEmail] = useState(DEMO_LOGIN ? 'motoristaesperto@vanbora.com' : '');
+  const [senha, setSenha] = useState(DEMO_LOGIN ? 'vanbora1' : '');
   const [whats, setWhats] = useState('');
   const [erro, setErro] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
