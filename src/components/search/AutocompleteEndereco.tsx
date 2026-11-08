@@ -28,13 +28,15 @@ function filtrarLocais(locais: SugestaoEndereco[], q: string): SugestaoEndereco[
  * pelo Photon/OpenStreetMap. Degrada sem erro para o usuário.
  */
 export function AutocompleteEndereco({
-  id, value, onChange, placeholder, locais = [],
+  id, value, onChange, placeholder, locais = [], usarSugestaoCompleta = false,
 }: {
   id?: string;
   value: string;
   onChange: (texto: string, coord?: { lat: number; lng: number }) => void;
   placeholder?: string;
   locais?: SugestaoEndereco[];
+  /** Cadastro de rota: escolher uma sugestão transfere o endereço completo e as coordenadas. */
+  usarSugestaoCompleta?: boolean;
 }) {
   const [sugestoes, setSugestoes] = useState<SugestaoEndereco[]>([]);
   const [aberto, setAberto] = useState(false);
@@ -83,12 +85,12 @@ export function AutocompleteEndereco({
     // Sugestões de rua frequentemente vêm com outro número (ou sem número) e
     // não podem substituir o endereço solicitado.
     const numeroDigitado = (value.match(/(\d{1,6})\s*$/) || [])[1] || '';
-    const texto = numeroDigitado ? value.trim() : s.rotulo;
+    const texto = numeroDigitado && !usarSugestaoCompleta ? value.trim() : s.rotulo;
     ignorar.current = texto;
     // Se mantivemos um número que a sugestão não tinha, a coordenada da sugestão
     // é só da RUA — não a usamos; deixamos o formulário geocodificar o texto COM
     // número na hora de buscar (geocodificarPreciso trata "Rua X, 123").
-    if (numeroDigitado) onChange(texto);
+    if (numeroDigitado && !usarSugestaoCompleta) onChange(texto);
     else onChange(texto, { lat: s.lat, lng: s.lng });
     setSugestoes([]);
     setAberto(false);
@@ -122,6 +124,7 @@ export function AutocompleteEndereco({
                 type="button"
                 className="flex w-full items-start gap-2 px-3 py-2.5 text-left text-sm hover:bg-mint-50"
                 onMouseDown={(e) => { e.preventDefault(); escolher(s); }}
+                onClick={() => { if (aberto) escolher(s); }}
               >
                 <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-mint-600" />
                 <span className="text-navy-700">{s.rotulo}</span>
