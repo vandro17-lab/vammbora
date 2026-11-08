@@ -2,13 +2,13 @@ import { nomeDestinoParaExibicao } from '@/lib/utils';
 import { useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, Check, MapPin, Search } from 'lucide-react';
-import type { Contratacao, ModalidadeTrajeto, Turno } from '@/types';
+import type { Contratacao, ModalidadeTrajeto } from '@/types';
 import { CIDADE_PADRAO } from '@/data/cidades';
 import { useVitrine } from '@/data/VitrineProvider';
-import { TURNO_LABEL, cn } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import { criteriosParaParams } from '@/lib/searchParams';
 import { AutocompleteEndereco } from '@/components/search/AutocompleteEndereco';
-import { locaisDeDestinos, geocodificarPreciso } from '@/lib/geocode';
+import { locaisDeDestinos, geocodificarPreciso, normalizarTexto, type SugestaoEndereco } from '@/lib/geocode';
 import { Loader2 } from 'lucide-react';
 
 const TITULOS = ['De onde vamos sair?', 'Qual é o destino?', 'Como é sua rotina?'];
@@ -26,7 +26,6 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
   const [endereco, setEndereco] = useState('');
   const [origemCoord, setOrigemCoord] = useState<{ lat: number; lng: number } | null>(null);
   const [destinoId, setDestinoId] = useState('');
-  const [turno, setTurno] = useState<Turno | ''>('');
   const [contratacao, setContratacao] = useState<Contratacao>('mensal');
   const [dataAvulso, setDataAvulso] = useState('');
   const [modalidade, setModalidade] = useState<ModalidadeTrajeto>('ida');
@@ -51,29 +50,34 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
     if (passo < 2) { ir(passo + 1); return; }
     if (localizando) return;
 
-    sessionStorage.setItem('vambora.busca.transicao', '1');
     const texto = endereco.trim();
-    // Garante uma COORDENADA de origem antes de buscar. Sem ela, o motor de
-    // rotas reais não classifica compatibilidade (era por isso que "nunca
-    // encontrava"). Quando o usuário digita um endereço com número e NÃO
-    // escolhe uma sugestão — ou escolhe só a rua — geocodificamos o texto
-    // respeitando o número da casa (geocodificarPreciso trata "Rua X, 123").
+    // Resolve a COORDENADA de origem — a busca DEPENDE dela para mostrar vans.
+    // Ordem: 1) a coordenada já escolhida numa sugestão; 2) geocodificação do
+    // texto (respeitando o número da casa) quando há número a refinar ou ainda
+    // não há coordenada; 3) se a geocodificação falhar, mantém a coordenada da
+    // sugestão; 4) por último, um lugar conhecido do catálogo. Só segue sem
+    // ponto quando o endereço realmente não existe no mapa.
     let coord = origemCoord;
     const temNumero = /\d/.test(texto);
     if (texto.length >= 3 && (!coord || temNumero)) {
       setLocalizando(true);
       const ctrl = new AbortController();
-      const limite = window.setTimeout(() => ctrl.abort(), 7000);
+      const limite = window.setTimeout(() => ctrl.abort(), 8000);
       try {
         const ponto = await geocodificarPreciso(texto, '', ctrl.signal);
         if (ponto && Number.isFinite(ponto.lat) && Number.isFinite(ponto.lng)) {
           coord = { lat: ponto.lat, lng: ponto.lng };
         }
-      } catch { /* serviço de mapas indisponível: segue sem coordenada precisa */ }
+      } catch { /* mantém a coordenada da sugestão, se houver */ }
       finally { clearTimeout(limite); setLocalizando(false); }
     }
+    if (!coord && texto.length >= 2) {
+      const local = acharLocal(locaisBusca, texto);
+      if (local) coord = { lat: local.lat, lng: local.lng };
+    }
 
-    const paramsBase = criteriosParaParams({ cidadeId: CIDADE_PADRAO.id, endereco: texto, destinoId: destinoId || null, turno: turno || null, contratacao, dataAvulso: contratacao === 'avulso' ? dataAvulso : undefined, modalidade, origemLat: coord?.lat, origemLng: coord?.lng });
+    sessionStorage.setItem('vambora.busca.transicao', '1');
+    const paramsBase = criteriosParaParams({ cidadeId: CIDADE_PADRAO.id, endereco: texto, destinoId: destinoId || null, turno: null, contratacao, dataAvulso: contratacao === 'avulso' ? dataAvulso : undefined, modalidade, origemLat: coord?.lat, origemLng: coord?.lng });
     const params = new URLSearchParams(paramsBase);
     params.set('horario', horario);
     navigate(`/resultados?${params.toString()}`, { preventScrollReset: true });
@@ -106,8 +110,7 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
           <p className="mt-4 rounded-xl bg-mint-50 p-4 text-sm leading-relaxed text-mint-800">{erro ? 'Não foi possível carregar os destinos. Você ainda pode explorar as vans da cidade.' : 'Você pode explorar as opções e confirmar o trajeto diretamente com o motorista.'}</p>
         </div>}
         {passo === 2 && <div className="mt-5 space-y-5">
-          <fieldset><legend className="field-label">Turno</legend><div className="flex flex-wrap gap-2">{(['', 'manha', 'tarde', 'noite', 'integral'] as const).map(t => <Segment key={t} ativo={turno === t} onClick={() => setTurno(t)}>{t ? TURNO_LABEL[t] : 'Qualquer'}</Segment>)}</div></fieldset>
-          <div><label className="field-label" htmlFor="horario-escolar">{modalidade === 'volta' ? 'Horário de saída da escola' : 'Horário em que precisa chegar'}</label><input id="horario-escolar" className="field-input" type="time" value={horario} required onChange={e => setHorario(e.target.value)} /><p className="mt-1 text-xs text-navy-500">O horário escolhido será usado para calcular o trajeto.</p></div>
+          <div><label className="field-label" htmlFor="horario-escolar">{modalidade === 'volta' ? 'Horário de saída da escola' : 'Horário de chegada na escola'}</label><input id="horario-escolar" className="field-input" type="time" value={horario} required onChange={e => setHorario(e.target.value)} /><p className="mt-1 text-xs text-navy-500">A busca é pelo horário de chegada ao seu destino — não importa o turno.</p></div>
           <fieldset><legend className="field-label">Contratação</legend><div className="flex gap-2">{(['mensal', 'avulso'] as const).map(c => <Segment key={c} ativo={contratacao === c} onClick={() => setContratacao(c)}>{c === 'mensal' ? 'Mensal' : 'Avulso'}</Segment>)}</div>
             {contratacao === 'avulso' && <div className="mt-3"><label htmlFor="data-avulso" className="field-label">Data da viagem</label><input id="data-avulso" type="date" required className="field-input" value={dataAvulso} onChange={e => setDataAvulso(e.target.value)} /></div>}
           </fieldset>
@@ -120,6 +123,13 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
       <p className="mt-4 text-center text-xs text-navy-500">Sem criar conta. No seu tempo.</p>
     </form>
   );
+}
+/** Último recurso para a origem: casa o texto digitado com um lugar conhecido
+ *  do catálogo (bairro/escola), usado quando o serviço de mapas está fora. */
+function acharLocal(locais: SugestaoEndereco[], texto: string): SugestaoEndereco | null {
+  const alvo = normalizarTexto(texto);
+  if (alvo.length < 2) return null;
+  return locais.find((l) => normalizarTexto(l.rotulo).includes(alvo)) ?? null;
 }
 function Segment({ ativo, onClick, children }: { ativo: boolean; onClick: () => void; children: React.ReactNode }) {
   return <button type="button" onClick={onClick} aria-pressed={ativo} className={cn('rounded-xl px-3 py-2.5 text-sm font-medium transition-colors', ativo ? 'bg-navy-900 text-white' : 'bg-navy-50 text-navy-600 hover:bg-navy-100')}>{children}</button>;

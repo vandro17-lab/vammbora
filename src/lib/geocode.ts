@@ -118,33 +118,44 @@ export async function buscarEnderecos(q: string, signal?: AbortSignal): Promise<
  * `housenumber` quando disponível. Devolve o ponto e a precisão, ou null.
  */
 export async function geocodificarPreciso(texto: string, numero: string, signal?: AbortSignal): Promise<PontoPreciso | null> {
-  const rua = texto.trim();
-  if (rua.length < 3) return null;
-  const estruturado = separarRuaNumero(rua, numero);
-  const exigeNumeroExato = Boolean(estruturado.num);
+  const { rua: via, num } = separarRuaNumero(texto.trim(), numero);
+  if (via.length < 3) return null;
 
+  // O número da casa é um REFINAMENTO, nunca um portão. Se algum serviço
+  // devolver o ponto EXATO, usamos ele na hora; caso contrário, guardamos o
+  // melhor ponto de RUA/ÁREA e o devolvemos no fim — assim a busca sempre tem
+  // uma geolocalização para mostrar vans. Só devolve null quando NENHUM serviço
+  // reconhece o endereço (aí não há o que encontrar no mapa).
+  let melhor: PontoPreciso | null = null;
+  const considerar = (p: PontoPreciso | null): PontoPreciso | null => {
+    if (!p || !Number.isFinite(p.lat) || !Number.isFinite(p.lng) || !dentroDeAracatuba(p.lat, p.lng)) return null;
+    if (p.precisao === 'exato') return p;        // melhor possível: usa já
+    if (!melhor) melhor = p;                      // guarda o 1º ponto de rua/área
+    return null;
+  };
+
+  // 1) Proxy privado (Geoapify estruturado): melhor qualidade, é o que de fato
+  //    resolve o NÚMERO da casa. Depende de GEOAPIFY_API_KEY na Vercel.
   if (!proxyIndisponivel) {
     try {
       const r = await fetch('/api/mapas', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ operacao: 'geocodificar', texto: estruturado.rua, numero: estruturado.num }), signal,
+        body: JSON.stringify({ operacao: 'geocodificar', texto: via, numero: num }), signal,
       });
       if (r.status === 503) {
         proxyIndisponivel = true;
       } else if (r.ok) {
         const d = (await r.json()) as { ponto?: PontoPreciso | null };
-        if (d.ponto && Number.isFinite(d.ponto.lat) && Number.isFinite(d.ponto.lng) && (!exigeNumeroExato || d.ponto.precisao === 'exato')) return d.ponto;
-        // Proxy respondeu sem ponto: ainda tentamos os fallbacks abaixo.
+        const exato = considerar(d.ponto ?? null);
+        if (exato) return exato;
       }
     } catch {
       /* segue para o fallback */
     }
   }
 
-  const { rua: via, num } = estruturado;
-
-  // Fallback SEM CHAVE (1): Nominatim estruturado — resolve o NÚMERO da casa
-  // melhor que o Photon (interpolação do OpenStreetMap), quando há número.
+  // 2) Fallback SEM CHAVE: Nominatim estruturado — resolve o NÚMERO da casa
+  //    melhor que o Photon (interpolação do OpenStreetMap), quando há número.
   if (num) {
     try {
       const u = new URL('https://nominatim.openstreetmap.org/search');
@@ -160,13 +171,14 @@ export async function geocodificarPreciso(texto: string, numero: string, signal?
         const f = arr?.[0];
         const lat = f ? Number(f.lat) : NaN;
         const lng = f ? Number(f.lon) : NaN;
-        if (f && Number.isFinite(lat) && Number.isFinite(lng) && dentroDeAracatuba(lat, lng)) {
+        if (f && Number.isFinite(lat) && Number.isFinite(lng)) {
           const hn = f.address?.house_number;
           const viaNome = f.address?.road || via;
           const bairro = f.address?.suburb || f.address?.neighbourhood || f.address?.city_district;
           const cidade = f.address?.city || f.address?.town || f.address?.municipality;
-          const rotulo = [`${viaNome}${hn ? ', ' + hn : (num ? ', ' + num : '')}`, bairro, cidade].filter(Boolean).join(', ');
-          if (hn) return { rotulo, lat, lng, precisao: 'exato' };
+          const rotulo = [`${viaNome}${hn ? ', ' + hn : ', ' + num}`, bairro, cidade].filter(Boolean).join(', ');
+          const exato = considerar({ rotulo, lat, lng, precisao: hn ? 'exato' : 'rua' });
+          if (exato) return exato;
         }
       }
     } catch {
@@ -174,7 +186,7 @@ export async function geocodificarPreciso(texto: string, numero: string, signal?
     }
   }
 
-  // Fallback SEM CHAVE (2): Photon. Lê housenumber para classificar a precisão.
+  // 3) Fallback SEM CHAVE: Photon. Garante ao menos o ponto da rua/área.
   try {
     const u = new URL('https://photon.komoot.io/api/');
     u.searchParams.set('q', `${[via, num].filter(Boolean).join(' ')}, Araçatuba`);
@@ -182,20 +194,24 @@ export async function geocodificarPreciso(texto: string, numero: string, signal?
     u.searchParams.set('lon', String(ARACATUBA.lng));
     u.searchParams.set('limit', '1');
     const r = await fetch(u, { signal });
-    if (!r.ok) return null;
-    const d = (await r.json()) as { features?: Array<{ geometry: { coordinates: [number, number] }; properties: Record<string, string> }> };
-    const f = d.features?.[0];
-    const [lng, lat] = f?.geometry?.coordinates ?? [NaN, NaN];
-    if (!f || !Number.isFinite(lat) || !Number.isFinite(lng) || !dentroDeAracatuba(lat, lng)) return null;
-    const p = f.properties ?? {};
-    const temNumero = !!p.housenumber;
-    const viaNome = p.street || p.name || via;
-    const rotulo = [`${viaNome}${p.housenumber ? ', ' + p.housenumber : (num ? ', ' + num : '')}`, p.district || p.suburb, p.city].filter(Boolean).join(', ');
-    if (exigeNumeroExato && !temNumero) return null;
-    return { rotulo, lat, lng, precisao: temNumero ? 'exato' : 'rua' };
+    if (r.ok) {
+      const d = (await r.json()) as { features?: Array<{ geometry: { coordinates: [number, number] }; properties: Record<string, string> }> };
+      const f = d.features?.[0];
+      const [lng, lat] = f?.geometry?.coordinates ?? [NaN, NaN];
+      if (f && Number.isFinite(lat) && Number.isFinite(lng)) {
+        const p = f.properties ?? {};
+        const temNumero = !!p.housenumber;
+        const viaNome = p.street || p.name || via;
+        const rotulo = [`${viaNome}${p.housenumber ? ', ' + p.housenumber : (num ? ', ' + num : '')}`, p.district || p.suburb, p.city].filter(Boolean).join(', ');
+        const exato = considerar({ rotulo, lat, lng, precisao: temNumero ? 'exato' : (num ? 'rua' : 'aproximado') });
+        if (exato) return exato;
+      }
+    }
   } catch {
-    return null;
+    /* sem mais fallbacks */
   }
+
+  return melhor;
 }
 
 /** Geocodificação reversa: endereço aproximado de um ponto (após arrastar o alfinete). */
