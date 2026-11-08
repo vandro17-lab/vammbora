@@ -16,7 +16,7 @@ import { SearchLoadingScreen } from '@/components/search/SearchLoadingScreen';
  * vira falso (sucesso, erro ou cancelamento).
  */
 function useOverlayCarregamento(ativo: boolean) {
-  const [mostrar, setMostrar] = useState(false);
+  const [mostrar, setMostrar] = useState(() => { try { const v = sessionStorage.getItem('vambora.busca.transicao') === '1'; sessionStorage.removeItem('vambora.busca.transicao'); return v; } catch { return false; } });
   const inicio = useRef(0);
   useEffect(() => {
     let aparecer: number | undefined;
