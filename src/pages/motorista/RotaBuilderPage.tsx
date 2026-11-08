@@ -440,6 +440,29 @@ function FormEndereco({ titulo, dica, botao, locais, onConfirmar, onCancelar, co
     return texto.trim();
   }
 
+  // Mesmo procedimento da busca de vans: tentar obter coordenadas precisas
+  // antes de concluir, sem depender apenas da seleção no autocomplete.
+  async function confirmarPonto() {
+    const endereco = montarRotulo();
+    if (!endereco || buscandoExato) return;
+    if (coord) { onConfirmar(endereco, coord); return; }
+    setBuscandoExato(true);
+    try {
+      const ctrl = new AbortController();
+      const limite = setTimeout(() => ctrl.abort(), 7000);
+      try {
+        const ponto = await geocodificarPreciso(endereco, '', ctrl.signal);
+        if (ponto && Number.isFinite(ponto.lat) && Number.isFinite(ponto.lng)) {
+          const localizado = { lat: ponto.lat, lng: ponto.lng };
+          setCoord(localizado);
+          setPrecisao(ponto.precisao);
+          setEnderecoNoMapa(ponto.rotulo || null);
+          onConfirmar(endereco, localizado);
+        }
+      } finally { clearTimeout(limite); }
+    } finally { setBuscandoExato(false); }
+  }
+
   // A busca atual aceita rua e número no mesmo campo. Preserva a geocodificação
   // estruturada do proxy, que extrai o número do texto automaticamente.
   useEffect(() => {
@@ -511,21 +534,18 @@ function FormEndereco({ titulo, dica, botao, locais, onConfirmar, onCancelar, co
       <div className="mt-3 flex gap-2">
         <button
           className="btn btn-md btn-primary flex-1"
-          disabled={!texto.trim() || !coord}
-          onClick={() => onConfirmar(montarRotulo(), coord ?? undefined)}
+          disabled={!texto.trim() || buscandoExato}
+          onClick={confirmarPonto}
         >
           {botao}
         </button>
         {onCancelar && <button className="btn btn-md btn-ghost" onClick={onCancelar}>Cancelar</button>}
       </div>
 
-      {texto.trim() && !coord && (
-        <button
-          className="mt-3 w-full text-center text-xs font-medium text-navy-400 hover:text-navy-700"
-          onClick={() => onConfirmar(montarRotulo(), undefined)}
-        >
-          Não encontrei no mapa — confirmar só pelo endereço digitado
-        </button>
+      {texto.trim() && !coord && !buscandoExato && (
+        <p className="mt-3 text-center text-xs text-navy-500">
+          Se o endereço não for localizado, confira a rua e o número ou marque o ponto no mapa.
+        </p>
       )}
     </div>
   );
