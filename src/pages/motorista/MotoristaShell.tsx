@@ -2,7 +2,7 @@ import { Link, Navigate } from 'react-router-dom';
 import { Loader2, LogOut, ArrowLeft } from 'lucide-react';
 import { Logo } from '@/components/brand/Logo';
 import { useAuth } from '@/lib/auth';
-import { USE_SUPABASE } from '@/lib/supabase';
+import { USE_SUPABASE, DEMO_MOTORISTA } from '@/lib/supabase';
 
 /**
  * Só deixa entrar quem está logado (modo Supabase). No modo demonstração
@@ -11,7 +11,8 @@ import { USE_SUPABASE } from '@/lib/supabase';
  */
 export function ExigirMotorista({ children }: { children: React.ReactNode }) {
   const { session, carregando } = useAuth();
-  if (!USE_SUPABASE) return <>{children}</>;
+  // Modo demonstração (ou sem Supabase): o painel abre livremente, sem login.
+  if (!USE_SUPABASE || DEMO_MOTORISTA) return <>{children}</>;
   if (carregando)
     return (
       <div className="flex min-h-dvh items-center justify-center text-navy-400">

@@ -3,16 +3,20 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Loader2, ArrowLeft, Bus } from 'lucide-react';
 import { Logo } from '@/components/brand/Logo';
 import { useAuth } from '@/lib/auth';
-import { supabase, USE_SUPABASE } from '@/lib/supabase';
+import { supabase, USE_SUPABASE, DEMO_MOTORISTA } from '@/lib/supabase';
 import { CIDADE_PADRAO } from '@/data/cidades';
+
+// Login demonstrativo: entra direto no painel, sem verificação (não trava).
+const DEMO_LOGIN = !USE_SUPABASE || DEMO_MOTORISTA;
 
 export function ContaMotoristaPage() {
   const navigate = useNavigate();
   const { entrar, cadastrar, entrarComProvedor } = useAuth();
   const [modo, setModo] = useState<'entrar' | 'criar'>('criar');
   const [nome, setNome] = useState('');
-  const [email, setEmail] = useState('');
-  const [senha, setSenha] = useState('');
+  // No modo demo já vem preenchido com um e-mail/senha de fachada.
+  const [email, setEmail] = useState(DEMO_LOGIN ? 'motoristaesperto@vambora.com' : '');
+  const [senha, setSenha] = useState(DEMO_LOGIN ? 'vambora2026' : '');
   const [whats, setWhats] = useState('');
   const [erro, setErro] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
@@ -22,7 +26,7 @@ export function ContaMotoristaPage() {
   async function entrarGoogle() {
     setErro(null);
     setAviso(null);
-    if (!USE_SUPABASE) {
+    if (DEMO_LOGIN) {
       navigate('/app');
       return;
     }
@@ -39,8 +43,9 @@ export function ContaMotoristaPage() {
     e.preventDefault();
     setErro(null);
     setAviso(null);
-    // Modo demonstração: entra direto no painel (dados ficam no navegador).
-    if (!USE_SUPABASE) {
+    // Modo demonstração: entra direto no painel (dados ficam no navegador),
+    // sem verificar e-mail/senha — a demonstração nunca trava no login.
+    if (DEMO_LOGIN) {
       navigate('/app');
       return;
     }
@@ -102,39 +107,57 @@ export function ContaMotoristaPage() {
               <Bus className="h-6 w-6" />
             </span>
             <h1 className="mt-3 font-display text-xl font-bold">
-              {modo === 'criar' ? 'Criar minha conta' : 'Entrar'}
+              {DEMO_LOGIN ? 'Área do motorista' : modo === 'criar' ? 'Criar minha conta' : 'Entrar'}
             </h1>
             <p className="mt-1 text-sm text-navy-500">
-              {USE_SUPABASE ? 'Entre com o Google para gerenciar suas rotas.' : 'Para motoristas de van.'}
+              {DEMO_LOGIN ? 'Para motoristas de van.' : 'Entre com o Google para gerenciar suas rotas.'}
             </p>
           </div>
 
-          {!USE_SUPABASE && (
-            <p className="mt-5 rounded-xl bg-amber-50 p-3 text-center text-sm text-amber-800">
-              Modo demonstração: você pode explorar o painel sem criar conta. Os dados ficam só neste
-              navegador.
-            </p>
+          {/* ---- Login DEMONSTRATIVO: e-mail/senha de fachada, entra sem verificar ---- */}
+          {DEMO_LOGIN && (
+            <>
+              <p className="mt-5 rounded-xl bg-amber-50 p-3 text-center text-sm text-amber-800">
+                Modo demonstração: entre no painel sem verificação. Os dados ficam só neste navegador.
+              </p>
+              <form onSubmit={onSubmit} className="mt-6 space-y-3.5">
+                <div>
+                  <label className="field-label" htmlFor="email">E-mail</label>
+                  <input id="email" type="email" className="field-input" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" />
+                </div>
+                <div>
+                  <label className="field-label" htmlFor="senha">Senha</label>
+                  <input id="senha" type="password" className="field-input" value={senha} onChange={(e) => setSenha(e.target.value)} autoComplete="current-password" />
+                </div>
+                <button type="submit" className="btn btn-sheen btn-lg btn-primary w-full">
+                  Entrar no painel
+                </button>
+              </form>
+              <p className="mt-3 text-center text-xs text-navy-400">Demonstração — qualquer e-mail/senha entra.</p>
+            </>
           )}
 
           {/* CTA principal: entrar com o Google (login social do motorista). */}
-          <button
-            type="button"
-            onClick={entrarGoogle}
-            disabled={enviando}
-            className="mt-6 flex w-full items-center justify-center gap-3 rounded-xl border border-navy-200 bg-white px-4 py-3 text-sm font-semibold text-navy-800 shadow-sm transition hover:bg-navy-50 disabled:opacity-60"
-          >
-            {enviando ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
-            ) : (
-              <GoogleIcon className="h-5 w-5" />
-            )}
-            Entrar com o Google
-          </button>
+          {!DEMO_LOGIN && (
+            <button
+              type="button"
+              onClick={entrarGoogle}
+              disabled={enviando}
+              className="mt-6 flex w-full items-center justify-center gap-3 rounded-xl border border-navy-200 bg-white px-4 py-3 text-sm font-semibold text-navy-800 shadow-sm transition hover:bg-navy-50 disabled:opacity-60"
+            >
+              {enviando ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <GoogleIcon className="h-5 w-5" />
+              )}
+              Entrar com o Google
+            </button>
+          )}
 
-          {erro && <p className="mt-3 rounded-xl bg-red-50 p-2.5 text-sm text-red-700" role="alert">{erro}</p>}
-          {aviso && <p className="mt-3 rounded-xl bg-mint-50 p-2.5 text-sm text-mint-800">{aviso}</p>}
+          {!DEMO_LOGIN && erro && <p className="mt-3 rounded-xl bg-red-50 p-2.5 text-sm text-red-700" role="alert">{erro}</p>}
+          {!DEMO_LOGIN && aviso && <p className="mt-3 rounded-xl bg-mint-50 p-2.5 text-sm text-mint-800">{aviso}</p>}
 
-          {USE_SUPABASE && (
+          {!DEMO_LOGIN && (
             <>
               <div className="my-5 flex items-center gap-3 text-xs text-navy-400">
                 <span className="h-px flex-1 bg-navy-100" /> ou com e-mail <span className="h-px flex-1 bg-navy-100" />
@@ -192,13 +215,6 @@ export function ContaMotoristaPage() {
             </>
           )}
 
-          {!USE_SUPABASE && (
-            <form onSubmit={onSubmit} className="mt-4">
-              <button type="submit" className="btn btn-sheen btn-lg btn-primary w-full">
-                Entrar no painel
-              </button>
-            </form>
-          )}
         </div>
       </div>
     </div>
