@@ -453,6 +453,7 @@ function FormEndereco({ titulo, dica, botao, locais, onConfirmar, onCancelar, co
         const p = await geocodificarPreciso(endereco, '', ctrl.signal);
         if (!vivo) return;
         if (p) { setCoord({ lat: p.lat, lng: p.lng }); setPrecisao(p.precisao); setEnderecoNoMapa(p.rotulo || null); }
+        else { setCoord(null); setPrecisao(undefined); setEnderecoNoMapa(null); }
       } finally {
         if (vivo) setBuscandoExato(false);
       }
@@ -472,7 +473,7 @@ function FormEndereco({ titulo, dica, botao, locais, onConfirmar, onCancelar, co
   const aviso = buscandoExato
     ? { c: 'bg-navy-50 text-navy-700', t: 'Localizando o número exato no mapa…' }
     : !temPonto
-      ? { c: 'bg-amber-50 text-amber-800', t: compacto ? 'Digite rua e número para localizar o ponto no mapa principal.' : 'Informe rua e número no mesmo campo, ou marque o ponto no mapa.' }
+      ? { c: 'bg-amber-50 text-amber-800', t: compacto ? (/(\d{1,6})\s*$/.test(texto.trim()) ? 'Número ainda não localizado. Confira rua e número para posicionar a van corretamente.' : 'Digite rua e número para localizar o ponto no mapa principal.') : 'Informe rua e número no mesmo campo, ou marque o ponto no mapa.' }
       : precisao === 'exato'
         ? { c: 'bg-mint-50 text-mint-800', t: 'Número localizado ✓ — confira no mapa e ajuste se precisar.' }
         : precisao === 'ajustado'
@@ -493,8 +494,8 @@ function FormEndereco({ titulo, dica, botao, locais, onConfirmar, onCancelar, co
           onChange={(t, c) => {
             setTexto(t);
             // Sugestão escolhida: ponto provisório (nível de rua) até a geocodificação precisa.
-            if (c) { setCoord(c); setPrecisao('rua'); setEnderecoNoMapa(null); }
-            else if (!t.trim()) { setCoord(null); setPrecisao(undefined); setEnderecoNoMapa(null); }
+            if (c && !/(\d{1,6})\s*$/.test(t.trim())) { setCoord(c); setPrecisao('rua'); setEnderecoNoMapa(null); }
+            else { setCoord(null); setPrecisao(undefined); setEnderecoNoMapa(null); }
           }}
         />
         <p className="mt-1 text-[11px] text-navy-400">Digite rua e número juntos. O mapa principal será atualizado.</p>

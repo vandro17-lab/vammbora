@@ -120,18 +120,20 @@ export async function buscarEnderecos(q: string, signal?: AbortSignal): Promise<
 export async function geocodificarPreciso(texto: string, numero: string, signal?: AbortSignal): Promise<PontoPreciso | null> {
   const rua = texto.trim();
   if (rua.length < 3) return null;
+  const estruturado = separarRuaNumero(rua, numero);
+  const exigeNumeroExato = Boolean(estruturado.num);
 
   if (!proxyIndisponivel) {
     try {
       const r = await fetch('/api/mapas', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ operacao: 'geocodificar', texto: rua, numero }), signal,
+        body: JSON.stringify({ operacao: 'geocodificar', texto: estruturado.rua, numero: estruturado.num }), signal,
       });
       if (r.status === 503) {
         proxyIndisponivel = true;
       } else if (r.ok) {
         const d = (await r.json()) as { ponto?: PontoPreciso | null };
-        if (d.ponto && Number.isFinite(d.ponto.lat) && Number.isFinite(d.ponto.lng)) return d.ponto;
+        if (d.ponto && Number.isFinite(d.ponto.lat) && Number.isFinite(d.ponto.lng) && (!exigeNumeroExato || d.ponto.precisao === 'exato')) return d.ponto;
         // Proxy respondeu sem ponto: ainda tentamos os fallbacks abaixo.
       }
     } catch {
@@ -139,7 +141,7 @@ export async function geocodificarPreciso(texto: string, numero: string, signal?
     }
   }
 
-  const { rua: via, num } = separarRuaNumero(rua, numero);
+  const { rua: via, num } = estruturado;
 
   // Fallback SEM CHAVE (1): Nominatim estruturado — resolve o NÚMERO da casa
   // melhor que o Photon (interpolação do OpenStreetMap), quando há número.
@@ -189,6 +191,7 @@ export async function geocodificarPreciso(texto: string, numero: string, signal?
     const temNumero = !!p.housenumber;
     const viaNome = p.street || p.name || via;
     const rotulo = [`${viaNome}${p.housenumber ? ', ' + p.housenumber : (num ? ', ' + num : '')}`, p.district || p.suburb, p.city].filter(Boolean).join(', ');
+    if (exigeNumeroExato && !temNumero) return null;
     return { rotulo, lat, lng, precisao: temNumero ? 'exato' : 'rua' };
   } catch {
     return null;
