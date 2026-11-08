@@ -50,7 +50,7 @@ export function SearchLoadingScreen({ totalConsultados, cidade }: Props) {
 
   return createPortal(
     <motion.div
-      className="fixed inset-0 z-[70] flex flex-col items-center justify-center overflow-hidden bg-brand-gradient grain"
+      className="fixed inset-0 z-[70] flex flex-col items-center justify-center overflow-hidden bg-[#101820]"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -62,8 +62,8 @@ export function SearchLoadingScreen({ totalConsultados, cidade }: Props) {
       {/* Aurora atrás */}
       {!reduzir && (
         <>
-          <div className="pointer-events-none absolute -left-32 top-16 h-72 w-72 rounded-full bg-mint-500/20 blur-3xl animate-aurora-a" />
-          <div className="pointer-events-none absolute -right-40 bottom-12 h-72 w-72 rounded-full bg-navy-400/15 blur-3xl animate-aurora-b" />
+          <div className="pointer-events-none absolute -left-32 top-16 h-72 w-72 rounded-full bg-[#FFC700]/20 blur-3xl animate-aurora-a" />
+          <div className="pointer-events-none absolute -right-40 bottom-12 h-72 w-72 rounded-full bg-amber-200/10 blur-3xl animate-aurora-b" />
         </>
       )}
 
@@ -79,7 +79,7 @@ export function SearchLoadingScreen({ totalConsultados, cidade }: Props) {
             <VanMark className="h-11 w-11" />
           </span>
           <span className="font-display text-2xl font-extrabold tracking-tightest text-white">
-            Vam<span className="text-mint-400">bora</span>
+            Vam<span className="text-[#FFC700]">bora</span>
           </span>
         </span>
       </motion.div>
@@ -95,7 +95,7 @@ export function SearchLoadingScreen({ totalConsultados, cidade }: Props) {
           >
             {[0, 1].map((k) => (
               <svg key={k} width="520" height="90" viewBox="0 0 520 90" className="shrink-0">
-                <g fill="#a8c0e4">
+                <g fill="#66717a">
                   {[10, 70, 120, 190, 250, 320, 380, 450].map((x, i) => (
                     <rect key={x} x={x} y={90 - (26 + ((i * 13) % 46))} width="34" height="90" rx="4" />
                   ))}
@@ -129,12 +129,12 @@ export function SearchLoadingScreen({ totalConsultados, cidade }: Props) {
 
         {/* Pontos de origem (embarque) e destino (escola) sobre a estrada */}
         <div className="absolute bottom-[34px] left-3 flex flex-col items-center gap-1">
-          <span className="h-3 w-3 rounded-full bg-emerald-400 ring-2 ring-emerald-400/30" />
-          <span className="text-[10px] font-semibold text-emerald-200/90">Origem</span>
+          <span className="h-3 w-3 rounded-full bg-[#FFC700] ring-2 ring-[#FFC700]/30" />
+          <span className="text-[10px] font-semibold text-amber-100/90">Origem</span>
         </div>
         <div className="absolute bottom-[34px] right-3 flex flex-col items-center gap-1">
-          <span className="h-3 w-3 rounded-full bg-mint-400 ring-2 ring-mint-400/30" />
-          <span className="text-[10px] font-semibold text-mint-200/90">Escola</span>
+          <span className="h-3 w-3 rounded-full bg-[#FFC700] ring-2 ring-mint-400/30" />
+          <span className="text-[10px] font-semibold text-amber-100/90">Escola</span>
         </div>
       </div>
 
@@ -149,7 +149,7 @@ export function SearchLoadingScreen({ totalConsultados, cidade }: Props) {
             transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
             className="inline-flex items-center gap-2 text-base font-medium text-navy-100"
           >
-            <AtualIcone className="h-4 w-4 text-mint-300" />
+            <AtualIcone className="h-4 w-4 text-[#FFC700]" />
             {passos[passo].texto}
           </motion.p>
         </AnimatePresence>
@@ -159,10 +159,10 @@ export function SearchLoadingScreen({ totalConsultados, cidade }: Props) {
           o overlay existe enquanto a busca real roda. */}
       <div className="relative z-10 mt-5 h-1.5 w-56 overflow-hidden rounded-full bg-white/10">
         {reduzir ? (
-          <div className="h-full w-1/3 rounded-full bg-mint-400/80" />
+          <div className="h-full w-1/3 rounded-full bg-[#FFC700]/80" />
         ) : (
           <motion.div
-            className="h-full w-2/5 rounded-full bg-gradient-to-r from-mint-400 to-mint-500"
+            className="h-full w-2/5 rounded-full bg-gradient-to-r from-[#FFC700] to-[#FFD84D]"
             animate={{ x: ['-110%', '260%'] }}
             transition={{ duration: 1.25, ease: 'easeInOut', repeat: Infinity }}
           />
@@ -186,9 +186,9 @@ function LoaderVan({ spinning }: { spinning: boolean }) {
     <svg width="170" height="92" viewBox="0 0 208 112" fill="none" aria-hidden="true">
       <defs>
         <linearGradient id="lv-corpo" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#5c84cf" />
-          <stop offset="60%" stopColor="#2f52a0" />
-          <stop offset="100%" stopColor="#182e60" />
+          <stop offset="0%" stopColor="#ffffff" />
+          <stop offset="60%" stopColor="#f5f5f5" />
+          <stop offset="100%" stopColor="#d9d9d9" />
         </linearGradient>
         <linearGradient id="lv-vidro" x1="0" y1="0" x2="0.3" y2="1">
           <stop offset="0%" stopColor="#eaf3ff" />
@@ -206,7 +206,9 @@ function LoaderVan({ spinning }: { spinning: boolean }) {
         fill="url(#lv-corpo)"
       />
       <path d="M18 42 Q18 30 34 28 L128 20 Q136 19 143 24 L128 24 L34 32 Q22 33 22 46 Z" fill="#fff" opacity="0.22" />
-      <rect x="14" y="74" width="176" height="8" fill="#3cc394" />
+      <rect x="14" y="74" width="176" height="8" fill="#FFC700" />
+      {/* faixa escolar e identificacao */}
+      <text x="94" y="81" fontSize="10" fontWeight="900" fill="#141414" textAnchor="middle">ESCOLAR</text>
       {/* vidros */}
       <g fill="url(#lv-vidro)">
         <rect x="34" y="34" width="34" height="26" rx="5" />
