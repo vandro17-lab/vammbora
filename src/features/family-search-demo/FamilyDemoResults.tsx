@@ -7,6 +7,7 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import type { OfertaDemo } from './engine';
 import { gerarAvaliacoesDemo, type AvaliacoesDemo } from './avaliacoes-demo';
+import { lerOverrides } from '@/data/motoristas-override';
 import { VanIllustration } from '@/components/brand/VanIllustration';
 import { Avatar } from '@/components/brand/Avatar';
 import { Stars } from '@/components/ui/Stars';
@@ -77,14 +78,23 @@ export function FamilyDemoResults({ ofertas, carregando, erro, horario, endereco
   const [filtroNota, setFiltroNota] = useState<0 | 5 | 4 | 3>(0);
   const [docAberta, setDocAberta] = useState(false);
 
+  // Aplica os ajustes do admin (nome/foto corrigidos no editor), se houver.
+  const ofertasAjustadas = useMemo(() => {
+    const ov = lerOverrides();
+    return ofertas.map((o) => {
+      const x = ov[o.slug];
+      return x ? { ...o, nome: x.nome || o.nome, imagem: x.imagem || o.imagem } : o;
+    });
+  }, [ofertas]);
+
   // Avaliações demonstrativas, determinísticas e estáveis por motorista.
   const avaliacoes = useMemo(() => {
     const m: Record<string, AvaliacoesDemo> = {};
-    for (const o of ofertas) m[o.id] = gerarAvaliacoesDemo(o.id, o.nome);
+    for (const o of ofertasAjustadas) m[o.id] = gerarAvaliacoesDemo(o.id, o.nome);
     return m;
-  }, [ofertas]);
+  }, [ofertasAjustadas]);
 
-  const lista = ofertas
+  const lista = ofertasAjustadas
     .filter((o) => !somenteVagas || o.vagas > 0)
     .sort((a, b) =>
       ordenacao === 'preco' ? a.precoMensal - b.precoMensal
