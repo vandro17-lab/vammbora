@@ -3,6 +3,7 @@ import {
   ArrowLeft, Heart, Star, SlidersHorizontal, X, Play, Pause, RotateCcw,
   ShieldCheck, Check, Clock3, Ruler, Map as MapIcon,
   ListChecks, Users, GraduationCap, ChevronRight, ChevronDown, BadgeCheck,
+  Bus, FileCheck2, Snowflake, UserRound,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { OfertaDemo } from './engine';
@@ -13,10 +14,6 @@ import { Avatar } from '@/components/brand/Avatar';
 import { Stars } from '@/components/ui/Stars';
 import { DemoBadge } from '@/components/ui/DemoBadge';
 import { cn } from '@/lib/utils';
-import iconeTransporte from '@/assets/icones-recursos/transporte-escolar.svg';
-import iconeDocumentos from '@/assets/icones-recursos/documentos.svg';
-import iconeAr from '@/assets/icones-recursos/ar-condicionado.svg';
-import iconeMonitor from '@/assets/icones-recursos/monitor.svg';
 import ilustracaoSemResultado from '@/assets/ilustracoes/nenhum-resultado.png';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -25,14 +22,20 @@ type Props = { ofertas: OfertaDemo[]; carregando: boolean; erro?: string; horari
 type Ordem = 'rapido' | 'preco' | 'vagas' | 'avaliacao';
 type Aba = 'trajeto' | 'perfil' | 'avaliacoes';
 
-// Ícones oficiais dos recursos (SVG do pacote visual — preto + acento #FFC700).
-// Usados como <img> para preservar o desenho bicolor da marca.
-const RECURSO_SVG: Record<string, string> = {
-  'Transporte infantil': iconeTransporte,
-  'Documentação': iconeDocumentos,
-  'Ar-condicionado': iconeAr,
-  Monitor: iconeMonitor,
+// Ícones dos selos — ícones de linha (lucide), limpos e consistentes.
+// Documentação usa um documento com check (verde) para sinalizar verificado.
+const RECURSO_ICONE: Record<string, LucideIcon> = {
+  'Transporte infantil': Bus,
+  'Documentação': FileCheck2,
+  'Ar-condicionado': Snowflake,
+  Monitor: UserRound,
 };
+
+/** Ícone de um selo, com cor coerente (verde para Documentação). */
+function IconeSelo({ recurso, size = 14, className }: { recurso: string; size?: number; className?: string }) {
+  const Ico = RECURSO_ICONE[recurso] ?? Check;
+  return <Ico size={size} className={cn('shrink-0', recurso === 'Documentação' ? 'text-emerald-600' : 'text-mint-700', className)} />;
+}
 
 // Documentação do motorista (sub-selo exibido ao abrir o perfil). Todos os
 // perfis demonstrativos exibidos já passaram pela verificação documental.
@@ -254,14 +257,11 @@ export function FamilyDemoResults({ ofertas, carregando, erro, horario, endereco
                 {/* Recursos com ícones */}
                 {o.recursos.length > 0 && (
                   <div className="mt-3 flex flex-wrap gap-1.5">
-                    {o.recursos.map((r) => {
-                      const ico = RECURSO_SVG[r];
-                      return (
-                        <span key={r} className="chip bg-navy-50 text-navy-700">
-                          {ico ? <img src={ico} alt="" className="h-4 w-4" /> : <Check size={13} className="text-mint-700" />} {r}
-                        </span>
-                      );
-                    })}
+                    {o.recursos.map((r) => (
+                      <span key={r} className="chip bg-navy-50 text-navy-700">
+                        <IconeSelo recurso={r} /> {r}
+                      </span>
+                    ))}
                   </div>
                 )}
 
@@ -415,7 +415,6 @@ export function FamilyDemoResults({ ofertas, carregando, erro, horario, endereco
                         <dt className="text-xs text-navy-500">Selos</dt>
                         <div className="mt-1.5 flex flex-wrap gap-1.5">
                           {selecionado.recursos.map((r) => {
-                            const ico = RECURSO_SVG[r];
                             if (r === 'Documentação') {
                               return (
                                 <button
@@ -423,16 +422,16 @@ export function FamilyDemoResults({ ofertas, carregando, erro, horario, endereco
                                   type="button"
                                   onClick={() => setDocAberta((v) => !v)}
                                   aria-expanded={docAberta}
-                                  className={cn('chip ring-1 transition-colors', docAberta ? 'bg-mint-50 text-navy-900 ring-mint-300' : 'bg-white text-navy-700 ring-navy-200 hover:ring-navy-300')}
+                                  className={cn('chip ring-1 transition-colors', docAberta ? 'bg-emerald-50 text-navy-900 ring-emerald-300' : 'bg-white text-navy-700 ring-navy-200 hover:ring-navy-300')}
                                 >
-                                  {ico && <img src={ico} alt="" className="h-4 w-4" />} Documentação
+                                  <IconeSelo recurso={r} /> Documentação
                                   <ChevronDown size={13} className={cn('transition-transform', docAberta && 'rotate-180')} />
                                 </button>
                               );
                             }
                             return (
                               <span key={r} className="chip bg-white text-navy-700 ring-1 ring-navy-200">
-                                {ico ? <img src={ico} alt="" className="h-4 w-4" /> : <Check size={13} className="text-mint-700" />} {r}
+                                <IconeSelo recurso={r} /> {r}
                               </span>
                             );
                           })}
