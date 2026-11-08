@@ -94,6 +94,26 @@ export function FamilyDemoResults({ ofertas, carregando, erro, horario, endereco
     return m;
   }, [ofertasAjustadas]);
 
+  // Selos demonstrativos: documentação em todos os perfis; manutenção periódica
+  // em parte deles, privilegiando as avaliações mais altas. Não representam
+  // verificação real nem certificação de segurança do veículo.
+  const temManutencaoDemo = (o: OfertaDemo) => (avaliacoes[o.id]?.media ?? 0) >= 4.5;
+
+  function SelosVerificacaoDemo({ oferta }: { oferta: OfertaDemo }) {
+    return (
+      <div className="flex flex-wrap gap-1.5" aria-label="Selos demonstrativos do motorista">
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800" title="Documentação demonstrativa; não constitui verificação real">
+          <ShieldCheck size={14} /> Documentação <Check size={14} strokeWidth={3} />
+        </span>
+        {temManutencaoDemo(oferta) && (
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-900" title="Manutenção periódica demonstrativa; não constitui inspeção real">
+            <BadgeCheck size={14} /> Manutenção periódica <Check size={14} strokeWidth={3} />
+          </span>
+        )}
+      </div>
+    );
+  }
+
   const lista = ofertasAjustadas
     .filter((o) => !somenteVagas || o.vagas > 0)
     .sort((a, b) =>
@@ -238,6 +258,8 @@ export function FamilyDemoResults({ ofertas, carregando, erro, horario, endereco
                     <small className="text-navy-500">{o.modelo}</small>
                   </span>
                 </button>
+
+                <div className="mt-3"><SelosVerificacaoDemo oferta={o} /></div>
 
                 {/* Avaliações demonstrativas — nota + total, abre a aba de avaliações */}
                 <button onClick={() => abrir(o, 'avaliacoes')} className="mt-2.5 inline-flex w-fit items-center gap-1 rounded-lg px-1 py-0.5 -ml-1 hover:bg-navy-50" aria-label={`Ver avaliações de ${o.nome}`}>
@@ -406,6 +428,7 @@ export function FamilyDemoResults({ ofertas, carregando, erro, horario, endereco
                     </button>
                   </div>
 
+                  <div className="mt-4"><SelosVerificacaoDemo oferta={selecionado} /></div>
                   <dl className="mt-5 space-y-3 rounded-2xl bg-navy-50/60 p-4">
                     <InfoLinha Icone={GraduationCap} rotulo="Atende" valor={`${selecionado.escola} e região`} />
                     <InfoLinha Icone={Users} rotulo="Vagas informadas" valor={`${selecionado.vagas} ${selecionado.vagas === 1 ? 'vaga' : 'vagas'}`} />
