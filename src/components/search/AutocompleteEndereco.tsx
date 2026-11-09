@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { MapPin, Loader2 } from 'lucide-react';
-import { buscarEnderecos, normalizarTexto, type SugestaoEndereco } from '@/lib/geocode';
+import { buscarEnderecos, normalizarTexto, separarRuaNumero, type SugestaoEndereco } from '@/lib/geocode';
 
 export type { SugestaoEndereco };
 
@@ -17,6 +17,12 @@ function filtrarLocais(locais: SugestaoEndereco[], q: string): SugestaoEndereco[
     if (out.length >= 6) break;
   }
   return out;
+}
+
+function rotuloComNumero(rotulo: string, numero: string): string {
+  if (!numero || new RegExp(`\\b${numero}\\b`).test(rotulo)) return rotulo;
+  const [rua, ...complemento] = rotulo.split(',').map((parte) => parte.trim());
+  return [rua, numero, ...complemento].filter(Boolean).join(', ');
 }
 
 /**
@@ -82,7 +88,7 @@ export function AutocompleteEndereco({
     // Se o usuário informou um número, preserva exatamente o texto digitado.
     // Sugestões de rua frequentemente vêm com outro número (ou sem número) e
     // não podem substituir o endereço solicitado.
-    const numeroDigitado = (value.match(/(\d{1,6})\s*$/) || [])[1] || '';
+    const numeroDigitado = separarRuaNumero(value, '').num;
     const texto = numeroDigitado ? value.trim() : s.rotulo;
     ignorar.current = texto;
     // Se mantivemos um número que a sugestão não tinha, a coordenada da sugestão
@@ -124,7 +130,7 @@ export function AutocompleteEndereco({
                 onMouseDown={(e) => { e.preventDefault(); escolher(s); }}
               >
                 <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-mint-600" />
-                <span className="text-navy-700">{s.rotulo}</span>
+                <span className="text-navy-700">{rotuloComNumero(s.rotulo, separarRuaNumero(value, '').num)}</span>
               </button>
             </li>
           ))}

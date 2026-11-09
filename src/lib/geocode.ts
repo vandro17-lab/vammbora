@@ -17,10 +17,12 @@ export function separarRuaNumero(texto: string, numero: string): { rua: string; 
     .trim();
   let num = String(numero ?? '').replace(/\D/g, '');
   if (num) {
-    rua = rua.replace(new RegExp(`(?:,?\\s*n[º°o]?\\.?\\s*)?\\b${num}\\b`, 'i'), '').replace(/[,\s]+$/, '').trim();
+    rua = rua.replace(new RegExp(`(?:,?\\s*n[º°o]?\\.?\\s*)?\\b${num}\\b`, 'i'), '').replace(/[ ,\\s]+$/, '').trim();
   } else {
-    const m = rua.match(/(?:,?\s*n[º°o]?\.?\s*)?(\d{1,6})\s*$/);
-    if (m) { num = m[1]; rua = rua.slice(0, m.index).replace(/[,\s]+$/, '').trim(); }
+    // Aceita o número no fim ("Rua A, 450") e antes do bairro após vírgula
+    // ou travessão ("Rua A, 450 — Centro"), como no exemplo do formulário.
+    const m = rua.match(/(?:,?\s*n[º°o]?\.?\s*|,\s*|\s+)(\d{1,6})(?=\s*(?:[,;–—-]|$))/);
+    if (m) { num = m[1]; rua = rua.slice(0, m.index).replace(/[ ,\s]+$/, '').trim(); }
   }
   return { rua: rua || texto.trim(), num };
 }

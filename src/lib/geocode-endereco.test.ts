@@ -18,6 +18,10 @@ describe('separarRuaNumero', () => {
     expect(separarRuaNumero('Rua Afonso Pena, 450', '')).toEqual({ rua: 'Rua Afonso Pena', num: '450' });
   });
 
+  it('extrai o número antes do bairro separado por travessão', () => {
+    expect(separarRuaNumero('Rua José Geraldo, 450 — Centro', '')).toEqual({ rua: 'Rua José Geraldo', num: '450' });
+  });
+
   it('entende "nº" antes do número', () => {
     expect(separarRuaNumero('Av. Brasília nº 1200', '')).toEqual({ rua: 'Av. Brasília', num: '1200' });
   });
