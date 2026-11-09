@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   Loader2, MapPin, Home, School, Plus, Check, X, ArrowUp, ArrowDown, Trash2, Users, Flag, CheckCircle2, AlertCircle,
@@ -435,6 +435,7 @@ function FormEndereco({ titulo, dica, botao, locais, onConfirmar, onCancelar, co
   const [precisao, setPrecisao] = useState<Precisao | undefined>(undefined);
   const [buscandoExato, setBuscandoExato] = useState(false);
   const [enderecoNoMapa, setEnderecoNoMapa] = useState<string | null>(null);
+  const sugestaoSelecionada = useRef(false);
 
   function montarRotulo(): string {
     return texto.trim();
@@ -445,6 +446,12 @@ function FormEndereco({ titulo, dica, botao, locais, onConfirmar, onCancelar, co
   useEffect(() => {
     const endereco = texto.trim();
     if (endereco.length < 3) return;
+    // A sugestão já traz uma coordenada válida (bairro/rua). Não substitua
+    // esse ponto por null enquanto uma tentativa opcional de precisão falha.
+    if (sugestaoSelecionada.current) {
+      sugestaoSelecionada.current = false;
+      return;
+    }
     const ctrl = new AbortController();
     let vivo = true;
     setBuscandoExato(true);
@@ -494,7 +501,8 @@ function FormEndereco({ titulo, dica, botao, locais, onConfirmar, onCancelar, co
           onChange={(t, c) => {
             setTexto(t);
             // Sugestão escolhida: ponto provisório (nível de rua) até a geocodificação precisa.
-            if (c && !/(\d{1,6})\s*$/.test(t.trim())) { setCoord(c); setPrecisao('rua'); setEnderecoNoMapa(null); }
+            sugestaoSelecionada.current = Boolean(c && !/(\d{1,6})\s*$/.test(t.trim()));
+            if (sugestaoSelecionada.current) { setCoord(c!); setPrecisao('rua'); setEnderecoNoMapa(null); }
             else { setCoord(null); setPrecisao(undefined); setEnderecoNoMapa(null); }
           }}
         />
