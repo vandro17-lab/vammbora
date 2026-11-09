@@ -60,6 +60,7 @@ export function StartupExperience({ children }: { children: ReactNode }) {
         key="vambora-opening" className="startup" role="dialog" aria-modal="true" aria-label="Boas-vindas ao Vambora"
         style={{ cursor: 'default' }}
         initial={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: reduzir ? 0 : 0.4, ease: [0.22, 1, 0.36, 1] }}
+        onPointerDown={() => { if (podeDispensar) fechar(); }}
         onKeyDown={e => {
           if (e.code === 'Space' && podeDispensar) { e.preventDefault(); fechar(); }
           if (e.key === 'Tab') { e.preventDefault(); dialogo.current?.focus(); }
@@ -82,7 +83,7 @@ export function StartupExperience({ children }: { children: ReactNode }) {
             <span className="startup-loading-line" aria-hidden="true" />
             <span className="startup-status">{carregando ? 'Preparando suas opções…' : 'Escolar e universitário'}</span>
           </div>
-          <span className="startup-skip" aria-hidden="true" data-visivel={podeDispensar || undefined}>Pressione espaço para continuar</span>
+          <span className="startup-skip" aria-hidden="true" data-visivel={podeDispensar || undefined}>Toque ou pressione espaço para continuar</span>
         </div>
         <div className="startup-bottom"><span>ARAÇATUBA E REGIÃO</span></div>
       </motion.div>}
