@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { Sparkles, MapPin, CheckCircle2, AlertTriangle, ChevronRight, Zap, Users, Eye, MessageCircle, TrendingUp, School, Navigation, Map as MapIcon } from 'lucide-react';
+import { Sparkles, MapPin, CheckCircle2, AlertTriangle, ChevronRight, Zap, Users, Eye, MessageCircle, TrendingUp, School, Navigation } from 'lucide-react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Avatar } from '@/components/brand/Avatar';
