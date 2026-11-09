@@ -83,7 +83,6 @@ export function StartupExperience({ children }: { children: ReactNode }) {
             <span className="startup-loading-line" aria-hidden="true" />
             <span className="startup-status">{carregando ? 'Preparando suas opções…' : 'Escolar e universitário'}</span>
           </div>
-          <span className="startup-skip" aria-hidden="true" data-visivel={podeDispensar || undefined}>Toque ou pressione espaço para continuar</span>
         </div>
         <div className="startup-bottom"><span>ARAÇATUBA E REGIÃO</span></div>
       </motion.div>}
