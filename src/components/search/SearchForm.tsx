@@ -67,7 +67,6 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
     const { num } = separarRuaNumero(texto, '');
     if (!num) {
       setErroEndereco('Informe o número do imóvel para localizar o ponto exato no mapa.');
-      ir(0);
       return;
     }
 
@@ -85,7 +84,6 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
 
     if (!ponto || ponto.precisao !== 'exato' || !Number.isFinite(ponto.lat) || !Number.isFinite(ponto.lng)) {
       setErroEndereco('Não localizamos o número exato. Confira o nome da rua e o número e tente novamente.');
-      ir(0);
       return;
     }
 
@@ -125,6 +123,7 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
           <p className="mt-4 rounded-xl bg-mint-50 p-4 text-sm leading-relaxed text-mint-800">{erro ? 'Não foi possível carregar os destinos. Você ainda pode explorar as vans da cidade.' : 'Você pode explorar as opções e confirmar o trajeto diretamente com o motorista.'}</p>
         </div>}
         {passo === 2 && <div className="mt-5 space-y-5">
+          {erroEndereco && <p role="alert" className="rounded-xl bg-amber-50 p-3 text-sm font-medium text-amber-900">{erroEndereco} <button type="button" className="ml-1 underline" onClick={() => ir(0)}>Corrigir endereço</button></p>}
           <fieldset><legend className="field-label">Turno</legend><div className="flex flex-wrap gap-2">{(['', 'manha', 'tarde', 'noite', 'integral'] as const).map(t => <Segment key={t} ativo={turno === t} onClick={() => setTurno(t)}>{t ? TURNO_LABEL[t] : 'Qualquer'}</Segment>)}</div></fieldset>
           <div><label className="field-label" htmlFor="horario-escolar">{modalidade === 'volta' ? 'Horário de saída da escola' : 'Horário em que precisa chegar'}</label><input id="horario-escolar" className="field-input" type="time" value={horario} required onChange={e => setHorario(e.target.value)} /><p className="mt-1 text-xs text-navy-500">O horário escolhido será usado para calcular o trajeto.</p></div>
           <fieldset><legend className="field-label">Contratação</legend><div className="flex gap-2">{(['mensal', 'avulso'] as const).map(c => <Segment key={c} ativo={contratacao === c} onClick={() => setContratacao(c)}>{c === 'mensal' ? 'Mensal' : 'Avulso'}</Segment>)}</div>
