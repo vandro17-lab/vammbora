@@ -93,6 +93,9 @@ Nosso objetivo é mostrar como a tecnologia pode ajudar a resolver um problema d
 
 Os outros arquivos da pasta [docs](docs/) apresentam a organização do sistema, as decisões do projeto, as pesquisas realizadas e os recursos utilizados durante o desenvolvimento.
 
----
+### Auditoria documental do Ideathon
 
+A auditoria, os wireframes documentais e o checklist das exigências estão em [`docs/ideathon-2026/`](docs/ideathon-2026/README.md). Itens sem evidência foram marcados como pendentes; consulte também a documentação original em `docs/`.
+
+---
 **VanBora — Fatec Araçatuba | Ideathon 2026**
