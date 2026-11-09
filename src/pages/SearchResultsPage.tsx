@@ -60,19 +60,21 @@ export function SearchResultsPage(){
  }, [mostrarOverlay]);
  useEffect(() => {
   if (carregando || !imagensProntas || !mostrarOverlay) return;
-  const id = requestAnimationFrame(() => {
+  const iniciadaEm = Number(sessionStorage.getItem('vambora.busca.iniciadaEm')) || Date.now();
+  const espera = Math.max(0, 3000 - (Date.now() - iniciadaEm));
+  const id = window.setTimeout(() => {
    window.scrollTo({top:0,left:0,behavior:'instant'});
    sessionStorage.removeItem('vambora.busca.transicao');
+   sessionStorage.removeItem('vambora.busca.iniciadaEm');
    setMostrarOverlay(false);
-  });
-  return () => cancelAnimationFrame(id);
+  }, espera);
+  return () => clearTimeout(id);
  }, [carregando, imagensProntas, mostrarOverlay]);
  return <main className="container-page py-8">
-  <AnimatePresence>{mostrarOverlay&&<SearchLoadingScreen key="busca-loading" totalConsultados={0} cidade="Araçatuba" />}</AnimatePresence>
+  <AnimatePresence>{mostrarOverlay&&<SearchLoadingScreen key="busca-loading" cidade="Araçatuba" />}</AnimatePresence>
   <Link to="/" className="inline-flex items-center gap-2 text-sm font-semibold text-navy-700 hover:text-navy-900"><ArrowLeft size={17}/> Nova busca</Link>
-  <div className="mt-5"><span className="chip bg-mint-100 font-bold text-mint-800 ring-1 ring-mint-200">Experiência demonstrativa</span></div>
   <h1 className="mt-3 font-display text-3xl font-bold tracking-tight text-navy-900">Vans para {destino?.nome||'sua escola'}</h1>
-  <p className="mt-2 text-sm text-navy-500">Ofertas ilustrativas · localização e trajetos consultados em mapas reais.</p>
+  <p className="mt-2 text-sm text-navy-500">Localização e trajetos consultados em mapas reais.</p>
   <FamilyDemoResults ofertas={ofertas} carregando={carregando} erro={erro} horario={horario} endereco={criterios.endereco} onEditar={()=>window.location.assign('/')}/>
  </main>;
 }

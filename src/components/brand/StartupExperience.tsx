@@ -5,10 +5,8 @@ import { useVitrine } from '@/data/VitrineProvider';
 import './startup.css';
 
 const SESSION_KEY = 'vambora:opening:v1';
-const MIN_DURATION = 2200;
-const MAX_DURATION = 7000;
-/** A partir de quando um toque/clique pode pular a abertura (evita dispensar por engano no 1º instante). */
-const DISMISS_GRACE = 700;
+/** Libera o comando Espaço depois que a sequência visual de abertura terminou. */
+const DISMISS_GRACE = 2200;
 
 function primeiraEntrada(pathname: string) {
   if (pathname.startsWith('/admin')) return false;
@@ -22,8 +20,6 @@ export function StartupExperience({ children }: { children: ReactNode }) {
   const { carregando } = useVitrine();
   const reduzir = useReducedMotion();
   const [aberto, setAberto] = useState(() => primeiraEntrada(pathname));
-  const [tempoMinimo, setTempoMinimo] = useState(false);
-  const [demorando, setDemorando] = useState(false);
   const [podeDispensar, setPodeDispensar] = useState(false);
   const conteudo = useRef<HTMLDivElement>(null);
   const dialogo = useRef<HTMLDivElement>(null);
@@ -36,22 +32,9 @@ export function StartupExperience({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!aberto) return;
-    const minimo = window.setTimeout(() => setTempoMinimo(true), reduzir ? 400 : MIN_DURATION);
-    const aviso = window.setTimeout(() => setDemorando(true), MIN_DURATION);
     const liberar = window.setTimeout(() => setPodeDispensar(true), reduzir ? 0 : DISMISS_GRACE);
-    const limite = window.setTimeout(fechar, MAX_DURATION);
-    return () => { clearTimeout(minimo); clearTimeout(aviso); clearTimeout(liberar); clearTimeout(limite); };
-  }, [aberto, reduzir, fechar]);
-
-  // Rede/aba estrangulada pode atrasar os timers: ao voltar o foco à aba, reavalia o fechamento.
-  useEffect(() => {
-    if (!aberto) return;
-    const aoVoltar = () => { if (document.visibilityState === 'visible' && tempoMinimo && !carregando) fechar(); };
-    document.addEventListener('visibilitychange', aoVoltar);
-    return () => document.removeEventListener('visibilitychange', aoVoltar);
-  }, [aberto, tempoMinimo, carregando, fechar]);
-
-  useEffect(() => { if (aberto && tempoMinimo && !carregando) fechar(); }, [aberto, tempoMinimo, carregando, fechar]);
+    return () => clearTimeout(liberar);
+  }, [aberto, reduzir]);
 
   useEffect(() => {
     if (!aberto) return;
@@ -75,10 +58,12 @@ export function StartupExperience({ children }: { children: ReactNode }) {
       {aberto && <motion.div
         ref={dialogo} tabIndex={-1}
         key="vambora-opening" className="startup" role="dialog" aria-modal="true" aria-label="Boas-vindas ao Vambora"
-        style={{ cursor: podeDispensar ? 'pointer' : 'default' }}
+        style={{ cursor: 'default' }}
         initial={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: reduzir ? 0 : 0.4, ease: [0.22, 1, 0.36, 1] }}
-        onPointerDown={() => { if (podeDispensar) fechar(); }}
-        onKeyDown={e => { if (e.key === 'Escape') fechar(); if (e.key === 'Tab') { e.preventDefault(); dialogo.current?.focus(); } }}
+        onKeyDown={e => {
+          if (e.code === 'Space' && podeDispensar) { e.preventDefault(); fechar(); }
+          if (e.key === 'Tab') { e.preventDefault(); dialogo.current?.focus(); }
+        }}
       >
         <div className="startup-glow" aria-hidden="true" />
         <div className="startup-grid" aria-hidden="true" />
@@ -95,9 +80,9 @@ export function StartupExperience({ children }: { children: ReactNode }) {
           <p className="startup-tagline"><span>Conectando pessoas.</span><span>Encurtando destinos.</span></p>
           <div className="startup-loading" role="status" aria-live="polite">
             <span className="startup-loading-line" aria-hidden="true" />
-            <span className="startup-status">{demorando && carregando ? 'Preparando suas opções…' : 'Escolar e universitário'}</span>
+            <span className="startup-status">{carregando ? 'Preparando suas opções…' : 'Escolar e universitário'}</span>
           </div>
-          <span className="startup-skip" aria-hidden="true" data-visivel={podeDispensar || undefined}>Toque para continuar</span>
+          <span className="startup-skip" aria-hidden="true" data-visivel={podeDispensar || undefined}>Pressione espaço para continuar</span>
         </div>
         <div className="startup-bottom"><span>ARAÇATUBA E REGIÃO</span></div>
       </motion.div>}
@@ -106,7 +91,7 @@ export function StartupExperience({ children }: { children: ReactNode }) {
 }
 
 /** Desenho vetorial próprio: leve, nítido em qualquer tela e sem imagens externas. */
-function OpeningVan() {
+export function OpeningVan() {
   return <svg viewBox="0 0 160 110" fill="none">
     <defs>
       <linearGradient id="opening-body" x1="35" y1="20" x2="105" y2="95" gradientUnits="userSpaceOnUse"><stop stopColor="#525252" /><stop offset=".45" stopColor="#292929" /><stop offset="1" stopColor="#171717" /></linearGradient>
