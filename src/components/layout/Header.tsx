@@ -40,6 +40,12 @@ export function Header() {
               Instalar VanBora
             </button>
           )}
+          <a
+            href="/pesquisa-validacao.html"
+            className="btn btn-sm btn-ghost whitespace-nowrap px-2 text-[11px]"
+          >
+            Pesquisa de validação de ideia
+          </a>
           <NavLink to="/motorista" className="btn btn-sm btn-navy">
             Sou motorista
           </NavLink>
@@ -85,6 +91,13 @@ export function Header() {
               Instalar VanBora
             </button>
           )}
+          <a
+            href="/pesquisa-validacao.html"
+            onClick={() => setAberto(false)}
+            className="btn btn-md btn-ghost mt-1 justify-start text-xs"
+          >
+            Pesquisa de validação de ideia
+          </a>
           <Link to="/motorista" onClick={() => setAberto(false)} className="btn btn-md btn-navy mt-1">
             Sou motorista
           </Link>
