@@ -8,7 +8,7 @@ import { useVitrine } from '@/data/VitrineProvider';
 import { TURNO_LABEL, cn } from '@/lib/utils';
 import { criteriosParaParams } from '@/lib/searchParams';
 import { AutocompleteEndereco } from '@/components/search/AutocompleteEndereco';
-import { locaisDeDestinos, geocodificarPreciso } from '@/lib/geocode';
+import { locaisDeDestinos, geocodificarPreciso, separarRuaNumero } from '@/lib/geocode';
 import { Loader2 } from 'lucide-react';
 import { SearchLoadingScreen } from '@/components/search/SearchLoadingScreen';
 
@@ -25,7 +25,7 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
 
   const [passo, setPasso] = useState(0);
   const [endereco, setEndereco] = useState('');
-  const [origemCoord, setOrigemCoord] = useState<{ lat: number; lng: number } | null>(null);
+  const [erroEndereco, setErroEndereco] = useState('');
   const [destinoId, setDestinoId] = useState('');
   const [turno, setTurno] = useState<Turno | ''>('');
   const [contratacao, setContratacao] = useState<Contratacao>('mensal');
@@ -50,34 +50,49 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
 
   async function enviar(e: React.FormEvent) {
     e.preventDefault();
+    const texto = endereco.trim();
+    if (passo === 0) {
+      const { num } = separarRuaNumero(texto, '');
+      if (!num) {
+        setErroEndereco('Informe o número do imóvel para localizar o ponto exato no mapa.');
+        return;
+      }
+      setErroEndereco('');
+      ir(1);
+      return;
+    }
     if (passo < 2) { ir(passo + 1); return; }
     if (localizando) return;
+
+    const { num } = separarRuaNumero(texto, '');
+    if (!num) {
+      setErroEndereco('Informe o número do imóvel para localizar o ponto exato no mapa.');
+      ir(0);
+      return;
+    }
+
+    // A pesquisa só começa depois de confirmar a coordenada exata do endereço
+    // numerado. Nunca prosseguir com o pino aproximado da rua ou do bairro.
+    setErroEndereco('');
+    setLocalizando(true);
+    const ctrl = new AbortController();
+    const limite = window.setTimeout(() => ctrl.abort(), 7000);
+    let ponto = null;
+    try {
+      ponto = await geocodificarPreciso(texto, '', ctrl.signal);
+    } catch { /* erro tratado abaixo com orientação para corrigir/repetir */ }
+    finally { clearTimeout(limite); setLocalizando(false); }
+
+    if (!ponto || ponto.precisao !== 'exato' || !Number.isFinite(ponto.lat) || !Number.isFinite(ponto.lng)) {
+      setErroEndereco('Não localizamos o número exato. Confira o nome da rua e o número e tente novamente.');
+      ir(0);
+      return;
+    }
 
     sessionStorage.setItem('vambora.busca.transicao', '1');
     sessionStorage.setItem('vambora.busca.iniciadaEm', String(Date.now()));
     setMostrarBusca(true);
-    const texto = endereco.trim();
-    // Garante uma COORDENADA de origem antes de buscar. Sem ela, o motor de
-    // rotas reais não classifica compatibilidade (era por isso que "nunca
-    // encontrava"). Quando o usuário digita um endereço com número e NÃO
-    // escolhe uma sugestão — ou escolhe só a rua — geocodificamos o texto
-    // respeitando o número da casa (geocodificarPreciso trata "Rua X, 123").
-    let coord = origemCoord;
-    const temNumero = /\d/.test(texto);
-    if (texto.length >= 3 && (!coord || temNumero)) {
-      setLocalizando(true);
-      const ctrl = new AbortController();
-      const limite = window.setTimeout(() => ctrl.abort(), 7000);
-      try {
-        const ponto = await geocodificarPreciso(texto, '', ctrl.signal);
-        if (ponto && Number.isFinite(ponto.lat) && Number.isFinite(ponto.lng)) {
-          coord = { lat: ponto.lat, lng: ponto.lng };
-        }
-      } catch { /* serviço de mapas indisponível: segue sem coordenada precisa */ }
-      finally { clearTimeout(limite); setLocalizando(false); }
-    }
-
-    const paramsBase = criteriosParaParams({ cidadeId: CIDADE_PADRAO.id, endereco: texto, destinoId: destinoId || null, turno: turno || null, contratacao, dataAvulso: contratacao === 'avulso' ? dataAvulso : undefined, modalidade, origemLat: coord?.lat, origemLng: coord?.lng });
+    const paramsBase = criteriosParaParams({ cidadeId: CIDADE_PADRAO.id, endereco: texto, destinoId: destinoId || null, turno: turno || null, contratacao, dataAvulso: contratacao === 'avulso' ? dataAvulso : undefined, modalidade, origemLat: ponto.lat, origemLng: ponto.lng });
     const params = new URLSearchParams(paramsBase);
     params.set('horario', horario);
     navigate(`/resultados?${params.toString()}`, { preventScrollReset: true });
@@ -99,7 +114,7 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
         <p className="mt-2 text-sm leading-relaxed text-navy-500">{DESCRICOES[passo]}</p>
         {passo === 0 && <div className="mt-6 space-y-5">
           <div className="flex items-center gap-3 rounded-xl bg-navy-50 p-4"><MapPin className="h-5 w-5 text-mint-700" /><div><span className="block text-xs text-navy-500">Sua cidade</span><span className="text-sm font-semibold">Araçatuba, SP</span></div></div>
-          <div><label className="field-label" htmlFor="endereco">Endereço ou bairro de embarque</label><AutocompleteEndereco id="endereco" value={endereco} locais={locaisBusca} placeholder="Ex.: Rua José Geraldo, 450 — Centro" onChange={(texto, coord) => { setEndereco(texto); setOrigemCoord(coord ?? null); }} /><p className="mt-2 text-xs text-navy-500">Pode incluir o número (ex.: “Rua José Geraldo, 450”). Escolha uma sugestão ou apenas digite — nós localizamos no mapa. O ponto exato você combina com o motorista.</p></div>
+          <div><label className="field-label" htmlFor="endereco">Endereço ou bairro de embarque</label><AutocompleteEndereco id="endereco" value={endereco} locais={locaisBusca} placeholder="Ex.: Rua José Geraldo, 450 — Centro" onChange={(texto) => { setEndereco(texto); setErroEndereco(''); }} /><p className="mt-2 text-xs text-navy-500">Informe rua e número do imóvel. O mapa precisa confirmar o número antes de buscar; bairro ou rua sem número não são suficientes.</p>{erroEndereco && <p role="alert" className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800">{erroEndereco}</p>}</div>
         </div>}
         {passo === 1 && <div className="mt-6">
           <label className="field-label" htmlFor="destino">Escola, faculdade ou destino</label>

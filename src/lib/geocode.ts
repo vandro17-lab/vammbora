@@ -180,11 +180,21 @@ export async function geocodificarPreciso(texto: string, numero: string, signal?
     u.searchParams.set('q', `${[via, num].filter(Boolean).join(' ')}, Araçatuba`);
     u.searchParams.set('lat', String(ARACATUBA.lat));
     u.searchParams.set('lon', String(ARACATUBA.lng));
-    u.searchParams.set('limit', '1');
+    // O primeiro resultado do Photon costuma ser o eixo da rua, sem número.
+    // Pedimos mais candidatos e, havendo número, selecionamos somente aquele
+    // cuja housenumber corresponde ao imóvel informado.
+    u.searchParams.set('limit', '8');
     const r = await fetch(u, { signal });
     if (!r.ok) return null;
     const d = (await r.json()) as { features?: Array<{ geometry: { coordinates: [number, number] }; properties: Record<string, string> }> };
-    const f = d.features?.[0];
+    const normalizarNumero = (v: string) => v.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\p{L}\p{N}]/gu, '').toLowerCase();
+    const f = (d.features ?? []).find((feature) => {
+      const [candidateLng, candidateLat] = feature.geometry?.coordinates ?? [NaN, NaN];
+      if (!Number.isFinite(candidateLat) || !Number.isFinite(candidateLng) || !dentroDeAracatuba(candidateLat, candidateLng)) return false;
+      const candidateNumber = feature.properties?.housenumber;
+      if (!exigeNumeroExato) return true;
+      return Boolean(candidateNumber) && normalizarNumero(candidateNumber) === normalizarNumero(num);
+    });
     const [lng, lat] = f?.geometry?.coordinates ?? [NaN, NaN];
     if (!f || !Number.isFinite(lat) || !Number.isFinite(lng) || !dentroDeAracatuba(lat, lng)) return null;
     const p = f.properties ?? {};
