@@ -1,6 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { Sparkles, MapPin, CheckCircle2, AlertTriangle, ChevronRight, Zap, Users } from 'lucide-react';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+import './OportunidadesPage.css';
+import { Activity, AlertTriangle, ArrowDownUp, BarChart3, Bell, CheckCircle2, ChevronRight, Clock3, Eye, GraduationCap, HandCoins, MapPin, MessageCircle, Navigation, Route as RouteIcon, School, SlidersHorizontal, Users, X, Zap } from 'lucide-react';
 import { Avatar } from '@/components/brand/Avatar';
 import { VMShell } from '@/components/vm/VMShell';
 import { Card, SubHeader, DemoChip, EstadoVazio } from '@/components/vm/ui';
@@ -9,81 +12,60 @@ import { useDadosMotorista } from '@/lib/vm/useDadosMotorista';
 import { OPORTUNIDADES_VM, simularEncaixe, DIAS_UTEIS_MES } from '@/lib/vm/encaixe';
 import { formatBRL, cn } from '@/lib/utils';
 
-const NOVAS_REGIAO = [
-  { regiao: 'Jd. Sumaré', escola: 'Colégio Paineiras', turno: 'Manhã' },
-  { regiao: 'Pozzobon', escola: 'Instituto São João', turno: 'Tarde' },
-  { regiao: 'Umuarama', escola: 'Colégio Paineiras', turno: 'Manhã' },
-  { regiao: 'Jardim Brasil', escola: 'Instituto São João', turno: 'Tarde' },
-  { regiao: 'Icaray', escola: 'Colégio Paineiras', turno: 'Manhã' },
-  { regiao: 'Conceição', escola: 'Instituto São João', turno: 'Tarde' },
-  { regiao: 'Jussara', escola: 'Colégio Paineiras', turno: 'Manhã' },
-  { regiao: 'São Joaquim', escola: 'Instituto São João', turno: 'Tarde' },
+type Demanda = 'Muito alta' | 'Alta' | 'Moderada' | 'Baixa' | 'Muito baixa';
+type Amostra = { id:string; nome:string; regiao:string; destino:string; turno:'Manhã'|'Tarde'|'Noite'; passageiros:number; servico:'Ida'|'Ida e volta'; demanda:Demanda; lat:number; lng:number; idade:string };
+const CORES:Record<Demanda,string> = {'Muito alta':'#e53e32',Alta:'#f28b28',Moderada:'#f0c419',Baixa:'#50a879','Muito baixa':'#4488c7'};
+const ESCOLAS = [
+  { nome:'Fatec Araçatuba', lat:-21.1914, lng:-50.4493 },
+  { nome:'Colégio Paineiras', lat:-21.2100, lng:-50.4250 },
+  { nome:'Instituto São João', lat:-21.2000, lng:-50.4450 },
 ];
-
-/* =========================== TELA 6 — Oportunidades =========================== */
+const AMOSTRAS:Amostra[] = [
+ {id:'d1',nome:'Mariana Oliveira',regiao:'Jardim Ipanema',destino:'Fatec Araçatuba',turno:'Manhã',passageiros:1,servico:'Ida e volta',demanda:'Muito alta',lat:-21.1869,lng:-50.4570,idade:'Universitária'},
+ {id:'d2',nome:'Família Santos',regiao:'Centro',destino:'Colégio Paineiras',turno:'Tarde',passageiros:2,servico:'Ida e volta',demanda:'Alta',lat:-21.2078,lng:-50.4370,idade:'Ensino fundamental'},
+ {id:'d3',nome:'Lucas Ferreira',regiao:'Umuarama',destino:'Instituto São João',turno:'Manhã',passageiros:1,servico:'Ida',demanda:'Alta',lat:-21.1950,lng:-50.4170,idade:'Ensino médio'},
+ {id:'d4',nome:'Família Costa',regiao:'Vila Mendonça',destino:'Colégio Paineiras',turno:'Tarde',passageiros:2,servico:'Ida e volta',demanda:'Moderada',lat:-21.2180,lng:-50.4470,idade:'Ensino fundamental'},
+ {id:'d5',nome:'Beatriz Almeida',regiao:'Jussara',destino:'Fatec Araçatuba',turno:'Noite',passageiros:1,servico:'Ida e volta',demanda:'Muito alta',lat:-21.2350,lng:-50.4140,idade:'Universitária'},
+ {id:'d6',nome:'Família Ribeiro',regiao:'Jardim Sumaré',destino:'Instituto São João',turno:'Manhã',passageiros:1,servico:'Ida',demanda:'Moderada',lat:-21.2015,lng:-50.4630,idade:'Ensino fundamental'},
+ {id:'d7',nome:'Pedro Martins',regiao:'Jardim Brasil',destino:'Colégio Paineiras',turno:'Tarde',passageiros:1,servico:'Ida e volta',demanda:'Baixa',lat:-21.2250,lng:-50.4290,idade:'Ensino médio'},
+ {id:'d8',nome:'Família Nogueira',regiao:'Ipanema',destino:'Fatec Araçatuba',turno:'Manhã',passageiros:2,servico:'Ida e volta',demanda:'Muito alta',lat:-21.1780,lng:-50.4480,idade:'Ensino fundamental'},
+ {id:'d9',nome:'Ana Clara Souza',regiao:'Centro',destino:'Instituto São João',turno:'Noite',passageiros:1,servico:'Ida',demanda:'Alta',lat:-21.2130,lng:-50.4325,idade:'Universitária'},
+ {id:'d10',nome:'Família Lima',regiao:'Umuarama',destino:'Colégio Paineiras',turno:'Manhã',passageiros:1,servico:'Ida e volta',demanda:'Moderada',lat:-21.1890,lng:-50.4100,idade:'Ensino fundamental'},
+ {id:'d11',nome:'Rafael Mendes',regiao:'Jardim Sumaré',destino:'Fatec Araçatuba',turno:'Noite',passageiros:1,servico:'Ida e volta',demanda:'Baixa',lat:-21.2050,lng:-50.4700,idade:'Universitário'},
+ {id:'d12',nome:'Família Carvalho',regiao:'Vila Mendonça',destino:'Instituto São João',turno:'Tarde',passageiros:2,servico:'Ida e volta',demanda:'Muito baixa',lat:-21.2250,lng:-50.4540,idade:'Ensino fundamental'},
+];
+const DEMANDAS:Demanda[]=['Muito alta','Alta','Moderada','Baixa','Muito baixa'];
+function pinIcon(op:Amostra, active:boolean) { return L.divIcon({className:'op-leaflet-pin',html:`<span class="op-pin ${active?'is-active':''}" style="--pin:${CORES[op.demanda]}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 10.5 12 3l9 7.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 19.5z"/><path d="M9 21v-7h6v7"/></svg></span>`,iconSize:[40,46],iconAnchor:[20,43]}); }
+function RadarMap({ items, selected, onSelect, onError, focusRegion }: {items:Amostra[];selected:string|null;onSelect:(id:string)=>void;onError:()=>void;focusRegion:string}) {
+ const host=useRef<HTMLDivElement>(null), map=useRef<L.Map|null>(null), markers=useRef<L.LayerGroup|null>(null);
+ useEffect(()=>{ if(!host.current||map.current)return; const m=L.map(host.current,{zoomControl:false,scrollWheelZoom:false,preferCanvas:true}).setView([-21.205,-50.438],13); map.current=m; L.control.zoom({position:'bottomright'}).addTo(m); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap contributors',maxZoom:19}).addTo(m).on('tileerror',onError); markers.current=L.layerGroup().addTo(m); const t=setTimeout(()=>m.invalidateSize(),100); return()=>{clearTimeout(t);m.remove();map.current=null;markers.current=null;}; },[onError]);
+ useEffect(()=>{if(!markers.current)return; markers.current.clearLayers(); items.forEach(op=>L.marker([op.lat,op.lng],{icon:pinIcon(op,op.id===selected),keyboard:true,title:`${op.regiao} — ${op.demanda}`}).on('click',()=>onSelect(op.id)).addTo(markers.current!)); ESCOLAS.forEach(e=>L.circleMarker([e.lat,e.lng],{radius:6,color:'#111827',weight:2,fillColor:'#ffc700',fillOpacity:1}).bindTooltip(e.nome,{direction:'top'}).addTo(markers.current!)); },[items,selected,onSelect]);
+ useEffect(()=>{ if(!map.current||!focusRegion)return; const op=AMOSTRAS.find(a=>a.regiao===focusRegion); const school=ESCOLAS.find(e=>e.nome===focusRegion); if(op)map.current.flyTo([op.lat,op.lng],14,{duration:.6}); else if(school)map.current.flyTo([school.lat,school.lng],15,{duration:.6}); },[focusRegion]);
+ return <div className="op-map-wrap"><div ref={host} className="op-map" role="application" aria-label="Mapa de oportunidades em Araçatuba"/><div className="op-map-loc"><Navigation size={13}/> Araçatuba · SP</div><div className="op-map-zoom-note">Toque em um marcador para ver a oportunidade</div></div>;
+}
+function MiniChart({data}:{data:number[]}) { const max=Math.max(...data); return <div className="op-chart" aria-label="Evolução demonstrativa de interesses">{data.map((v,i)=><div className="op-chart-col" key={i}><div style={{height:`${Math.max(10,v/max*100)}%`}}/><span>{['1','5','9','13','17','21','25','30'][i]}</span></div>)}</div>; }
 export function OportunidadesPage() {
-  const { dados } = useDadosMotorista();
-  const [aba, setAba] = useState<'compat' | 'regiao'>('compat');
-
-  const compativeis = useMemo(() => OPORTUNIDADES_VM
-    .map((op) => ({ op, r: simularEncaixe(dados, op) }))
-    .filter((x) => x.r.cabe)
-    .sort((a, b) => b.r.compatibilidadePct - a.r.compatibilidadePct), [dados]);
-
-  return (
-    <VMShell>
-      <SubHeader titulo="Oportunidades" />
-      <div className="px-4 pt-4">
-        <div className="flex flex-wrap gap-2 text-sm font-semibold">
-          <button onClick={() => setAba('compat')} className={cn('inline-flex items-center gap-1.5 rounded-full px-3 py-2', aba === 'compat' ? 'bg-mint-500 text-white' : 'bg-navy-100 text-navy-500')}><Zap className="h-4 w-4" /> Compatíveis ({compativeis.length})</button>
-          <button onClick={() => setAba('regiao')} className={cn('inline-flex items-center gap-1.5 rounded-full px-3 py-2', aba === 'regiao' ? 'bg-mint-500 text-white' : 'bg-navy-100 text-navy-500')}><Sparkles className="h-4 w-4" /> Novas da região ({NOVAS_REGIAO.length})</button>
-        </div>
-        {dados.demo && <div className="mt-3 flex justify-end"><DemoChip /></div>}
-
-        {aba === 'compat' ? (
-          <div className="mt-3 space-y-3">
-            {compativeis.length === 0 && (
-              <EstadoVazio
-                icon={Zap}
-                ilustracao={<SlotIlustracao slot="oportunidades.vazio" alt="" fallback={<Zap className="h-8 w-8" />} />}
-                titulo="Nenhuma oportunidade compatível"
-                texto="Quando houver famílias que encaixam na sua rota sem atrasar os outros alunos, elas aparecem aqui. Veja também as novas da região."
-              />
-            )}
-            {compativeis.map(({ op, r }) => (
-              <Link key={op.id} to={`/app/oportunidades/${op.id}`} className="block">
-                <Card className="vm-press flex items-center gap-3 p-3.5">
-                  <Avatar nome={op.regiao} className="h-11 w-11 text-sm" />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-bold text-navy-900">{op.regiao} → {op.escola}</p>
-                    <p className="text-xs text-navy-500">{op.alunos} aluno{op.alunos > 1 ? 's' : ''} · {op.turno}</p>
-                    <p className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-mint-700"><CheckCircle2 className="h-3.5 w-3.5" /> {r.compatibilidadePct}% de compatibilidade</p>
-                  </div>
-                  <ChevronRight className="h-5 w-5 shrink-0 text-navy-300" />
-                </Card>
-              </Link>
-            ))}
-            {compativeis.length > 0 && (
-              <p className="pt-1 text-center text-[11px] text-navy-400">Compatibilidade calculada pelo motor de encaixe, sobre a sua rota. Sem dados pessoais das famílias.</p>
-            )}
-          </div>
-        ) : (
-          <div className="mt-3 space-y-2.5">
-            {NOVAS_REGIAO.map((n, i) => (
-              <Card key={i} className="flex items-center gap-3 p-3.5">
-                <span className="vm-chip-ico vm-ico-purple"><MapPin className="h-5 w-5" /></span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-navy-900">{n.regiao} → {n.escola}</p>
-                  <p className="text-xs text-navy-500">{n.turno}</p>
-                </div>
-                <span className="chip bg-navy-50 text-navy-500">avaliar</span>
-              </Card>
-            ))}
-          </div>
-        )}
-      </div>
-    </VMShell>
-  );
+ const {dados}=useDadosMotorista(); const [aba,setAba]=useState<'radar'|'rota'|'interesse'|'analise'>('radar'); const [turno,setTurno]=useState('Todos'); const [regiao,setRegiao]=useState('Todas'); const [destino,setDestino]=useState('Todos'); const [selected,setSelected]=useState<string|null>('d1'); const [detalhe,setDetalhe]=useState(false); const [dias,setDias]=useState(30); const [mapError,setMapError]=useState(false); const [focus,setFocus]=useState('');
+ const mapFail=useMemo(()=>()=>setMapError(true),[]);
+ const filtered=useMemo(()=>AMOSTRAS.filter(o=>(turno==='Todos'||o.turno===turno)&&(regiao==='Todas'||o.regiao===regiao)&&(destino==='Todos'||o.destino===destino)),[turno,regiao,destino]);
+ const selectedOp=filtered.find(o=>o.id===selected)??filtered[0]??null;
+ const compativeis=useMemo(()=>OPORTUNIDADES_VM.map(op=>({op,r:simularEncaixe(dados,op)})).filter(x=>x.r.cabe).sort((a,b)=>b.r.compatibilidadePct-a.r.compatibilidadePct),[dados]);
+ const counts=useMemo(()=>{const c=new Map<string,number>();filtered.forEach(o=>c.set(o.regiao,(c.get(o.regiao)||0)+o.passageiros));return [...c.entries()].sort((a,b)=>b[1]-a[1]);},[filtered]);
+ const clear=()=>{setTurno('Todos');setRegiao('Todas');setDestino('Todos');setFocus('');};
+ const tabs=[['radar','Radar de demanda',MapPin],['rota','Na sua rota',RouteIcon],['interesse','Interesse',Activity],['analise','Análises',BarChart3]] as const;
+ return <VMShell wide><SubHeader titulo="Oportunidades" acao={<button className="op-head-icon" aria-label="Notificações"><Bell size={18}/></button>}/><main className="op-page"><div className="op-intro"><div><p className="op-eyebrow">VANBORA MOTORISTAS</p><h2>Encontre sua próxima rota.</h2><p>Famílias e estudantes procurando transporte em Araçatuba.</p></div><span className="op-live"><i/> {AMOSTRAS.length} oportunidades</span></div>
+ <div className="op-tabs" role="tablist">{tabs.map(([id,label,Icon])=><button key={id} role="tab" aria-selected={aba===id} onClick={()=>setAba(id)} className={aba===id?'active':''}><Icon size={15}/><span>{label}</span></button>)}</div>
+ {aba==='radar'&&<>
+  <section className="op-filterbar"><label><SlidersHorizontal size={15}/><span className="sr-only">Turno</span><select value={turno} onChange={e=>setTurno(e.target.value)}><option>Todos</option><option>Manhã</option><option>Tarde</option><option>Noite</option></select></label><label><MapPin size={15}/><span className="sr-only">Região</span><select value={regiao} onChange={e=>{setRegiao(e.target.value);setFocus(e.target.value==='Todas'?'':e.target.value)}}><option>Todas</option>{[...new Set(AMOSTRAS.map(o=>o.regiao))].map(r=><option key={r}>{r}</option>)}</select></label><label><School size={15}/><span className="sr-only">Destino</span><select value={destino} onChange={e=>setDestino(e.target.value)}><option>Todos</option>{ESCOLAS.map(e=><option key={e.nome}>{e.nome}</option>)}</select></label>{(turno!=='Todos'||regiao!=='Todas'||destino!=='Todos')&&<button className="op-clear" onClick={clear}><X size={14}/> Limpar</button>}</section>
+  <div className="op-map-card"><div className="op-map-head"><div><span className="op-section-kicker">RADAR DE OPORTUNIDADES</span><h3>Araçatuba, SP</h3></div><span className="op-count">{filtered.length} resultados</span></div>{mapError?<div className="op-map-fallback"><div className="op-fallback-title"><AlertTriangle size={18}/> Mapa temporariamente indisponível</div><p>Você ainda pode explorar as oportunidades pela lista abaixo.</p></div>:<RadarMap items={filtered} selected={selectedOp?.id??null} onSelect={setSelected} onError={mapFail} focusRegion={focus}/>}<div className="op-legend"><span className="op-legend-title">Procura regional</span>{DEMANDAS.map(d=><span key={d}><i style={{background:CORES[d]}}/>{d}</span>)}</div></div>
+  <div className="op-subheading"><div><span className="op-section-kicker">PERTO DE VOCÊ</span><h3>{selectedOp?selectedOp.regiao:'Oportunidades'}</h3></div><button onClick={()=>setSelected(filtered[(Math.max(0,filtered.findIndex(o=>o.id===selected))+1)%Math.max(filtered.length,1)]?.id??null)} className="op-text-button">Explorar <ArrowDownUp size={14}/></button></div>
+  {selectedOp?<article className="op-person-card"><div className="op-person-top"><div className="op-avatar"><Users size={19}/></div><div className="op-person-main"><h4>{selectedOp.nome}</h4><p>{selectedOp.idade} <span>·</span> {selectedOp.regiao}</p></div><span className="op-demand" style={{'--demand':CORES[selectedOp.demanda]} as React.CSSProperties}><i/>{selectedOp.demanda}</span></div><div className="op-route-line"><span className="op-route-dot"/><div><small>ORIGEM · EXEMPLO</small><b>{selectedOp.regiao}, Araçatuba</b></div><span className="op-route-stem"/><span className="op-school-dot"/><div><small>DESTINO</small><b>{selectedOp.destino}</b></div></div><div className="op-facts"><span><Clock3 size={15}/>{selectedOp.turno}</span><span><Users size={15}/>{selectedOp.passageiros} passageiro{selectedOp.passageiros>1?'s':''}</span><span><RouteIcon size={15}/>{selectedOp.servico}</span></div><div className="op-card-actions"><button className="op-primary-action" onClick={()=>setDetalhe(true)}>Ver detalhes <ChevronRight size={16}/></button><button className="op-secondary-action" onClick={()=>setDetalhe(true)}><MessageCircle size={16}/> WhatsApp</button><button className="op-icon-action" onClick={()=>setFocus(selectedOp.destino)} aria-label="Ver destino no mapa"><Navigation size={17}/></button></div></article>:<p className="op-empty">Nenhuma oportunidade corresponde aos filtros. Ajuste ou limpe a seleção.</p>}
+  <p className="op-demo-note"><DemoChip/> Dados demonstrativos; marcadores aproximados em ruas e bairros. Nenhum contato real.</p>
+ </>}
+ {aba==='rota'&&<section className="op-section"><div className="op-section-heading"><div><span className="op-section-kicker">OPORTUNIDADES NA MINHA ROTA</span><h3>Sugestões para avaliar</h3></div><span className="op-count">{compativeis.length} compatíveis</span></div><p className="op-muted">Compatibilidade calculada pelo motor original sobre sua rota cadastrada.</p>{compativeis.length?compativeis.map(({op,r})=><Link key={op.id} to={`/app/oportunidades/${op.id}`} className="op-route-card"><span className="op-route-icon"><RouteIcon size={19}/></span><span className="op-route-body"><b>{op.regiao} <i>→</i> {op.escola}</b><small>{op.turno} · {op.alunos} passageiro{op.alunos>1?'s':''}</small><em><CheckCircle2 size={14}/>{r.compatibilidadePct}% de compatibilidade calculada</em></span><span className="op-evaluate">Ver encaixe <ChevronRight size={14}/></span></Link>):<EstadoVazio icon={Zap} ilustracao={<SlotIlustracao slot="oportunidades.vazio" alt="" fallback={<Zap className="h-8 w-8"/>}/>} titulo="Nenhuma oportunidade compatível" texto="Quando houver famílias que encaixem na sua rota sem atrasar os outros alunos, elas aparecem aqui."/>}</section>}
+ {aba==='interesse'&&<section className="op-section"><div className="op-section-heading"><div><span className="op-section-kicker">DESEMPENHO DO SEU PERFIL</span><h3>Interesse no seu perfil</h3></div><select className="op-period" value={dias} onChange={e=>setDias(Number(e.target.value))}><option value={7}>Últimos 7 dias</option><option value={30}>Últimos 30 dias</option><option value={90}>Últimos 90 dias</option></select></div><div className="op-stats"><div><Eye/><b>{dias===7?'68':dias===90?'842':'286'}</b><small>Visualizações</small><em>+24%</em></div><div><MessageCircle/><b>{dias===7?'9':dias===90?'109':'37'}</b><small>Cliques no WhatsApp</small><em>+32%</em></div><div><Users/><b>{dias===7?'6':dias===90?'64':'21'}</b><small>Contatos recebidos</small><em>+17%</em></div></div><Card className="op-chart-card"><div className="op-section-heading"><div><h3>Evolução do interesse</h3><p>Atividade ao longo do período</p></div><span className="op-chart-total">{dias===7?'68':'286'} <small>visualizações</small></span></div><MiniChart data={dias===7?[12,18,23,20,31,28,39,35]:dias===90?[21,28,34,27,48,43,56,72]:[8,12,15,21,17,26,23,33]}/><div className="op-chart-axis"><span>Início do período</span><span>Hoje</span></div></Card><Card className="op-interest-origin"><h3>Origem do interesse</h3><p>Distribuição demonstrativa por região</p>{counts.slice(0,5).map(([r,n])=><div key={r}><span>{r}</span><div><i style={{width:`${Math.max(12,n/Math.max(...counts.map(c=>c[1]))*100)}%`}}/></div><b>{n}</b></div>)}</Card><p className="op-demo-note"><DemoChip/> Métricas locais de exemplo; o aplicativo não registra essas interações.</p></section>}
+ {aba==='analise'&&<section className="op-section"><div className="op-section-heading"><div><span className="op-section-kicker">INTELIGÊNCIA REGIONAL</span><h3>Demanda e oferta</h3></div><span className="op-count">Araçatuba</span></div><Card className="op-insight-banner"><span><HandCoins size={22}/></span><div><small>SIMULAÇÃO DE RECEITA ADICIONAL</small><b>+ R$ 1.280,00 <i>/ mês</i></b><p>Projeção demonstrativa com oportunidades da região.</p></div></Card><Card className="op-chart-card"><div className="op-section-heading"><div><h3>Procura por região</h3><p>Passageiros nos exemplos filtrados</p></div></div>{counts.length?counts.map(([r,n])=><div className="op-demand-row" key={r}><span>{r}</span><div><i style={{width:`${Math.max(8,n/Math.max(...counts.map(c=>c[1]))*100)}%`,background:CORES[DEMANDAS[Math.min(4,Math.floor((n-1)/2))]]}}/></div><b>{n}</b></div>):<p>Sem resultados com os filtros selecionados.</p>}<div className="op-legend op-legend-inline">{DEMANDAS.map(d=><span key={d}><i style={{background:CORES[d]}}/>{d}</span>)}</div></Card><Card className="op-chart-card"><div className="op-section-heading"><div><h3>Distribuição por turno</h3><p>Oportunidades demonstrativas</p></div></div>{['Manhã','Tarde','Noite'].map(t=>{const n=filtered.filter(o=>o.turno===t).length;return <div className="op-demand-row" key={t}><span>{t}</span><div><i style={{width:`${filtered.length?n/filtered.length*100:0}%`}}/></div><b>{n}</b></div>})}</Card><Card className="op-chart-card"><h3>Destinos mais procurados</h3>{ESCOLAS.map(e=>{const n=filtered.filter(o=>o.destino===e.nome).length;return <div className="op-destination" key={e.nome}><GraduationCap size={17}/><span><b>{e.nome}</b><small>{n} oportunidades no cenário</small></span><ChevronRight size={16}/></div>})}</Card><p className="op-demo-note"><DemoChip/> Indicadores calculados da mesma base de exemplos. Não representam estatísticas reais nem oferta cadastrada.</p></section>}
+ </main>{detalhe&&selectedOp&&<div className="op-modal-backdrop" role="presentation" onClick={()=>setDetalhe(false)}><section className="op-modal" role="dialog" aria-modal="true" aria-labelledby="op-modal-title" onClick={e=>e.stopPropagation()}><button className="op-modal-close" onClick={()=>setDetalhe(false)} aria-label="Fechar"><X size={20}/></button><span className="op-section-kicker">OPORTUNIDADE DEMONSTRATIVA</span><h3 id="op-modal-title">{selectedOp.nome}</h3><p>{selectedOp.idade} · {selectedOp.regiao}</p><div className="op-modal-details"><span>Destino<b>{selectedOp.destino}</b></span><span>Turno<b>{selectedOp.turno}</b></span><span>Passageiros<b>{selectedOp.passageiros}</b></span><span>Serviço<b>{selectedOp.servico}</b></span><span>Demanda regional<b style={{color:CORES[selectedOp.demanda]}}>{selectedOp.demanda}</b></span><span>Status<b>Procurando transporte</b></span></div><div className="op-preview"><MessageCircle size={17}/><p>Prévia: “Olá, vi seu interesse por transporte em {selectedOp.regiao}. Gostaria de conversar sobre horários e detalhes.”</p></div><p className="op-muted">Esta é uma prévia. Nenhum telefone ou contato real é usado.</p><button className="op-primary-action op-modal-done" onClick={()=>setDetalhe(false)}>Entendi</button></section></div>}</VMShell>;
 }
 
 /* ========================== TELA 7 — Simular Encaixe ========================== */
@@ -95,7 +77,6 @@ export function SimularEncaixePage() {
   const op = OPORTUNIDADES_VM.find((o) => o.id === id) ?? OPORTUNIDADES_VM[0];
   const r = useMemo(() => simularEncaixe(dados, op), [dados, op]);
   const c = r.comparativo;
-
   const linhas = [
     { label: 'Alunos', antes: c.alunosAntes, depois: c.alunosDepois },
     { label: 'Ocupação', antes: `${c.ocupAntesPct}%`, depois: `${c.ocupDepoisPct}%` },
@@ -103,65 +84,5 @@ export function SimularEncaixePage() {
     { label: 'Diesel por dia', antes: `${c.dieselDiaAntes.toFixed(1).replace('.', ',')} L`, depois: `${c.dieselDiaDepois.toFixed(1).replace('.', ',')} L` },
     { label: 'Custo por dia', antes: formatBRL(c.custoDiaAntes), depois: formatBRL(c.custoDiaDepois) },
   ];
-
-  return (
-    <VMShell nav={false}>
-      <SubHeader titulo="Simular encaixe" onVoltar={() => navigate('/app/oportunidades')} />
-      <div className="space-y-3.5 px-4 pt-4">
-        <Card className="flex items-center gap-3 p-4">
-          <Avatar nome={op.regiao} className="h-11 w-11 text-sm" />
-          <div>
-            <p className="font-bold text-navy-900">{op.regiao} → {op.escola}</p>
-            <p className="text-xs text-navy-500">{op.alunos} aluno{op.alunos > 1 ? 's' : ''} · {op.turno}</p>
-          </div>
-        </Card>
-
-        <Card className="p-0 overflow-hidden">
-          <p className="px-4 pt-4 font-display font-bold text-navy-900">Comparativo da rota</p>
-          <div className="mt-2 grid grid-cols-[1fr_auto_auto] items-center">
-            <div className="px-4 py-2" />
-            <div className="px-3 py-2 text-center text-[11px] font-semibold text-navy-500">Rota atual</div>
-            <div className="rounded-t-lg bg-mint-50 px-3 py-2 text-center text-[11px] font-semibold text-mint-700">Com novo aluno</div>
-            {linhas.map((l) => (
-              <div key={l.label} className="contents">
-                <div className="border-t border-navy-50 px-4 py-2.5 text-sm text-navy-600">{l.label}</div>
-                <div className="border-t border-navy-50 px-3 py-2.5 text-center text-sm font-semibold text-navy-700">{l.antes}</div>
-                <div className="border-t border-navy-50 bg-mint-50/60 px-3 py-2.5 text-center text-sm font-bold text-navy-900">{l.depois}</div>
-              </div>
-            ))}
-          </div>
-        </Card>
-
-        <Card className={cn('p-4', r.cabe ? 'ring-mint-200' : 'ring-amber-200')}>
-          <div className="flex items-start gap-3">
-            <span className={cn('grid h-10 w-10 shrink-0 place-items-center rounded-2xl text-white', r.cabe ? 'bg-mint-500' : 'bg-amber-500')}>
-              {r.cabe ? <CheckCircle2 className="h-5 w-5" /> : <AlertTriangle className="h-5 w-5" />}
-            </span>
-            <div>
-              <p className="font-display font-bold text-navy-900">Análise da oportunidade</p>
-              <p className="mt-0.5 text-sm text-navy-600">
-                {r.cabe
-                  ? `O novo aluno acrescenta cerca de ${formatBRL(c.custoExtraDia)} por dia em combustível e mantém os horários da escola.`
-                  : 'Esse aluno não cabe sem atrasar os outros além da tolerância ou passar do horário da escola.'}
-              </p>
-            </div>
-          </div>
-        </Card>
-
-        {r.cabe && (
-          <button onClick={() => setAceito(true)} disabled={aceito}
-            className="flex h-14 w-full items-center justify-center gap-2 rounded-full bg-mint-500 text-base font-bold text-white shadow-float transition active:scale-[0.98] disabled:opacity-70">
-            {aceito ? 'Oportunidade marcada ✓' : 'Aceitar oportunidade'}
-          </button>
-        )}
-        {aceito && (
-          <p className="text-center text-xs text-navy-500">
-            A simulação <strong>não altera</strong> sua rota. Para incluir de verdade, abra o{' '}
-            <Link to="/painel/rotas" className="font-semibold text-mint-700 underline">construtor de rotas</Link> e confirme.
-          </p>
-        )}
-        <p className="pb-2 text-center text-[11px] text-navy-400"><Users className="mr-1 inline h-3 w-3" />Cálculo do motor real sobre a sua rota · receita extra estimada {formatBRL(c.receitaExtraMes)}/mês ({DIAS_UTEIS_MES} dias úteis).</p>
-      </div>
-    </VMShell>
-  );
+  return <VMShell nav={false}><SubHeader titulo="Simular encaixe" onVoltar={() => navigate('/app/oportunidades')} /><div className="space-y-3.5 px-4 pt-4"><Card className="flex items-center gap-3 p-4"><Avatar nome={op.regiao} className="h-11 w-11 text-sm"/><div><p className="font-bold text-navy-900">{op.regiao} → {op.escola}</p><p className="text-xs text-navy-500">{op.alunos} aluno{op.alunos > 1 ? 's' : ''} · {op.turno}</p></div></Card><Card className="p-0 overflow-hidden"><p className="px-4 pt-4 font-display font-bold text-navy-900">Comparativo da rota</p><div className="mt-2 grid grid-cols-[1fr_auto_auto] items-center"><div className="px-4 py-2"/><div className="px-3 py-2 text-center text-[11px] font-semibold text-navy-500">Rota atual</div><div className="rounded-t-lg bg-mint-50 px-3 py-2 text-center text-[11px] font-semibold text-mint-700">Com novo aluno</div>{linhas.map(l=><div key={l.label} className="contents"><div className="border-t border-navy-50 px-4 py-2.5 text-sm text-navy-600">{l.label}</div><div className="border-t border-navy-50 px-3 py-2.5 text-center text-sm font-semibold text-navy-700">{l.antes}</div><div className="border-t border-navy-50 bg-mint-50/60 px-3 py-2.5 text-center text-sm font-bold text-navy-900">{l.depois}</div></div>)}</div></Card><Card className={cn('p-4',r.cabe?'ring-mint-200':'ring-amber-200')}><div className="flex items-start gap-3"><span className={cn('grid h-10 w-10 shrink-0 place-items-center rounded-2xl text-white',r.cabe?'bg-mint-500':'bg-amber-500')}>{r.cabe?<CheckCircle2 className="h-5 w-5"/>:<AlertTriangle className="h-5 w-5"/>}</span><div><p className="font-display font-bold text-navy-900">Análise da oportunidade</p><p className="mt-0.5 text-sm text-navy-600">{r.cabe?`O novo aluno acrescenta cerca de ${formatBRL(c.custoExtraDia)} por dia em combustível e mantém os horários da escola.`:'Esse aluno não cabe sem atrasar os outros além da tolerância ou passar do horário da escola.'}</p></div></div></Card>{r.cabe&&<button onClick={()=>setAceito(true)} disabled={aceito} className="flex h-14 w-full items-center justify-center gap-2 rounded-full bg-mint-500 text-base font-bold text-white shadow-float transition active:scale-[0.98] disabled:opacity-70">{aceito?'Oportunidade marcada ✓':'Aceitar oportunidade'}</button>}{aceito&&<p className="text-center text-xs text-navy-500">A simulação <strong>não altera</strong> sua rota. Para incluir de verdade, abra o <Link to="/painel/rotas" className="font-semibold text-mint-700 underline">construtor de rotas</Link> e confirme.</p>}<p className="pb-2 text-center text-[11px] text-navy-400"><Users className="mr-1 inline h-3 w-3"/>Cálculo do motor real sobre a sua rota · receita extra estimada {formatBRL(c.receitaExtraMes)}/mês ({DIAS_UTEIS_MES} dias úteis).</p></div></VMShell>;
 }
