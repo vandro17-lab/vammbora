@@ -64,7 +64,7 @@ export function Footer() {
           <p>© {new Date().getFullYear()} Vambora · Feito em Araçatuba.</p>
           <details className="max-w-sm text-center sm:text-right">
             <summary className="cursor-pointer text-navy-200">Sobre esta versão</summary>
-            <p className="mt-2 leading-relaxed">Protótipo acadêmico · Fatec Araçatuba. Perfis e informações ilustrativos, sem contratação disponível nesta versão.</p>
+            <p className="mt-2 leading-relaxed">Vambora · Araçatuba e região. A contratação e o combinado da rota acontecem direto com o motorista.</p>
           </details>
         </div>
       </div>

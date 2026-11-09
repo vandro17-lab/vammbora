@@ -108,9 +108,8 @@ export function Trust() {
           <div>
             <h2 className="font-display text-3xl font-bold sm:text-4xl">Transparência em primeiro lugar</h2>
             <p className="mt-3 text-navy-600">
-              Preferimos um protótipo honesto a promessas vazias. Só marcamos “documentação
-              verificada” quando existe verificação de verdade — e dados de exemplo são sempre
-              identificados.
+              Preferimos transparência a promessas vazias. Só marcamos “documentação
+              verificada” quando existe verificação de verdade.
             </p>
             <ul className="mt-6 space-y-4">
               <li className="flex items-start gap-3">

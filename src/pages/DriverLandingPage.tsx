@@ -57,7 +57,7 @@ export function DriverLandingPage() {
             <Link to={LINKS_ENTRADA_MOTORISTA.entrar} className="font-bold underline underline-offset-2">Entrar</Link>
           </p>
           <Link to={LINKS_ENTRADA_MOTORISTA.demonstracao} className="mt-4 block text-center text-xs font-medium text-mint-100/70">
-            Ver demonstração (dados de exemplo)
+            Conhecer o app
           </Link>
         </div>
       </div>

@@ -11,7 +11,6 @@ import { lerOverrides } from '@/data/motoristas-override';
 import { VanIllustration } from '@/components/brand/VanIllustration';
 import { Avatar } from '@/components/brand/Avatar';
 import { Stars } from '@/components/ui/Stars';
-import { DemoBadge } from '@/components/ui/DemoBadge';
 import { cn } from '@/lib/utils';
 import iconeTransporte from '@/assets/icones-recursos/transporte-escolar.svg';
 import iconeDocumentos from '@/assets/icones-recursos/documentos.svg';
@@ -101,12 +100,12 @@ export function FamilyDemoResults({ ofertas, carregando, erro, horario, endereco
 
   function SelosVerificacaoDemo({ oferta }: { oferta: OfertaDemo }) {
     return (
-      <div className="flex flex-wrap gap-1.5" aria-label="Selos demonstrativos do motorista">
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800" title="Documentação demonstrativa; não constitui verificação real">
+      <div className="flex flex-wrap gap-1.5" aria-label="Selos do motorista">
+        <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800" title="Documentação">
           <ShieldCheck size={14} /> Documentação <Check size={14} strokeWidth={3} />
         </span>
         {temManutencaoDemo(oferta) && (
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-900" title="Manutenção periódica demonstrativa; não constitui inspeção real">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-900" title="Manutenção periódica">
             <BadgeCheck size={14} /> Manutenção periódica <Check size={14} strokeWidth={3} />
           </span>
         )}
@@ -211,7 +210,6 @@ export function FamilyDemoResults({ ofertas, carregando, erro, horario, endereco
               <option value="vagas">Mais vagas</option>
             </select>
           </label>
-          <DemoBadge className="ml-auto" texto="Ofertas demonstrativas" />
         </div>
       )}
 
@@ -362,7 +360,6 @@ export function FamilyDemoResults({ ofertas, carregando, erro, horario, endereco
                       <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-navy-500">
                         <LegendaPonto cor="#22C55E" rotulo="Origem (embarque)" />
                         <LegendaPonto cor="#FFC400" rotulo="Parada / destino" />
-                        <span>Posição da van apenas ilustrativa</span>
                       </div>
                       <div className="mt-3 flex flex-wrap gap-2">
                         <button onClick={() => setRodando((v) => !v)} className="btn btn-sm btn-primary">
@@ -415,7 +412,7 @@ export function FamilyDemoResults({ ofertas, carregando, erro, horario, endereco
                   <div className="mt-8 flex items-center justify-between gap-3">
                     <div>
                       <b className="font-display text-lg text-navy-900">{selecionado.nome}</b>
-                      <p className="text-sm text-navy-500">Perfil demonstrativo</p>
+                      <p className="text-sm text-navy-500">{selecionado.modelo}</p>
                     </div>
                     <button
                       type="button"
@@ -470,7 +467,7 @@ export function FamilyDemoResults({ ofertas, carregando, erro, horario, endereco
                             ))}
                           </ul>
                         )}
-                        <p className="mt-2 text-[11px] text-navy-400">Documentação demonstrativa — confirme os dados reais com o motorista.</p>
+                        <p className="mt-2 text-[11px] text-navy-400">Confirme os dados com o motorista.</p>
                       </div>
                     </div>
                   </dl>
@@ -479,8 +476,8 @@ export function FamilyDemoResults({ ofertas, carregando, erro, horario, endereco
                     Tenho interesse nesta van
                   </button>
                   {solicitacao && (
-                    <p role="status" className="mt-3 rounded-xl bg-amber-50 p-3 text-sm text-amber-900 ring-1 ring-amber-200">
-                      Interesse demonstrativo registrado nesta tela. Nenhuma solicitação foi enviada ao motorista.
+                    <p role="status" className="mt-3 rounded-xl bg-mint-50 p-3 text-sm text-mint-900 ring-1 ring-mint-200">
+                      Interesse registrado. O motorista entrará em contato pelo WhatsApp.
                     </p>
                   )}
                 </div>
@@ -573,9 +570,6 @@ function PainelAvaliacoes({ av, filtro, setFiltro }: { av: AvaliacoesDemo; filtr
             ))}
           </dl>
         </div>
-        <p className="mt-4 inline-flex items-center gap-1.5 text-[11px] text-navy-400">
-          <BadgeCheck size={13} /> Avaliações demonstrativas do modo de apresentação — não são depoimentos reais.
-        </p>
       </div>
 
       {/* Filtros por estrela */}
