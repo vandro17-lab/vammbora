@@ -56,8 +56,8 @@ describe('tempo estimado da rota = dirigindo + parado nas paradas', () => {
   const base = { id: 'r', nome: '', sentido: 'volta' as const, turno: null, dias: [], veiculoId: null, monitor: false, monitorOcupaLugar: false, lugaresReservados: 0, ultimoDesembarqueMin: null, limiteAntecipacaoMin: null, status: 'concluida' as const, atualizadoEm: '' };
   it('soma o tempo viário dos trechos e o tempo de cada parada com aluno', () => {
     const rota = { ...base, paradas: [p('escola', 0, 'escola', 5), p('c1', 1, 'casa', 2), p('c2', 2, 'casa', null)],
-      passageiros: [{ id: 'a', identificacao: 'A', embarqueParadaId: 'escola', desembarqueParadaId: 'c1' }, { id: 'b', identificacao: 'B', embarqueParadaId: 'escola', desembarqueParadaId: 'c2', atendimentoMin: 4 }] };
-    expect(tempoRotaMin(rota)).toEqual({ total: 16, dirigindo: 7, parado: 9 }); // 3 (escola) + 2 (padrão) + 4 (informado)
+      passageiros: [{ id: 'a', identificacao: 'A', embarqueParadaId: 'escola', desembarqueParadaId: 'c1' }, { id: 'b', identificacao: 'B', embarqueParadaId: 'escola', desembarqueParadaId: 'c2', atendimentoMin: 4 }, { id: 'c', identificacao: 'C', embarqueParadaId: 'escola', desembarqueParadaId: 'c2' }] };
+    expect(tempoRotaMin(rota)).toEqual({ total: 18, dirigindo: 7, parado: 11 }); // 3 (escola, grupo) + 2 (padrão) + 4 (informado) + 2 (irmão na mesma casa)
   });
   it('sem tempo viário, usa a distância a velocidade urbana (nunca 35 km/h sem paradas)', () => {
     const rota = { ...base, paradas: [p('escola', 0, 'escola', null), p('c1', 1, 'casa', null)], passageiros: [{ id: 'a', identificacao: 'A', embarqueParadaId: 'escola', desembarqueParadaId: 'c1' }] };

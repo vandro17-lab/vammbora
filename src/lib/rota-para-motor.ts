@@ -1,3 +1,4 @@
+import { PARADA_ESCOLA_MIN, atendimentoNaCasa } from '@/lib/tempos-parada';
 import type { Rota, Veiculo, PassageiroRota } from '@/types/motorista';
 import {
   planejarRota,
@@ -22,7 +23,6 @@ import { capacidadeAlunos } from '@/lib/ocupacao-rota';
  *  - temposTrechosMin[k] = minutos até a parada k (saída -> 1ª parada, etc.).
  */
 
-const DEFAULT_ATENDIMENTO_MIN = 1; // provisório quando o aluno não informou (nunca "confirmado")
 
 /** Interseção das janelas individuais (horário habitual ± ajuste) dos alunos
  *  atendidos numa mesma parada. Sem janela se ninguém informou; `undefined`
@@ -80,11 +80,12 @@ export function montarEntradaMotor(rota: Rota, veiculo: Veiculo | null): RotaPla
     // O atendimento individual acontece na CASA do aluno (ida: embarque; volta:
     // desembarque). CONSOLIDAÇÃO quando vários alunos partilham a parada: soma
     // SEQUENCIAL (DEC-022), cada evento contado uma vez, sem presumir embarque
-    // simultâneo. Escola/saída: atendimento 0 (não é atendimento de aluno).
+    // simultâneo. Escola com alunos: tempo fixo da parada (grupo). Saída: 0.
     const atendidos = p.tipo === 'casa'
       ? rota.passageiros.filter((x) => (rota.sentido === 'ida' ? x.embarqueParadaId : x.desembarqueParadaId) === p.id)
       : [];
-    const atendimentoMin = atendidos.reduce((s, x) => s + (x.atendimentoMin ?? DEFAULT_ATENDIMENTO_MIN), 0);
+    const naEscola = p.tipo === 'escola' && embarques.length + desembarques.length > 0;
+    const atendimentoMin = naEscola ? PARADA_ESCOLA_MIN : atendidos.reduce((s, x) => s + atendimentoNaCasa(x), 0);
     const janela = intersecaoJanelas(atendidos);
     return { id: p.id, embarques, desembarques, atendimentoMin, ...(janela ? { janela } : {}) };
   });

@@ -1,3 +1,4 @@
+import { ATENDIMENTO_CASA_PADRAO_MIN, PARADA_ESCOLA_MIN } from '@/lib/tempos-parada';
 import type { Rota, Veiculo, ParadaRota } from '@/types/motorista';
 import {
   encontrarEncaixesProgressivo,
@@ -33,7 +34,8 @@ import { ESTIMATIVAS_INICIAIS, matrizConservadora, type EstimativasOperacionais 
  *  NÃO houver horário cadastrado na rota/escola. Margem operacional de 5 min. */
 export const MARGEM_OPERACIONAL_MIN = 5;
 export const TOLERANCIA_MAX_MIN = 10;
-export const ATENDIMENTO_PADRAO_MIN = 1;
+/** Atendimento por aluno na casa quando não informado (regra única: `tempos-parada`). */
+export const ATENDIMENTO_PADRAO_MIN = ATENDIMENTO_CASA_PADRAO_MIN;
 
 export const LIMITE_CHEGADA_POR_TURNO: Record<string, number> = {
   manha: 7 * 60, // 07h00
@@ -196,17 +198,18 @@ function montarOperacional(
     for (const pax of rota.passageiros.filter((x) => x.desembarqueParadaId === parada.id)) {
       compromissos.push({
         id: 'des:' + pax.id, ponto, tipo: 'desembarque', alunoId: pax.id,
-        atendimentoMin: ehEscola && rota.sentido === 'ida' ? 0 : atendimentoDe(pax),
+        atendimentoMin: ehEscola ? 0 : atendimentoDe(pax),
         ...(ehEscola && limiteEscola != null ? { limiteEscolaMin: limiteEscola } : {}),
       });
       nomes['des:' + pax.id] = pax.identificacao;
     }
-    // Marcador de escola carrega o limite mesmo sem passageiro descendo nela.
+    // Marcador de escola carrega o limite mesmo sem passageiro descendo nela e
+    // o tempo parado na escola (uma vez, para o grupo — não por aluno).
     if (ehEscola) {
-      compromissos.push({ id: 'escola:' + parada.id, ponto, tipo: 'escola', atendimentoMin: 0, ...(limiteEscola != null ? { limiteEscolaMin: limiteEscola } : {}) });
+      compromissos.push({ id: 'escola:' + parada.id, ponto, tipo: 'escola', atendimentoMin: PARADA_ESCOLA_MIN, ...(limiteEscola != null ? { limiteEscolaMin: limiteEscola } : {}) });
     }
     for (const pax of rota.passageiros.filter((x) => x.embarqueParadaId === parada.id)) {
-      compromissos.push({ id: 'emb:' + pax.id, ponto, tipo: 'embarque', alunoId: pax.id, atendimentoMin: atendimentoDe(pax) });
+      compromissos.push({ id: 'emb:' + pax.id, ponto, tipo: 'embarque', alunoId: pax.id, atendimentoMin: ehEscola ? 0 : atendimentoDe(pax) });
       nomes['emb:' + pax.id] = pax.identificacao;
     }
   }

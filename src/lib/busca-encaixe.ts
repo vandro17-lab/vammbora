@@ -1,3 +1,4 @@
+import { ATENDIMENTO_CASA_PADRAO_MIN, PARADA_ESCOLA_MIN } from '@/lib/tempos-parada';
 import type {
   CriteriosBusca, Motorista, Destino, ResultadoCompatibilidade, NivelCompatibilidade, Turno,
 } from '@/types';
@@ -86,10 +87,10 @@ export function rotaDemonstrativaDoMotorista(m: Motorista, destino: Destino, lim
     for (let k = 0; k < qtd; k++) {
       const alunoId = `ex-${bi}-${k}`;
       existentes.push(alunoId);
-      compromissos.push({ id: `emb-${bi}-${k}`, ponto: casa, tipo: 'embarque', alunoId, atendimentoMin: 1 });
+      compromissos.push({ id: `emb-${bi}-${k}`, ponto: casa, tipo: 'embarque', alunoId, atendimentoMin: ATENDIMENTO_CASA_PADRAO_MIN });
     }
   });
-  compromissos.push({ id: `escola-${destino.id}`, ponto: escolaPonto, tipo: 'escola', atendimentoMin: 0, limiteEscolaMin: limiteMin });
+  compromissos.push({ id: `escola-${destino.id}`, ponto: escolaPonto, tipo: 'escola', atendimentoMin: PARADA_ESCOLA_MIN, limiteEscolaMin: limiteMin });
   for (const alunoId of existentes) {
     compromissos.push({ id: `des-${alunoId}`, ponto: escolaPonto, tipo: 'desembarque', alunoId, atendimentoMin: 0, limiteEscolaMin: limiteMin });
   }

@@ -22,11 +22,14 @@ describe('sugerirRotaDoCadastro — sugestão para o motorista', () => {
     const antes = JSON.stringify(r);
     const s = sugerirRotaDoCadastro(r, van, matriz);
     expect(s.sugestao?.melhorou).toBe(true);
-    expect(s.exigeCombinarHorarios).toBe(false); // a: −10, b: −10, c: +9 — tudo dentro da tolerância
-    expect(s.alunosComHorarioAlterado).toBe(3);
+    // Com 2 min parado em cada casa, a ordem a→b→c atrasaria o aluno c em 20 min
+    // (fora do combinado). A melhor ordem DENTRO da tolerância é a→c→b: a: −10, c: +10.
+    expect(s.exigeCombinarHorarios).toBe(false);
+    expect(s.alunosComHorarioAlterado).toBe(2);
     expect(s.maiorMudancaMin).toBe(10);
-    expect(s.paradas.map((p) => p.nome)).toEqual(['Parada a', 'Parada b', 'Parada c', 'Escola']);
-    expect(s.sugestao!.economiaMin).toBe(16);
+    expect(s.paradas.map((p) => p.nome)).toEqual(['Parada a', 'Parada c', 'Parada b', 'Escola']);
+    expect(s.sugestao!.economiaMin).toBe(8);
+    expect(s.sugestao!.depois.fimMin - s.paradas.at(-1)!.chegadaMin).toBe(3); // tempo parado na escola
     expect(s.paradas.at(-1)!.chegadaMin).toBeLessThanOrEqual(415); // escola: limite 07:00 − margem de 5 min
     expect(s.paradas.at(-1)!.descem).toHaveLength(3);
     expect(JSON.stringify(r)).toBe(antes);

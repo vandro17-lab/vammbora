@@ -1,4 +1,5 @@
 import type { Rota, Veiculo, ParadaRota, PassageiroRota } from '@/types/motorista';
+import { PARADA_ESCOLA_MIN, atendimentoNaCasa } from '@/lib/tempos-parada';
 import { capacidadeAlunos, picoOcupacao, ocupacaoPorTrecho } from '@/lib/ocupacao-rota';
 
 /**
@@ -100,10 +101,6 @@ export function distanciaRotaKm(rota: Rota, fatorRuas = 1.32): number {
   return (m / 1000) * fatorRuas;
 }
 
-/** Tempo parado em cada casa quando o aluno não informou o seu (min). */
-export const PARADA_CASA_MIN = 2;
-/** Tempo parado em cada escola, para embarque/desembarque do grupo (min). */
-export const PARADA_ESCOLA_MIN = 3;
 /** Velocidade média de van escolar na cidade, usada só quando não há tempo viário do trecho. */
 const VELOCIDADE_URBANA_KMH = 22;
 
@@ -111,8 +108,8 @@ const VELOCIDADE_URBANA_KMH = 22;
  * Tempo estimado da rota (min) = DIRIGINDO + PARADO NAS PARADAS.
  *  - dirigindo: tempo viário de cada trecho quando o mapa já calculou; senão,
  *    a distância do trecho a velocidade urbana de van escolar;
- *  - parado: em cada casa, o maior tempo de atendimento informado dos alunos
- *    dali (ou o padrão); em cada escola, o tempo de embarque/desembarque.
+ *  - parado: a regra única de `tempos-parada` (por aluno na casa; por parada
+ *    na escola).
  */
 export function tempoRotaMin(rota: Rota): { total: number; dirigindo: number; parado: number } {
   const paradas = [...rota.paradas].sort((a, b) => a.ordem - b.ordem);
@@ -126,7 +123,7 @@ export function tempoRotaMin(rota: Rota): { total: number; dirigindo: number; pa
   for (const p of paradas) {
     const alunos = rota.passageiros.filter((x) => x.embarqueParadaId === p.id || x.desembarqueParadaId === p.id);
     if (!alunos.length) continue;
-    parado += p.tipo === 'escola' ? PARADA_ESCOLA_MIN : Math.max(...alunos.map((x) => x.atendimentoMin ?? PARADA_CASA_MIN));
+    parado += p.tipo === 'escola' ? PARADA_ESCOLA_MIN : alunos.reduce((t, x) => t + atendimentoNaCasa(x), 0);
   }
   const d = Math.round(dirigindo), e = Math.round(parado);
   return { total: d + e, dirigindo: d, parado: e };

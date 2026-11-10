@@ -82,14 +82,14 @@ describe('os dados chegam ao motor de planejamento (rota-para-motor)', () => {
     const pa = entrada.paradas.find((p) => p.id === 'A')!;
     expect(pa.atendimentoMin).toBe(5); // 2 (ana) + 3 (bru)
     const pe = entrada.paradas.find((p) => p.id === 'E')!;
-    expect(pe.atendimentoMin).toBe(0); // escola não é atendimento de aluno
+    expect(pe.atendimentoMin).toBe(3); // escola: tempo fixo da parada (grupo), não por aluno
   });
 
-  it('atendimento ausente usa provisório de 1 min (nunca apresentado como confirmado)', () => {
+  it('atendimento ausente usa o provisório de 2 min (nunca apresentado como confirmado)', () => {
     const r = rotaIda();
     r.passageiros = [pax('semdado', 'A', 'E')]; // sem atendimentoMin
     const entrada = montarEntradaMotor(r, veiculo);
-    expect(entrada.paradas.find((p) => p.id === 'A')!.atendimentoMin).toBe(1);
+    expect(entrada.paradas.find((p) => p.id === 'A')!.atendimentoMin).toBe(2);
   });
 
   it('janela individual por interseção das tolerâncias dos alunos da parada', () => {
@@ -116,10 +116,11 @@ describe('os dados chegam ao motor geográfico (rota-para-encaixe/encaixe)', () 
     expect(emb.atendimentoMin).toBe(4);
   });
 
-  it('atendimento ausente usa provisório de 1 min no motor geográfico', () => {
+  it('atendimento ausente usa o provisório de 2 min no motor geográfico', () => {
     const r = rotaIda();
     r.passageiros = [pax('ana', 'A', 'E')];
     const op = rotaOperacionalDeCadastro(r, { capacidade: 10, partidaMin: 400 })!;
-    expect(op.compromissos.find((c) => c.id === 'emb:ana')!.atendimentoMin).toBe(1);
+    expect(op.compromissos.find((c) => c.id === 'emb:ana')!.atendimentoMin).toBe(2);
+    expect(op.compromissos.find((c) => c.tipo === 'escola')!.atendimentoMin).toBe(3);
   });
 });

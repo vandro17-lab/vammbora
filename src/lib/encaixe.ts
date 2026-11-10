@@ -11,6 +11,7 @@
  *  - um provedor rodoviário real (Geoapify), ligado quando a chave estiver
  *    configurada — o motor nunca inventa tempo: sem dado viário, recusa.
  */
+import { PARADA_ESCOLA_MIN, atendimentoNaCasa } from '@/lib/tempos-parada';
 import {
   encontrarEncaixes,
   encontrarIdaVolta,
@@ -84,15 +85,15 @@ export function rotaOperacionalDeCadastro(
     const ponto = pontoDeParada(p);
     if (!ponto) return null; // sem coordenada não há como estimar
     for (const pax of rota.passageiros.filter((x) => x.embarqueParadaId === p.id)) {
-      // Atendimento por aluno (DEC-022); 1 min é só o provisório quando ausente.
-      compromissos.push({ id: 'emb:' + pax.id, ponto, tipo: 'embarque', alunoId: pax.id, atendimentoMin: pax.atendimentoMin ?? 1 });
+      // Atendimento por aluno na casa (DEC-022); na escola o tempo é da parada.
+      compromissos.push({ id: 'emb:' + pax.id, ponto, tipo: 'embarque', alunoId: pax.id, atendimentoMin: p.tipo === 'escola' ? 0 : atendimentoNaCasa(pax) });
     }
     if (p.tipo === 'escola') {
-      compromissos.push({ id: 'escola:' + p.id, ponto, tipo: 'escola', atendimentoMin: 0, limiteEscolaMin: limite });
+      compromissos.push({ id: 'escola:' + p.id, ponto, tipo: 'escola', atendimentoMin: PARADA_ESCOLA_MIN, limiteEscolaMin: limite });
     }
     for (const pax of rota.passageiros.filter((x) => x.desembarqueParadaId === p.id)) {
       compromissos.push({
-        id: 'des:' + pax.id, ponto, tipo: 'desembarque', alunoId: pax.id, atendimentoMin: 0,
+        id: 'des:' + pax.id, ponto, tipo: 'desembarque', alunoId: pax.id, atendimentoMin: p.tipo === 'escola' ? 0 : atendimentoNaCasa(pax),
         ...(p.tipo === 'escola' ? { limiteEscolaMin: limite } : {}),
       });
     }
