@@ -9,7 +9,6 @@ import type { Rota } from '@/types/motorista';
  * NÃO grava no banco real — prova o contrato do cliente.
  */
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-type L = Record<string, unknown>;
 const db = vi.hoisted(() => ({
   usuario: 'user-1' as string | null,
   routes: [] as Record<string, unknown>[], stops: [] as Record<string, unknown>[], pax: [] as Record<string, unknown>[],
