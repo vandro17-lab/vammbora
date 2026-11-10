@@ -7,7 +7,7 @@ import {
 import { Path } from '@phosphor-icons/react';
 import { VMShell } from '@/components/vm/VMShell';
 import { VMSectionHeader } from '@/components/vm/VMHeader';
-import { Card, SubHeader, DemoChip, EstadoVazio } from '@/components/vm/ui';
+import { Card, SubHeader, DemoChip, EstadoVazio, AvisoErro } from '@/components/vm/ui';
 import { MapaInterativoRota } from '@/components/motorista/MapaInterativoRota';
 import { SugestaoRotaMelhor } from '@/components/motorista/SugestaoRotaMelhor';
 import { useDadosMotorista } from '@/lib/vm/useDadosMotorista';
@@ -24,7 +24,7 @@ const IconeTurno = (r: Rota) => (r.sentido === 'ida' ? Sunrise : Sunset);
 
 /* ============================ TELA 1 — Minhas Rotas ============================ */
 export function RotasPage() {
-  const { dados } = useDadosMotorista();
+  const { dados, carregando, erro, recarregar } = useDadosMotorista();
   const [aba, setAba] = useState<'ativas' | 'simulacoes'>('ativas');
   const ativas = dados.rotas.length;
 
@@ -55,7 +55,10 @@ export function RotasPage() {
 
         {aba === 'ativas' ? (
           <div className="mt-3 space-y-3">
-            {ativas === 0 && !dados.demo ? (
+            {erro && <AvisoErro mensagem={erro} onTentar={recarregar} />}
+            {ativas === 0 && (carregando || erro) ? (
+              !erro && <p className="py-10 text-center text-sm text-navy-400">Carregando…</p>
+            ) : ativas === 0 && !dados.demo ? (
               <EstadoVazio
                 icon={RouteIcon}
                 titulo="Nenhuma rota ainda"
@@ -142,8 +145,9 @@ function BotaoMontarRota({ to }: { to: string }) {
 export function RotaDetalhePage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { dados, recarregar } = useDadosMotorista();
-  const rota = dados.rotas.find((r) => r.id === id) ?? dados.rotas[0];
+  const { dados, recarregar, carregando, erro } = useDadosMotorista();
+  // Só o cenário de exemplo cai na 1ª rota; no fluxo real, id desconhecido = não encontrada.
+  const rota = dados.rotas.find((r) => r.id === id) ?? (dados.demo ? dados.rotas[0] : undefined);
   const [todas, setTodas] = useState(false);
   const [mapaGrande, setMapaGrande] = useState(false);
   const [publicando, setPublicando] = useState(false);
@@ -168,7 +172,9 @@ export function RotaDetalhePage() {
     return (
       <VMShell nav={false}>
         <SubHeader titulo="Detalhes da Rota" onVoltar={() => navigate('/app/rotas')} />
-        <p className="p-6 text-center text-navy-500">Rota não encontrada.</p>
+        {erro
+          ? <div className="p-4"><AvisoErro mensagem={erro} onTentar={recarregar} /></div>
+          : <p className="p-6 text-center text-navy-500">{carregando ? 'Carregando…' : 'Rota não encontrada.'}</p>}
       </VMShell>
     );
   }

@@ -5,7 +5,7 @@ import {
   Minus, CalendarDays, Hash, Lock, Users, Snowflake, ShieldCheck, Accessibility, type LucideIcon,
 } from 'lucide-react';
 import { VMShell } from '@/components/vm/VMShell';
-import { Card, SubHeader, LinhaValor, DemoChip, EstadoVazio } from '@/components/vm/ui';
+import { Card, SubHeader, LinhaValor, DemoChip, EstadoVazio, AvisoErro } from '@/components/vm/ui';
 import { VanEscolar } from '@/components/vm/VanEscolar';
 import { SlotIlustracao } from '@/components/vm/SlotImagem';
 import { useDadosMotorista, lerPrefs, salvarPrefs } from '@/lib/vm/useDadosMotorista';
@@ -16,9 +16,21 @@ import type { Veiculo } from '@/types/motorista';
 /* ============================= TELA 9 — Minha Van ============================= */
 export function MinhaVanPage() {
   const navigate = useNavigate();
-  const { dados, indicadores: ind } = useDadosMotorista();
+  const { dados, indicadores: ind, carregando, erro, recarregar } = useDadosMotorista();
   const v = dados.veiculo;
   const prefs = lerPrefs();
+
+  // Ainda consultando, ou a consulta falhou: não é "sem van".
+  if (!v && (carregando || erro)) {
+    return (
+      <VMShell>
+        <SubHeader titulo="Minha Van" />
+        <div className="px-4 pt-4">
+          {erro ? <AvisoErro mensagem={erro} onTentar={recarregar} /> : <p className="py-10 text-center text-sm text-navy-400">Carregando…</p>}
+        </div>
+      </VMShell>
+    );
+  }
 
   // Dados reais, mas o motorista ainda não cadastrou a van.
   if (!dados.demo && !v) {
@@ -93,7 +105,7 @@ const MODELOS = ['Mercedes-Benz Sprinter', 'Renault Master', 'Fiat Ducato', 'Ive
 
 export function CadastroVanPage() {
   const navigate = useNavigate();
-  const { dados, carregando } = useDadosMotorista();
+  const { dados, carregando, erro: erroCarga } = useDadosMotorista();
   const prefs = lerPrefs();
   const [passo, setPasso] = useState(1);
   const [salvo, setSalvo] = useState(false);
@@ -116,13 +128,13 @@ export function CadastroVanPage() {
   // realmente cadastrada — senão editar gravaria os valores de exemplo por cima.
   const [sincronizado, setSincronizado] = useState(false);
   useEffect(() => {
-    if (carregando || sincronizado) return;
+    if (carregando || erroCarga || sincronizado) return;
     setSincronizado(true);
     const v = dados.demo ? null : dados.veiculo;
     if (!v) return;
     setModelo(v.modelo); setAno(v.ano ?? 0); setPlaca(v.placa ?? ''); setLugares(v.lugaresPassageiro);
     setAc(v.arCondicionado); setCintos(v.cintos); setAcessivel(v.acessivel);
-  }, [carregando, sincronizado, dados]);
+  }, [carregando, erroCarga, sincronizado, dados]);
 
   async function concluir() {
     // Só edita uma van REAL do motorista; a van do cenário de exemplo vira cadastro novo.
