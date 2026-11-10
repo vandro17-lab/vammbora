@@ -50,12 +50,13 @@ alter table public.route_trips       enable row level security;
 alter table public.route_trip_events enable row level security;
 
 drop policy if exists route_trips_owner on public.route_trips;
-create policy route_trips_owner on public.route_trips for all
-  using ((select auth.uid()) = owner_id or public.is_admin())
-  with check ((select auth.uid()) = owner_id or public.is_admin());
+create policy route_trips_owner on public.route_trips
+  for all
+  using (owner_id = auth.uid() or public.is_admin())
+  with check (owner_id = auth.uid() or public.is_admin());
 
 drop policy if exists route_trip_events_owner on public.route_trip_events;
-create policy route_trip_events_owner on public.route_trip_events for all
-  using ((select auth.uid()) = owner_id or public.is_admin())
-  with check (((select auth.uid()) = owner_id or public.is_admin())
-    and exists (select 1 from public.route_trips t where t.id = trip_id and t.owner_id = route_trip_events.owner_id));
+create policy route_trip_events_owner on public.route_trip_events
+  for all
+  using (owner_id = auth.uid() or public.is_admin())
+  with check (owner_id = auth.uid() or public.is_admin());
