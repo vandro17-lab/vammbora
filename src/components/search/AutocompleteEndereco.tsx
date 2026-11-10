@@ -28,13 +28,16 @@ function filtrarLocais(locais: SugestaoEndereco[], q: string): SugestaoEndereco[
  * pelo Photon/OpenStreetMap. Degrada sem erro para o usuário.
  */
 export function AutocompleteEndereco({
-  id, value, onChange, placeholder, locais = [],
+  id, value, onChange, placeholder, locais = [], onEscolher,
 }: {
   id?: string;
   value: string;
   onChange: (texto: string, coord?: { lat: number; lng: number }) => void;
   placeholder?: string;
   locais?: SugestaoEndereco[];
+  /** Avisado SEMPRE que uma sugestão é escolhida, com a coordenada dela — mesmo
+   *  quando o texto mantém um número digitado (aí o ponto é só o da rua). */
+  onEscolher?: (texto: string, sugestao: SugestaoEndereco, soDaRua: boolean) => void;
 }) {
   const [sugestoes, setSugestoes] = useState<SugestaoEndereco[]>([]);
   const [aberto, setAberto] = useState(false);
@@ -90,6 +93,7 @@ export function AutocompleteEndereco({
     // número na hora de buscar (geocodificarPreciso trata "Rua X, 123").
     if (numeroDigitado) onChange(texto);
     else onChange(texto, { lat: s.lat, lng: s.lng });
+    onEscolher?.(texto, s, !!numeroDigitado);
     setSugestoes([]);
     setAberto(false);
   }

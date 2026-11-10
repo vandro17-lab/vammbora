@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   Loader2, MapPin, Home, School, Plus, Check, X, ArrowUp, ArrowDown, Trash2, Users, Flag, CheckCircle2, AlertCircle,
@@ -48,6 +48,8 @@ function Builder() {
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
+  const [erroCarga, setErroCarga] = useState<string | null>(null);
 
   useEffect(() => {
     let vivo = true;
@@ -58,8 +60,16 @@ function Builder() {
       const lista = vanRecebida && !vs.some((v) => v.id === vanRecebida.id) ? [vanRecebida, ...vs] : vs;
       let r = rotaNova();
       if (id && id !== 'nova') {
-        const existente = await obterRota(id).catch(() => null);
-        if (existente) r = existente;
+        // Editar uma rota que não carregou abriria um formulário em branco e
+        // salvaria uma rota NOVA por cima da intenção do motorista: melhor parar.
+        try {
+          const existente = await obterRota(id);
+          if (!existente) { if (vivo) { setErroCarga('Rota não encontrada na sua conta.'); setCarregando(false); } return; }
+          r = existente;
+        } catch (e) {
+          if (vivo) { setErroCarga('Não foi possível carregar a rota: ' + (e as Error).message); setCarregando(false); }
+          return;
+        }
       }
       if (!r.veiculoId) r.veiculoId = vanRecebida?.id ?? (lista.length === 1 ? lista[0].id : null);
       if (vivo) {
@@ -98,6 +108,7 @@ function Builder() {
   async function salvar(status: Rota['status'], rotaAtualizada: Rota = rota) {
     setSalvando(true);
     setAviso(null);
+    setErro(null);
     try {
       const nome = rotaAtualizada.nome || `Rota ${rotaAtualizada.sentido === 'ida' ? 'de ida' : 'de volta'}`;
       const salva = await salvarRota({ ...rotaAtualizada, nome, status });
@@ -108,10 +119,18 @@ function Builder() {
         setAviso('Rascunho salvo. Você pode continuar depois.');
       }
     } catch (e) {
-      setAviso('Não foi possível salvar: ' + (e as Error).message);
+      setErro('Não foi possível salvar: ' + (e as Error).message);
     } finally {
       setSalvando(false);
     }
+  }
+
+  if (erroCarga) {
+    return (
+      <MotoristaShell titulo="Rota" voltarPara="/painel/rotas">
+        <p role="alert" className="rounded-xl bg-red-50 p-4 text-sm font-medium text-red-700">{erroCarga}</p>
+      </MotoristaShell>
+    );
   }
 
   if (carregando) {
@@ -138,6 +157,7 @@ function Builder() {
   return (
     <MotoristaShell titulo="Criar rota" voltarPara="/painel/rotas">
       {aviso && <p className="mb-4 rounded-xl bg-mint-50 p-3 text-sm text-mint-800">{aviso}</p>}
+      {erro && <p role="alert" className="mb-4 rounded-xl bg-red-50 p-3 text-sm font-medium text-red-700">{erro}</p>}
 
       {etapa === 'preparacao' ? (
         <Preparacao rota={rota} setRota={setRota} veiculos={veiculos} veiculo={veiculo} capacidade={capacidade}
@@ -423,6 +443,21 @@ export function AcaoParada({ rota, setRota, destinos, locais, aBordo, capacidade
   );
 }
 
+/** Decide o ponto do endereço: geocodificação precisa quando existe; senão, o
+ *  ponto da sugestão escolhida (nunca perde latitude/longitude já obtidas). */
+export function resolverPontoEndereco(
+  preciso: { lat: number; lng: number; precisao: Precisao; rotulo?: string } | null,
+  sugestao: { lat: number; lng: number } | null,
+): { coord: { lat: number; lng: number } | null; precisao: Precisao | undefined; rotulo: string | null } {
+  if (preciso && Number.isFinite(preciso.lat) && Number.isFinite(preciso.lng)) {
+    return { coord: { lat: preciso.lat, lng: preciso.lng }, precisao: preciso.precisao, rotulo: preciso.rotulo || null };
+  }
+  if (sugestao && Number.isFinite(sugestao.lat) && Number.isFinite(sugestao.lng)) {
+    return { coord: { lat: sugestao.lat, lng: sugestao.lng }, precisao: 'rua', rotulo: null };
+  }
+  return { coord: null, precisao: undefined, rotulo: null };
+}
+
 /* Formulário de endereço com autocomplete + número que GEOCODIFICA com precisão
  * (respeita o número da casa) e deixa o motorista arrastar o alfinete no mapa. */
 function FormEndereco({ titulo, dica, botao, locais, onConfirmar, onCancelar, compacto = false }: {
@@ -435,6 +470,12 @@ function FormEndereco({ titulo, dica, botao, locais, onConfirmar, onCancelar, co
   const [precisao, setPrecisao] = useState<Precisao | undefined>(undefined);
   const [buscandoExato, setBuscandoExato] = useState(false);
   const [enderecoNoMapa, setEnderecoNoMapa] = useState<string | null>(null);
+  // Coordenada da SUGESTÃO escolhida para o texto atual. É o ponto de reserva:
+  // se a busca pelo número exato não achar nada, o endereço NÃO fica sem
+  // latitude/longitude — fica no ponto da sugestão (nível de rua), ajustável.
+  const sugestaoEscolhida = useRef<{ texto: string; lat: number; lng: number } | null>(null);
+  // Ponto ajustado à mão vale mais que qualquer geocodificação posterior.
+  const ajustadoAMao = useRef(false);
 
   function montarRotulo(): string {
     return texto.trim();
@@ -451,9 +492,9 @@ function FormEndereco({ titulo, dica, botao, locais, onConfirmar, onCancelar, co
     const t = setTimeout(async () => {
       try {
         const p = await geocodificarPreciso(endereco, '', ctrl.signal);
-        if (!vivo) return;
-        if (p) { setCoord({ lat: p.lat, lng: p.lng }); setPrecisao(p.precisao); setEnderecoNoMapa(p.rotulo || null); }
-        else { setCoord(null); setPrecisao(undefined); setEnderecoNoMapa(null); }
+        if (!vivo || ajustadoAMao.current) return;
+        const r = resolverPontoEndereco(p, sugestaoEscolhida.current?.texto === texto ? sugestaoEscolhida.current : null);
+        setCoord(r.coord); setPrecisao(r.precisao); setEnderecoNoMapa(r.rotulo);
       } finally {
         if (vivo) setBuscandoExato(false);
       }
@@ -463,6 +504,7 @@ function FormEndereco({ titulo, dica, botao, locais, onConfirmar, onCancelar, co
 
   // Arraste manual do alfinete: assume o ponto e confirma o endereço embaixo dele.
   function aoArrastar(lat: number, lng: number) {
+    ajustadoAMao.current = true;
     setCoord({ lat, lng });
     setPrecisao('ajustado');
     setEnderecoNoMapa(null);
@@ -493,9 +535,16 @@ function FormEndereco({ titulo, dica, botao, locais, onConfirmar, onCancelar, co
           placeholder="Ex.: Rua José Geraldo, 580"
           onChange={(t, c) => {
             setTexto(t);
+            ajustadoAMao.current = false;
+            sugestaoEscolhida.current = null; // digitação livre: zera a reserva (onEscolher repõe)
             // Sugestão escolhida: ponto provisório (nível de rua) até a geocodificação precisa.
-            if (c && !/(\d{1,6})\s*$/.test(t.trim())) { setCoord(c); setPrecisao('rua'); setEnderecoNoMapa(null); }
+            if (c) { setCoord(c); setPrecisao('rua'); setEnderecoNoMapa(null); }
             else { setCoord(null); setPrecisao(undefined); setEnderecoNoMapa(null); }
+          }}
+          onEscolher={(t, sug) => {
+            // Guarda o ponto da sugestão (mesmo quando o texto mantém o número digitado).
+            sugestaoEscolhida.current = { texto: t, lat: sug.lat, lng: sug.lng };
+            setCoord({ lat: sug.lat, lng: sug.lng }); setPrecisao('rua');
           }}
         />
         <p className="mt-1 text-[11px] text-navy-400">Digite rua e número juntos. O mapa principal será atualizado.</p>
