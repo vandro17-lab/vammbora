@@ -23,10 +23,13 @@ function Veiculos() {
   const [editando, setEditando] = useState<Veiculo | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
 
   async function recarregar() {
     setCarregando(true);
-    try { setLista(await listarVeiculos()); } catch { /* vazio */ } finally { setCarregando(false); }
+    try { setLista(await listarVeiculos()); }
+    catch (e) { setErro('Não foi possível carregar suas vans: ' + (e as Error).message); }
+    finally { setCarregando(false); }
   }
   useEffect(() => { recarregar(); }, []);
 
@@ -34,13 +37,14 @@ function Veiculos() {
     if (!editando) return;
     setSalvando(true);
     setAviso(null);
+    setErro(null);
     try {
       await salvarVeiculo(editando);
-      await recarregar();
       setEditando(null);
       setAviso('Van salva!');
+      await recarregar(); // relê do banco: a lista mostra o que realmente ficou gravado
     } catch (e) {
-      setAviso('Não foi possível salvar: ' + (e as Error).message);
+      setErro('Não foi possível salvar: ' + (e as Error).message);
     } finally {
       setSalvando(false);
     }
@@ -49,6 +53,7 @@ function Veiculos() {
   return (
     <MotoristaShell titulo="Minha van" voltarPara="/painel">
       {aviso && <p className="mb-4 rounded-xl bg-mint-50 p-3 text-sm text-mint-800">{aviso}</p>}
+      {erro && <p role="alert" className="mb-4 rounded-xl bg-red-50 p-3 text-sm font-medium text-red-700">{erro}</p>}
 
       {editando ? (
         <div className="card p-5">
@@ -59,7 +64,7 @@ function Veiculos() {
                 <input className="field-input" value={editando.modelo} onChange={(e) => setEditando({ ...editando, modelo: e.target.value })} />
               </Campo>
               <Campo rotulo="Ano (opcional)">
-                <input className="field-input" inputMode="numeric" value={editando.ano ?? ''} onChange={(e) => setEditando({ ...editando, ano: e.target.value ? Number(e.target.value) : undefined })} />
+                <input className="field-input" inputMode="numeric" value={editando.ano ?? ''} maxLength={4} onChange={(e) => { const d = e.target.value.replace(/\D/g, ''); setEditando({ ...editando, ano: d ? Number(d) : undefined }); }} />
               </Campo>
             </div>
             <Campo rotulo="Placa (fica privada)" exemplo="Só a equipe vê. Não aparece às famílias.">
@@ -67,7 +72,7 @@ function Veiculos() {
             </Campo>
             <Campo rotulo="Quantos lugares para alunos?" exemplo="Sem contar você, o motorista.">
               <div className="flex items-center gap-3">
-                <button type="button" className="btn btn-md btn-ghost h-11 w-11 !px-0" onClick={() => setEditando({ ...editando, lugaresPassageiro: Math.max(0, editando.lugaresPassageiro - 1) })}>−</button>
+                <button type="button" className="btn btn-md btn-ghost h-11 w-11 !px-0" onClick={() => setEditando({ ...editando, lugaresPassageiro: Math.max(1, editando.lugaresPassageiro - 1) })}>−</button>
                 <span className="w-12 text-center font-display text-2xl font-bold">{editando.lugaresPassageiro}</span>
                 <button type="button" className="btn btn-md btn-ghost h-11 w-11 !px-0" onClick={() => setEditando({ ...editando, lugaresPassageiro: editando.lugaresPassageiro + 1 })}>+</button>
               </div>
@@ -82,7 +87,7 @@ function Veiculos() {
             </div>
           </div>
           <div className="mt-6 flex gap-3">
-            <button className="btn btn-lg btn-primary flex-1" onClick={salvar} disabled={salvando || !editando.modelo}>
+            <button className="btn btn-lg btn-primary flex-1" onClick={salvar} disabled={salvando || !editando.modelo.trim()}>
               {salvando ? <><Loader2 className="h-5 w-5 animate-spin" /> Salvando…</> : 'Salvar van'}
             </button>
             <button className="btn btn-lg btn-ghost" onClick={() => setEditando(null)}>Cancelar</button>

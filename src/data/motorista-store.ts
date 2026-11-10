@@ -45,54 +45,113 @@ function lsSet<T>(k: string, v: T): void {
 }
 
 /* ------------------------------- VEÍCULOS -------------------------------- */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const COLUNAS_VEICULO = 'id,model,year,plate,seats_passenger,feature_ac,feature_accessible,feature_seatbelt,photo_urls';
+
+interface LinhaVeiculo {
+  id: string; model: string | null; year: number | null; plate: string | null; seats_passenger: number | null;
+  feature_ac: boolean | null; feature_accessible: boolean | null; feature_seatbelt: boolean | null; photo_urls: string[] | null;
+}
+
+/** Linha do banco -> Veiculo do app. */
+export function mapVeiculoDoBanco(r: LinhaVeiculo): Veiculo {
+  return {
+    id: r.id,
+    modelo: r.model ?? '',
+    ano: r.year ?? undefined,
+    placa: r.plate ?? undefined,
+    lugaresPassageiro: r.seats_passenger ?? 0,
+    arCondicionado: !!r.feature_ac,
+    acessivel: !!r.feature_accessible,
+    cintos: !!r.feature_seatbelt,
+    fotos: r.photo_urls ?? [],
+  };
+}
+
+/** Veiculo do app -> colunas do banco (sem `id`; campos vazios viram NULL). */
+export function veiculoParaBanco(v: Veiculo, ownerId: string) {
+  const ano = typeof v.ano === 'number' && Number.isInteger(v.ano) && v.ano > 0 ? v.ano : null;
+  return {
+    owner_id: ownerId,
+    model: v.modelo.trim(),
+    year: ano,
+    plate: v.placa?.trim() ? v.placa.trim().toUpperCase() : null,
+    seats_passenger: v.lugaresPassageiro,
+    feature_ac: !!v.arCondicionado,
+    feature_accessible: !!v.acessivel,
+    feature_seatbelt: !!v.cintos,
+    photo_urls: v.fotos ?? [],
+  };
+}
+
+/** Confere os campos antes de gravar. Devolve a mensagem do 1º problema, ou null. */
+export function validarVeiculo(v: Veiculo): string | null {
+  if (!v.modelo?.trim()) return 'Informe o modelo da van.';
+  if (!Number.isInteger(v.lugaresPassageiro) || v.lugaresPassageiro < 1) return 'Informe quantos lugares para alunos a van tem (pelo menos 1).';
+  if (v.lugaresPassageiro > 60) return 'Número de lugares acima do possível para uma van escolar.';
+  if (v.ano != null && v.ano !== 0 && (!Number.isInteger(v.ano) || v.ano < 1980 || v.ano > new Date().getFullYear() + 1)) return 'Confira o ano da van.';
+  return null;
+}
+
+/** Erro do banco -> mensagem compreensível, SEM esconder o motivo real. */
+function erroDoBanco(e: { message?: string; code?: string }): Error {
+  const real = e.message || 'erro desconhecido';
+  const amigavel =
+    e.code === '42501' ? 'Sem permissão para gravar esta van. Saia e entre de novo na sua conta.'
+    : e.code === '23503' ? 'Seu cadastro de motorista ainda não está completo no servidor. Saia e entre de novo.'
+    : e.code === '23514' ? 'Algum dado da van é inválido.'
+    : /fetch|network/i.test(real) ? 'Sem conexão com o servidor. Verifique a internet e tente de novo.'
+    : null;
+  return new Error(amigavel ? `${amigavel} (${real})` : real);
+}
+
+/** Id do usuário logado (sessão local; a RLS valida no servidor). */
+async function usuarioLogadoId(): Promise<string | null> {
+  if (!supabase) return null;
+  const { data } = await supabase.auth.getSession();
+  return data.session?.user?.id ?? null;
+}
+
 export async function listarVeiculos(): Promise<Veiculo[]> {
   if (USAR_BANCO_MOTORISTA && supabase) {
+    const ownerId = await usuarioLogadoId();
+    if (!ownerId) return []; // sem sessão não há "minhas vans"
     const { data, error } = await supabase
       .from('vehicles')
-      .select('id,model,year,plate,seats_passenger,feature_ac,feature_accessible,feature_seatbelt,photo_urls')
-      // Esconde veículos de demonstração do painel do motorista real (RLS já limita ao dono).
+      .select(COLUNAS_VEICULO)
+      // SÓ as vans do próprio motorista: a RLS também libera tudo para admin e
+      // as vans de demonstração para leitura — sem este filtro elas apareceriam
+      // (e poderiam ser editadas) como se fossem do usuário.
+      .eq('owner_id', ownerId)
       .eq('is_demo', false)
       .order('created_at');
-    if (error) throw new Error(error.message);
-    return (data ?? []).map((r) => ({
-      id: r.id as string,
-      modelo: (r.model as string) ?? '',
-      ano: (r.year as number) ?? undefined,
-      placa: (r.plate as string) ?? undefined,
-      lugaresPassageiro: (r.seats_passenger as number) ?? 0,
-      arCondicionado: !!r.feature_ac,
-      acessivel: !!r.feature_accessible,
-      cintos: !!r.feature_seatbelt,
-      fotos: (r.photo_urls as string[]) ?? [],
-    }));
+    if (error) throw erroDoBanco(error);
+    return ((data ?? []) as unknown as LinhaVeiculo[]).map(mapVeiculoDoBanco);
   }
   return lsGet<Veiculo[]>(K_VEIC, []);
 }
 
 export async function salvarVeiculo(v: Veiculo): Promise<Veiculo> {
+  const invalido = validarVeiculo(v);
+  if (invalido) throw new Error(invalido);
   if (USAR_BANCO_MOTORISTA && supabase) {
     // owner_id é obrigatório (NOT NULL) e usado pela RLS: preenche com o usuário logado.
-    const { data: u } = await supabase.auth.getUser();
-    const ownerId = u.user?.id;
+    const ownerId = await usuarioLogadoId();
     if (!ownerId) throw new Error('Faça login para salvar a van.');
-    // IDs de cenários demonstrativos não são UUIDs do banco.
-    // Nesse caso, criamos um registro novo e deixamos o Postgres gerar o UUID.
-    const uuidValido = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v.id);
-    const payload = {
-      ...(uuidValido ? { id: v.id } : {}),
-      owner_id: ownerId,
-      model: v.modelo,
-      year: v.ano ?? null,
-      plate: v.placa ?? null,
-      seats_passenger: v.lugaresPassageiro,
-      feature_ac: v.arCondicionado,
-      feature_accessible: v.acessivel,
-      feature_seatbelt: v.cintos,
-      photo_urls: v.fotos,
-    };
-    const { data, error } = await supabase.from('vehicles').upsert(payload).select('id').single();
-    if (error) throw new Error(error.message);
-    return { ...v, id: (data?.id as string) ?? v.id };
+    const payload = veiculoParaBanco(v, ownerId);
+    // EDIÇÃO: atualiza a van existente DESTE motorista (nunca cria outra nem
+    // assume a van de outra pessoa).
+    if (UUID_RE.test(v.id)) {
+      const { data, error } = await supabase
+        .from('vehicles').update(payload).eq('id', v.id).eq('owner_id', ownerId).select(COLUNAS_VEICULO).maybeSingle();
+      if (error) throw erroDoBanco(error);
+      if (data) return mapVeiculoDoBanco(data as unknown as LinhaVeiculo);
+    }
+    // NOVA (ou id local/demonstrativo que não existe no banco): o Postgres gera o UUID.
+    const { data, error } = await supabase.from('vehicles').insert(payload).select(COLUNAS_VEICULO).single();
+    if (error) throw erroDoBanco(error);
+    if (!data) throw new Error('O servidor não confirmou a gravação da van. Tente de novo.');
+    return mapVeiculoDoBanco(data as unknown as LinhaVeiculo);
   }
   const lista = lsGet<Veiculo[]>(K_VEIC, []);
   const id = v.id || novoId();
