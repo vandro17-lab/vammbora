@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   Loader2, MapPin, Home, School, Plus, Check, X, ArrowUp, ArrowDown, Trash2, Users, Flag, CheckCircle2, AlertCircle,
@@ -12,9 +12,9 @@ import { capacidadeAlunos, aBordoEm, validarRota, podeFinalizar } from '@/lib/oc
 import { PlanoMotor } from '@/components/motorista/PlanoMotor';
 import { planejarRotaDoCadastro } from '@/lib/rota-para-motor';
 import { MapaInterativoRota } from '@/components/motorista/MapaInterativoRota';
-import { SeletorPontoMapa } from '@/components/motorista/SeletorPontoMapa';
-import { AutocompleteEndereco } from '@/components/search/AutocompleteEndereco';
-import { locaisDeDestinos, geocodificarPreciso, reverseGeocodificar, type SugestaoEndereco, type Precisao } from '@/lib/geocode';
+import { CampoEndereco } from '@/components/search/CampoEndereco';
+import { ENDERECO_VAZIO, type EnderecoCampo } from '@/lib/endereco';
+import { locaisDeDestinos, type SugestaoEndereco } from '@/lib/geocode';
 import { TURNO_LABEL, cn, minutosParaTextoHora, horaParaMinutos, nomeDestinoParaExibicao } from '@/lib/utils';
 
 const DIAS = [['seg', 'Seg'], ['ter', 'Ter'], ['qua', 'Qua'], ['qui', 'Qui'], ['sex', 'Sex']] as const;
@@ -443,84 +443,15 @@ export function AcaoParada({ rota, setRota, destinos, locais, aBordo, capacidade
   );
 }
 
-/** Decide o ponto do endereço: geocodificação precisa quando existe; senão, o
- *  ponto da sugestão escolhida (nunca perde latitude/longitude já obtidas). */
-export function resolverPontoEndereco(
-  preciso: { lat: number; lng: number; precisao: Precisao; rotulo?: string } | null,
-  sugestao: { lat: number; lng: number } | null,
-): { coord: { lat: number; lng: number } | null; precisao: Precisao | undefined; rotulo: string | null } {
-  if (preciso && Number.isFinite(preciso.lat) && Number.isFinite(preciso.lng)) {
-    return { coord: { lat: preciso.lat, lng: preciso.lng }, precisao: preciso.precisao, rotulo: preciso.rotulo || null };
-  }
-  if (sugestao && Number.isFinite(sugestao.lat) && Number.isFinite(sugestao.lng)) {
-    return { coord: { lat: sugestao.lat, lng: sugestao.lng }, precisao: 'rua', rotulo: null };
-  }
-  return { coord: null, precisao: undefined, rotulo: null };
-}
-
-/* Formulário de endereço com autocomplete + número que GEOCODIFICA com precisão
- * (respeita o número da casa) e deixa o motorista arrastar o alfinete no mapa. */
+/* Formulário de endereço da rota (saída da van e casas): usa o CAMPO ÚNICO de
+ * endereço do app — sugestões, número, aviso de precisão e ajuste no mapa. */
 function FormEndereco({ titulo, dica, botao, locais, onConfirmar, onCancelar, compacto = false }: {
   titulo: string; dica?: string; botao: string; locais: SugestaoEndereco[];
   onConfirmar: (rotulo: string, coord?: { lat: number; lng: number }) => void;
   onCancelar: (() => void) | null; compacto?: boolean;
 }) {
-  const [texto, setTexto] = useState('');
-  const [coord, setCoord] = useState<{ lat: number; lng: number } | null>(null);
-  const [precisao, setPrecisao] = useState<Precisao | undefined>(undefined);
-  const [buscandoExato, setBuscandoExato] = useState(false);
-  const [enderecoNoMapa, setEnderecoNoMapa] = useState<string | null>(null);
-  // Coordenada da SUGESTÃO escolhida para o texto atual. É o ponto de reserva:
-  // se a busca pelo número exato não achar nada, o endereço NÃO fica sem
-  // latitude/longitude — fica no ponto da sugestão (nível de rua), ajustável.
-  const sugestaoEscolhida = useRef<{ texto: string; lat: number; lng: number } | null>(null);
-  // Ponto ajustado à mão vale mais que qualquer geocodificação posterior.
-  const ajustadoAMao = useRef(false);
-
-  function montarRotulo(): string {
-    return texto.trim();
-  }
-
-  // A busca atual aceita rua e número no mesmo campo. Preserva a geocodificação
-  // estruturada do proxy, que extrai o número do texto automaticamente.
-  useEffect(() => {
-    const endereco = texto.trim();
-    if (endereco.length < 3) return;
-    const ctrl = new AbortController();
-    let vivo = true;
-    setBuscandoExato(true);
-    const t = setTimeout(async () => {
-      try {
-        const p = await geocodificarPreciso(endereco, '', ctrl.signal);
-        if (!vivo || ajustadoAMao.current) return;
-        const r = resolverPontoEndereco(p, sugestaoEscolhida.current?.texto === texto ? sugestaoEscolhida.current : null);
-        setCoord(r.coord); setPrecisao(r.precisao); setEnderecoNoMapa(r.rotulo);
-      } finally {
-        if (vivo) setBuscandoExato(false);
-      }
-    }, 600);
-    return () => { vivo = false; ctrl.abort(); clearTimeout(t); };
-  }, [texto]);
-
-  // Arraste manual do alfinete: assume o ponto e confirma o endereço embaixo dele.
-  function aoArrastar(lat: number, lng: number) {
-    ajustadoAMao.current = true;
-    setCoord({ lat, lng });
-    setPrecisao('ajustado');
-    setEnderecoNoMapa(null);
-    reverseGeocodificar(lat, lng).then((r) => { if (r) setEnderecoNoMapa(r); }).catch(() => {});
-  }
-
-  const temPonto = !!coord;
-  const aviso = buscandoExato
-    ? { c: 'bg-navy-50 text-navy-700', t: 'Localizando o número exato no mapa…' }
-    : !temPonto
-      ? { c: 'bg-amber-50 text-amber-800', t: compacto ? (/(\d{1,6})\s*$/.test(texto.trim()) ? 'Número ainda não localizado. Confira rua e número para posicionar a van corretamente.' : 'Digite rua e número para localizar o ponto no mapa principal.') : 'Informe rua e número no mesmo campo, ou marque o ponto no mapa.' }
-      : precisao === 'exato'
-        ? { c: 'bg-mint-50 text-mint-800', t: 'Número localizado ✓ — confira no mapa e ajuste se precisar.' }
-        : precisao === 'ajustado'
-          ? { c: 'bg-sky-50 text-sky-800', t: 'Ponto ajustado à mão ✓' }
-          : { c: 'bg-amber-50 text-amber-800', t: 'Localizamos a rua. Arraste o alfinete até o número certo.' };
+  const [endereco, setEndereco] = useState<EnderecoCampo>(ENDERECO_VAZIO);
+  const texto = endereco.texto.trim();
 
   return (
     <div className={cn('card mt-0', compacto ? 'p-2.5 shadow-none ring-0' : 'mt-4 p-5')}>
@@ -529,49 +460,28 @@ function FormEndereco({ titulo, dica, botao, locais, onConfirmar, onCancelar, co
 
       <div className="mt-2">
         <label className="field-label">Endereço (rua e número)</label>
-        <AutocompleteEndereco
-          value={texto}
-          locais={locais}
-          placeholder="Ex.: Rua José Geraldo, 580"
-          onChange={(t, c) => {
-            setTexto(t);
-            ajustadoAMao.current = false;
-            sugestaoEscolhida.current = null; // digitação livre: zera a reserva (onEscolher repõe)
-            // Sugestão escolhida: ponto provisório (nível de rua) até a geocodificação precisa.
-            if (c) { setCoord(c); setPrecisao('rua'); setEnderecoNoMapa(null); }
-            else { setCoord(null); setPrecisao(undefined); setEnderecoNoMapa(null); }
-          }}
-          onEscolher={(t, sug) => {
-            // Guarda o ponto da sugestão (mesmo quando o texto mantém o número digitado).
-            sugestaoEscolhida.current = { texto: t, lat: sug.lat, lng: sug.lng };
-            setCoord({ lat: sug.lat, lng: sug.lng }); setPrecisao('rua');
-          }}
+        <CampoEndereco
+          valor={endereco} onChange={setEndereco} locais={locais}
+          placeholder="Ex.: Rua José Geraldo, 580" mapa={compacto ? 'sob-demanda' : 'sempre'}
         />
         <p className="mt-1 text-[11px] text-navy-400">Digite rua e número juntos. O mapa principal será atualizado.</p>
       </div>
 
-      <p className={cn('mt-3 rounded-xl p-2.5 text-sm', aviso.c)}>{aviso.t}</p>
-
-      {!compacto && <div className="mt-3">
-        <SeletorPontoMapa ponto={coord} precisao={precisao} onMover={aoArrastar} />
-        {enderecoNoMapa && <p className="mt-1 text-xs text-navy-500">No mapa: {enderecoNoMapa}</p>}
-      </div>}
-
       <div className="mt-3 flex gap-2">
         <button
           className="btn btn-md btn-primary flex-1"
-          disabled={!texto.trim() || !coord}
-          onClick={() => onConfirmar(montarRotulo(), coord ?? undefined)}
+          disabled={!texto || !endereco.coord || endereco.validando}
+          onClick={() => onConfirmar(texto, endereco.coord ?? undefined)}
         >
           {botao}
         </button>
         {onCancelar && <button className="btn btn-md btn-ghost" onClick={onCancelar}>Cancelar</button>}
       </div>
 
-      {texto.trim() && !coord && (
+      {texto && !endereco.coord && !endereco.validando && (
         <button
           className="mt-3 w-full text-center text-xs font-medium text-navy-400 hover:text-navy-700"
-          onClick={() => onConfirmar(montarRotulo(), undefined)}
+          onClick={() => onConfirmar(texto, undefined)}
         >
           Não encontrei no mapa — confirmar só pelo endereço digitado
         </button>

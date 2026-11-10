@@ -1,5 +1,6 @@
 import type { Destino } from '@/types';
 import { nomeDestinoParaExibicao } from '@/lib/utils';
+import { numeroDoEndereco } from '@/lib/endereco';
 
 export interface SugestaoEndereco { rotulo: string; lat: number; lng: number }
 
@@ -60,8 +61,41 @@ export function locaisDeDestinos(destinos: Destino[]): SugestaoEndereco[] {
 // uma chamada 503 a cada tecla). Vale para toda a sessão da página.
 let proxyIndisponivel = false;
 
-/** Busca endereços de rua. Tenta o proxy privado (Geoapify); se faltar, usa Photon (sem chave). */
+// Memória curta das consultas já respondidas: digitar, apagar e redigitar o
+// mesmo trecho não gasta novas consultas (o proxy limita por IP e, quando
+// estoura, a busca caía para outro provedor com resultados diferentes).
+const MEMORIA_MAX = 120;
+const memoriaSugestoes = new Map<string, SugestaoEndereco[]>();
+const memoriaPontos = new Map<string, PontoPreciso | null>();
+function lembrar<V>(mapa: Map<string, V>, chave: string, valor: V): V {
+  if (mapa.size >= MEMORIA_MAX) mapa.delete(mapa.keys().next().value as string);
+  mapa.set(chave, valor);
+  return valor;
+}
+/** Só para testes: esquece consultas e o estado do proxy. */
+export function reiniciarGeocodificacao(): void {
+  memoriaSugestoes.clear(); memoriaPontos.clear(); proxyIndisponivel = false;
+}
+
+/**
+ * Sugestões de endereço. Se o texto traz o NÚMERO do imóvel e o mapa não tem
+ * esse número, repete a busca só com a rua — a pessoa continua vendo (e podendo
+ * escolher) a rua, em vez de a lista sumir ao digitar o número.
+ */
 export async function buscarEnderecos(q: string, signal?: AbortSignal): Promise<SugestaoEndereco[]> {
+  const chave = normalizarTexto(q);
+  const memo = memoriaSugestoes.get(chave);
+  if (memo) return memo;
+  let achados = await consultarSugestoes(q, signal);
+  if (achados.length === 0 && !signal?.aborted) {
+    const { rua, num } = numeroDoEndereco(q);
+    if (num && rua.length >= 3) achados = await consultarSugestoes(rua, signal);
+  }
+  return achados.length && !signal?.aborted ? lembrar(memoriaSugestoes, chave, achados) : achados;
+}
+
+/** Uma consulta de sugestões: proxy privado (Geoapify); se faltar, Photon (sem chave). */
+async function consultarSugestoes(q: string, signal?: AbortSignal): Promise<SugestaoEndereco[]> {
   // 1) Proxy privado Geoapify (melhor qualidade + privacidade), se configurado.
   if (!proxyIndisponivel) {
     try {
@@ -73,7 +107,10 @@ export async function buscarEnderecos(q: string, signal?: AbortSignal): Promise<
         proxyIndisponivel = true; // sem GEOAPIFY_API_KEY: cai para o Photon
       } else if (r.ok) {
         const d = (await r.json()) as { resultados?: SugestaoEndereco[] };
-        if (Array.isArray(d.resultados) && d.resultados.length) return d.resultados;
+        // Mesma regra do provedor alternativo: só endereços da região atendida.
+        const daRegiao = (Array.isArray(d.resultados) ? d.resultados : [])
+          .filter((x) => x && typeof x.rotulo === 'string' && Number.isFinite(x.lat) && Number.isFinite(x.lng) && dentroDeAracatuba(x.lat, x.lng));
+        if (daRegiao.length) return daRegiao;
       }
     } catch {
       /* segue para o fallback */
@@ -116,12 +153,37 @@ export async function buscarEnderecos(q: string, signal?: AbortSignal): Promise<
  * Geocodificação PRECISA que respeita o número da casa (geocodificação
  * estruturada do Geoapify via proxy). Sem chave, cai para o Photon lendo o
  * `housenumber` quando disponível. Devolve o ponto e a precisão, ou null.
+ *
+ * Com número no endereço, só devolve 'exato' quando o provedor CONFIRMOU o
+ * número. `aceitarSemNumero`: se nenhum provedor tiver o número, devolve o
+ * ponto da RUA com precisão 'rua' (nunca como exato) em vez de null — quem
+ * chama informa a limitação e deixa ajustar no mapa.
  */
-export async function geocodificarPreciso(texto: string, numero: string, signal?: AbortSignal): Promise<PontoPreciso | null> {
+export async function geocodificarPreciso(
+  texto: string, numero: string, signal?: AbortSignal, opcoes: { aceitarSemNumero?: boolean } = {},
+): Promise<PontoPreciso | null> {
+  const chave = `${normalizarTexto(texto)}|${numero}|${opcoes.aceitarSemNumero ? 1 : 0}`;
+  if (memoriaPontos.has(chave)) return memoriaPontos.get(chave) ?? null;
+  const ponto = await geocodificarSemMemoria(texto, numero, signal, opcoes);
+  // Só guarda resposta de consulta concluída (nunca de uma consulta abortada).
+  return signal?.aborted ? ponto : lembrar(memoriaPontos, chave, ponto);
+}
+
+async function geocodificarSemMemoria(
+  texto: string, numero: string, signal: AbortSignal | undefined, opcoes: { aceitarSemNumero?: boolean },
+): Promise<PontoPreciso | null> {
   const rua = texto.trim();
   if (rua.length < 3) return null;
-  const estruturado = separarRuaNumero(rua, numero);
+  // Número em campo próprio: regra antiga. Tudo no mesmo texto: acha o número
+  // onde ele estiver ("Rua X, 450, Centro" — formato das próprias sugestões).
+  const estruturado = numero ? separarRuaNumero(rua, numero) : numeroDoEndereco(rua);
   const exigeNumeroExato = Boolean(estruturado.num);
+  // Melhor ponto SEM o número confirmado (nível de rua), guardado para o fim.
+  let soDaRua: PontoPreciso | null = null;
+  const guardarRua = (p: { rotulo: string; lat: number; lng: number; precisao: Precisao }) => {
+    if (!soDaRua && p.precisao !== 'aproximado' && dentroDeAracatuba(p.lat, p.lng)) soDaRua = { rotulo: p.rotulo, lat: p.lat, lng: p.lng, precisao: 'rua' };
+  };
+  const fim = (): PontoPreciso | null => (opcoes.aceitarSemNumero ? soDaRua : null);
 
   if (!proxyIndisponivel) {
     try {
@@ -133,8 +195,11 @@ export async function geocodificarPreciso(texto: string, numero: string, signal?
         proxyIndisponivel = true;
       } else if (r.ok) {
         const d = (await r.json()) as { ponto?: PontoPreciso | null };
-        if (d.ponto && Number.isFinite(d.ponto.lat) && Number.isFinite(d.ponto.lng) && (!exigeNumeroExato || d.ponto.precisao === 'exato')) return d.ponto;
-        // Proxy respondeu sem ponto: ainda tentamos os fallbacks abaixo.
+        if (d.ponto && Number.isFinite(d.ponto.lat) && Number.isFinite(d.ponto.lng)) {
+          if (!exigeNumeroExato || d.ponto.precisao === 'exato') return d.ponto;
+          guardarRua(d.ponto); // achou a rua, não o número
+        }
+        // Proxy respondeu sem o número: ainda tentamos os fallbacks abaixo.
       }
     } catch {
       /* segue para o fallback */
@@ -166,7 +231,8 @@ export async function geocodificarPreciso(texto: string, numero: string, signal?
           const bairro = f.address?.suburb || f.address?.neighbourhood || f.address?.city_district;
           const cidade = f.address?.city || f.address?.town || f.address?.municipality;
           const rotulo = [`${viaNome}${hn ? ', ' + hn : (num ? ', ' + num : '')}`, bairro, cidade].filter(Boolean).join(', ');
-          if (hn) return { rotulo, lat, lng, precisao: 'exato' };
+          // Só é exato se o mapa devolveu O número pedido (não um vizinho).
+          if (hn && hn.replace(/\D/g, '') === num) return { rotulo, lat, lng, precisao: 'exato' };
         }
       }
     } catch {
@@ -182,19 +248,24 @@ export async function geocodificarPreciso(texto: string, numero: string, signal?
     u.searchParams.set('lon', String(ARACATUBA.lng));
     u.searchParams.set('limit', '1');
     const r = await fetch(u, { signal });
-    if (!r.ok) return null;
+    if (!r.ok) return fim();
     const d = (await r.json()) as { features?: Array<{ geometry: { coordinates: [number, number] }; properties: Record<string, string> }> };
     const f = d.features?.[0];
     const [lng, lat] = f?.geometry?.coordinates ?? [NaN, NaN];
-    if (!f || !Number.isFinite(lat) || !Number.isFinite(lng) || !dentroDeAracatuba(lat, lng)) return null;
+    if (!f || !Number.isFinite(lat) || !Number.isFinite(lng) || !dentroDeAracatuba(lat, lng)) return fim();
     const p = f.properties ?? {};
-    const temNumero = !!p.housenumber;
+    // Com número pedido, só vale o MESMO número; sem pedido, qualquer número do mapa.
+    const temNumero = !!p.housenumber && (!num || String(p.housenumber).replace(/\D/g, '') === num);
     const viaNome = p.street || p.name || via;
-    const rotulo = [`${viaNome}${p.housenumber ? ', ' + p.housenumber : (num ? ', ' + num : '')}`, p.district || p.suburb, p.city].filter(Boolean).join(', ');
-    if (exigeNumeroExato && !temNumero) return null;
+    if (exigeNumeroExato && !temNumero) {
+      // Rua encontrada, número não: o rótulo NÃO afirma o número digitado.
+      if (p.street || p.osm_key === 'highway') guardarRua({ rotulo: [viaNome, p.district || p.suburb, p.city].filter(Boolean).join(', '), lat, lng, precisao: 'rua' });
+      return fim();
+    }
+    const rotulo = [`${viaNome}${temNumero ? ', ' + p.housenumber : ''}`, p.district || p.suburb, p.city].filter(Boolean).join(', ');
     return { rotulo, lat, lng, precisao: temNumero ? 'exato' : 'rua' };
   } catch {
-    return null;
+    return fim();
   }
 }
 
