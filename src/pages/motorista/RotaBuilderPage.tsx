@@ -12,9 +12,9 @@ import { capacidadeAlunos, aBordoEm, validarRota, podeFinalizar } from '@/lib/oc
 import { PlanoMotor } from '@/components/motorista/PlanoMotor';
 import { planejarRotaDoCadastro } from '@/lib/rota-para-motor';
 import { MapaInterativoRota } from '@/components/motorista/MapaInterativoRota';
-import { SeletorPontoMapa } from '@/components/motorista/SeletorPontoMapa';
-import { AutocompleteEndereco } from '@/components/search/AutocompleteEndereco';
-import { locaisDeDestinos, geocodificarPreciso, reverseGeocodificar, type SugestaoEndereco, type Precisao } from '@/lib/geocode';
+import { CampoEndereco } from '@/components/search/CampoEndereco';
+import { ENDERECO_VAZIO, type EnderecoCampo } from '@/lib/endereco';
+import { locaisDeDestinos, type SugestaoEndereco } from '@/lib/geocode';
 import { TURNO_LABEL, cn, minutosParaTextoHora, horaParaMinutos, nomeDestinoParaExibicao } from '@/lib/utils';
 
 const DIAS = [['seg', 'Seg'], ['ter', 'Ter'], ['qua', 'Qua'], ['qui', 'Qui'], ['sex', 'Sex']] as const;
@@ -48,6 +48,8 @@ function Builder() {
   const [carregando, setCarregando] = useState(true);
   const [salvando, setSalvando] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
+  const [erroCarga, setErroCarga] = useState<string | null>(null);
 
   useEffect(() => {
     let vivo = true;
@@ -58,8 +60,16 @@ function Builder() {
       const lista = vanRecebida && !vs.some((v) => v.id === vanRecebida.id) ? [vanRecebida, ...vs] : vs;
       let r = rotaNova();
       if (id && id !== 'nova') {
-        const existente = await obterRota(id).catch(() => null);
-        if (existente) r = existente;
+        // Editar uma rota que não carregou abriria um formulário em branco e
+        // salvaria uma rota NOVA por cima da intenção do motorista: melhor parar.
+        try {
+          const existente = await obterRota(id);
+          if (!existente) { if (vivo) { setErroCarga('Rota não encontrada na sua conta.'); setCarregando(false); } return; }
+          r = existente;
+        } catch (e) {
+          if (vivo) { setErroCarga('Não foi possível carregar a rota: ' + (e as Error).message); setCarregando(false); }
+          return;
+        }
       }
       if (!r.veiculoId) r.veiculoId = vanRecebida?.id ?? (lista.length === 1 ? lista[0].id : null);
       if (vivo) {
@@ -98,20 +108,30 @@ function Builder() {
   async function salvar(status: Rota['status'], rotaAtualizada: Rota = rota) {
     setSalvando(true);
     setAviso(null);
+    setErro(null);
     try {
       const nome = rotaAtualizada.nome || `Rota ${rotaAtualizada.sentido === 'ida' ? 'de ida' : 'de volta'}`;
       const salva = await salvarRota({ ...rotaAtualizada, nome, status });
       setRota(salva);
       if (status === 'concluida') {
-        navigate('/painel/rotas');
+        // Ida concluída: o app já oferece montar a volta a partir dela.
+        navigate(salva.sentido === 'ida' && salva.passageiros.length > 0 ? `/app/rotas/${salva.id}/volta` : '/painel/rotas');
       } else {
         setAviso('Rascunho salvo. Você pode continuar depois.');
       }
     } catch (e) {
-      setAviso('Não foi possível salvar: ' + (e as Error).message);
+      setErro('Não foi possível salvar: ' + (e as Error).message);
     } finally {
       setSalvando(false);
     }
+  }
+
+  if (erroCarga) {
+    return (
+      <MotoristaShell titulo="Rota" voltarPara="/painel/rotas">
+        <p role="alert" className="rounded-xl bg-red-50 p-4 text-sm font-medium text-red-700">{erroCarga}</p>
+      </MotoristaShell>
+    );
   }
 
   if (carregando) {
@@ -138,6 +158,7 @@ function Builder() {
   return (
     <MotoristaShell titulo="Criar rota" voltarPara="/painel/rotas">
       {aviso && <p className="mb-4 rounded-xl bg-mint-50 p-3 text-sm text-mint-800">{aviso}</p>}
+      {erro && <p role="alert" className="mb-4 rounded-xl bg-red-50 p-3 text-sm font-medium text-red-700">{erro}</p>}
 
       {etapa === 'preparacao' ? (
         <Preparacao rota={rota} setRota={setRota} veiculos={veiculos} veiculo={veiculo} capacidade={capacidade}
@@ -423,62 +444,15 @@ export function AcaoParada({ rota, setRota, destinos, locais, aBordo, capacidade
   );
 }
 
-/* Formulário de endereço com autocomplete + número que GEOCODIFICA com precisão
- * (respeita o número da casa) e deixa o motorista arrastar o alfinete no mapa. */
+/* Formulário de endereço da rota (saída da van e casas): usa o CAMPO ÚNICO de
+ * endereço do app — sugestões, número, aviso de precisão e ajuste no mapa. */
 function FormEndereco({ titulo, dica, botao, locais, onConfirmar, onCancelar, compacto = false }: {
   titulo: string; dica?: string; botao: string; locais: SugestaoEndereco[];
   onConfirmar: (rotulo: string, coord?: { lat: number; lng: number }) => void;
   onCancelar: (() => void) | null; compacto?: boolean;
 }) {
-  const [texto, setTexto] = useState('');
-  const [coord, setCoord] = useState<{ lat: number; lng: number } | null>(null);
-  const [precisao, setPrecisao] = useState<Precisao | undefined>(undefined);
-  const [buscandoExato, setBuscandoExato] = useState(false);
-  const [enderecoNoMapa, setEnderecoNoMapa] = useState<string | null>(null);
-
-  function montarRotulo(): string {
-    return texto.trim();
-  }
-
-  // A busca atual aceita rua e número no mesmo campo. Preserva a geocodificação
-  // estruturada do proxy, que extrai o número do texto automaticamente.
-  useEffect(() => {
-    const endereco = texto.trim();
-    if (endereco.length < 3) return;
-    const ctrl = new AbortController();
-    let vivo = true;
-    setBuscandoExato(true);
-    const t = setTimeout(async () => {
-      try {
-        const p = await geocodificarPreciso(endereco, '', ctrl.signal);
-        if (!vivo) return;
-        if (p) { setCoord({ lat: p.lat, lng: p.lng }); setPrecisao(p.precisao); setEnderecoNoMapa(p.rotulo || null); }
-        else { setCoord(null); setPrecisao(undefined); setEnderecoNoMapa(null); }
-      } finally {
-        if (vivo) setBuscandoExato(false);
-      }
-    }, 600);
-    return () => { vivo = false; ctrl.abort(); clearTimeout(t); };
-  }, [texto]);
-
-  // Arraste manual do alfinete: assume o ponto e confirma o endereço embaixo dele.
-  function aoArrastar(lat: number, lng: number) {
-    setCoord({ lat, lng });
-    setPrecisao('ajustado');
-    setEnderecoNoMapa(null);
-    reverseGeocodificar(lat, lng).then((r) => { if (r) setEnderecoNoMapa(r); }).catch(() => {});
-  }
-
-  const temPonto = !!coord;
-  const aviso = buscandoExato
-    ? { c: 'bg-navy-50 text-navy-700', t: 'Localizando o número exato no mapa…' }
-    : !temPonto
-      ? { c: 'bg-amber-50 text-amber-800', t: compacto ? (/(\d{1,6})\s*$/.test(texto.trim()) ? 'Número ainda não localizado. Confira rua e número para posicionar a van corretamente.' : 'Digite rua e número para localizar o ponto no mapa principal.') : 'Informe rua e número no mesmo campo, ou marque o ponto no mapa.' }
-      : precisao === 'exato'
-        ? { c: 'bg-mint-50 text-mint-800', t: 'Número localizado ✓ — confira no mapa e ajuste se precisar.' }
-        : precisao === 'ajustado'
-          ? { c: 'bg-sky-50 text-sky-800', t: 'Ponto ajustado à mão ✓' }
-          : { c: 'bg-amber-50 text-amber-800', t: 'Localizamos a rua. Arraste o alfinete até o número certo.' };
+  const [endereco, setEndereco] = useState<EnderecoCampo>(ENDERECO_VAZIO);
+  const texto = endereco.texto.trim();
 
   return (
     <div className={cn('card mt-0', compacto ? 'p-2.5 shadow-none ring-0' : 'mt-4 p-5')}>
@@ -487,42 +461,28 @@ function FormEndereco({ titulo, dica, botao, locais, onConfirmar, onCancelar, co
 
       <div className="mt-2">
         <label className="field-label">Endereço (rua e número)</label>
-        <AutocompleteEndereco
-          value={texto}
-          locais={locais}
+        <CampoEndereco
+          valor={endereco} onChange={setEndereco} locais={locais}
           placeholder="Ex.: Rua José Geraldo, 580"
-          onChange={(t, c) => {
-            setTexto(t);
-            // Sugestão escolhida: ponto provisório (nível de rua) até a geocodificação precisa.
-            if (c && !/(\d{1,6})\s*$/.test(t.trim())) { setCoord(c); setPrecisao('rua'); setEnderecoNoMapa(null); }
-            else { setCoord(null); setPrecisao(undefined); setEnderecoNoMapa(null); }
-          }}
         />
-        <p className="mt-1 text-[11px] text-navy-400">Digite rua e número juntos. O mapa principal será atualizado.</p>
+        <p className="mt-1 text-[11px] text-navy-400">Digite rua e número juntos: o alfinete aparece no mapa e você pode arrastá-lo até a porta.</p>
       </div>
-
-      <p className={cn('mt-3 rounded-xl p-2.5 text-sm', aviso.c)}>{aviso.t}</p>
-
-      {!compacto && <div className="mt-3">
-        <SeletorPontoMapa ponto={coord} precisao={precisao} onMover={aoArrastar} />
-        {enderecoNoMapa && <p className="mt-1 text-xs text-navy-500">No mapa: {enderecoNoMapa}</p>}
-      </div>}
 
       <div className="mt-3 flex gap-2">
         <button
           className="btn btn-md btn-primary flex-1"
-          disabled={!texto.trim() || !coord}
-          onClick={() => onConfirmar(montarRotulo(), coord ?? undefined)}
+          disabled={!texto || !endereco.coord || endereco.validando}
+          onClick={() => onConfirmar(texto, endereco.coord ?? undefined)}
         >
           {botao}
         </button>
         {onCancelar && <button className="btn btn-md btn-ghost" onClick={onCancelar}>Cancelar</button>}
       </div>
 
-      {texto.trim() && !coord && (
+      {texto && !endereco.coord && !endereco.validando && (
         <button
           className="mt-3 w-full text-center text-xs font-medium text-navy-400 hover:text-navy-700"
-          onClick={() => onConfirmar(montarRotulo(), undefined)}
+          onClick={() => onConfirmar(texto, undefined)}
         >
           Não encontrei no mapa — confirmar só pelo endereço digitado
         </button>

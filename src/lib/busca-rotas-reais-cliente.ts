@@ -1,5 +1,6 @@
 import type { CriteriosBusca, ModalidadeTrajeto } from '@/types';
 import { listarRotas, listarVeiculos } from '@/data/motorista-store';
+import { criarMatrizDemo } from '@/lib/encaixe';
 import {
   buscarEmRotasReais,
   rotaElegivelParaBusca,
@@ -37,6 +38,8 @@ export interface CartaoRotaRealDados {
   /** Ida: chegada à ESCOLA. Volta: saída da ESCOLA. */
   horarioEscolaMin: number | null;
   minutosABordo: number | null;
+  /** Tempos de trajeto estimados (sem consulta viária): nunca "compatível". */
+  temposEstimados?: boolean;
   motivo: string;
 }
 
@@ -49,6 +52,7 @@ const mostravel = (s: StatusBuscaReal) => s === 'compativel' || s === 'sob_confi
 export async function buscarRotasReais(
   criterios: CriteriosBusca,
   escolaPonto?: { lat: number; lng: number } | null,
+  signal?: AbortSignal,
 ): Promise<{ estado: EstadoBuscaReal; resultados: CartaoRotaRealDados[] }> {
   if (!Number.isFinite(criterios.origemLat) || !Number.isFinite(criterios.origemLng) || !criterios.destinoId) {
     return { estado: 'ok', resultados: [] };
@@ -58,6 +62,7 @@ export async function buscarRotasReais(
     try {
       const r = await fetch('/api/buscar-rotas', {
         method: 'POST',
+        signal,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           origem: { lat: criterios.origemLat, lng: criterios.origemLng },
@@ -81,8 +86,8 @@ export async function buscarRotasReais(
 
 /* ===================== Modo demonstração (localStorage) =====================
  * Sem backend, as rotas reais vivem no navegador do próprio usuário. Rodamos o
- * MESMO núcleo (buscarEmRotasReais) sobre as rotas ELEGÍVEIS (concluídas e
- * PUBLICADAS), provando o fluxo ponta a ponta sem infra. */
+ * MESMO núcleo (buscarEmRotasReais) sobre as rotas ELEGÍVEIS (concluídas),
+ * provando o fluxo ponta a ponta sem infra. */
 export async function buscarRotasReaisDemo(
   criterios: CriteriosBusca,
   escolaPonto?: { lat: number; lng: number } | null,
@@ -105,7 +110,8 @@ export async function buscarRotasReaisDemo(
       sentido,
       turno: criterios.turno,
       contratacao: criterios.contratacao,
-    });
+    // Demonstração local: tempos ESTIMADOS — o núcleo limita a "sob confirmação".
+    }, criarMatrizDemo());
     for (const r of resultados) {
       if (!mostravel(r.status)) continue; // nunca mostrar falso encaixe
       const rota = rotaPorId.get(r.rotaId);
@@ -121,6 +127,7 @@ export async function buscarRotasReaisDemo(
         passagemCasaMin: r.passagemCasaMin,
         horarioEscolaMin: r.horarioEscolaMin,
         minutosABordo: r.minutosABordo,
+        temposEstimados: r.temposEstimados,
         motivo: r.motivo,
       });
     }

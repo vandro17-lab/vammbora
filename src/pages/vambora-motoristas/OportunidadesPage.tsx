@@ -3,13 +3,14 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Sparkles, MapPin, CheckCircle2, AlertTriangle, ChevronRight, Zap, Users } from 'lucide-react';
 import { Avatar } from '@/components/brand/Avatar';
 import { VMShell } from '@/components/vm/VMShell';
-import { Card, SubHeader, DemoChip, EstadoVazio } from '@/components/vm/ui';
+import { Card, SubHeader, DemoChip, EstadoVazio, AvisoErro } from '@/components/vm/ui';
 import { SlotIlustracao } from '@/components/vm/SlotImagem';
 import { useDadosMotorista } from '@/lib/vm/useDadosMotorista';
 import { OPORTUNIDADES_VM, simularEncaixe, DIAS_UTEIS_MES } from '@/lib/vm/encaixe';
 import { formatBRL, cn } from '@/lib/utils';
 
-const NOVAS_REGIAO = [
+/** Exemplos ilustrativos — exibidos SÓ no modo demonstração explícito. */
+const NOVAS_REGIAO_DEMO = [
   { regiao: 'Jd. Sumaré', escola: 'Colégio Paineiras', turno: 'Manhã' },
   { regiao: 'Pozzobon', escola: 'Instituto São João', turno: 'Tarde' },
   { regiao: 'Umuarama', escola: 'Colégio Paineiras', turno: 'Manhã' },
@@ -22,10 +23,13 @@ const NOVAS_REGIAO = [
 
 /* =========================== TELA 6 — Oportunidades =========================== */
 export function OportunidadesPage() {
-  const { dados } = useDadosMotorista();
+  const { dados, erro, recarregar } = useDadosMotorista();
   const [aba, setAba] = useState<'compat' | 'regiao'>('compat');
 
-  const compativeis = useMemo(() => OPORTUNIDADES_VM
+  // Oportunidades e regiões de exemplo existem apenas no cenário demonstrativo.
+  // No fluxo real ainda não há pedidos de famílias persistidos: estado vazio.
+  const NOVAS_REGIAO = dados.demo ? NOVAS_REGIAO_DEMO : [];
+  const compativeis = useMemo(() => (dados.demo ? OPORTUNIDADES_VM : [])
     .map((op) => ({ op, r: simularEncaixe(dados, op) }))
     .filter((x) => x.r.cabe)
     .sort((a, b) => b.r.compatibilidadePct - a.r.compatibilidadePct), [dados]);
@@ -39,6 +43,8 @@ export function OportunidadesPage() {
           <button onClick={() => setAba('regiao')} className={cn('inline-flex items-center gap-1.5 rounded-full px-3 py-2', aba === 'regiao' ? 'bg-mint-500 text-white' : 'bg-navy-100 text-navy-500')}><Sparkles className="h-4 w-4" /> Novas da região ({NOVAS_REGIAO.length})</button>
         </div>
         {dados.demo && <div className="mt-3 flex justify-end"><DemoChip /></div>}
+
+        {erro && <AvisoErro mensagem={erro} onTentar={recarregar} className="mt-3" />}
 
         {aba === 'compat' ? (
           <div className="mt-3 space-y-3">
@@ -69,6 +75,9 @@ export function OportunidadesPage() {
           </div>
         ) : (
           <div className="mt-3 space-y-2.5">
+            {NOVAS_REGIAO.length === 0 && (
+              <EstadoVazio icon={MapPin} titulo="Nenhum pedido novo na região" texto="Quando famílias da sua região procurarem transporte, os pedidos aparecem aqui." />
+            )}
             {NOVAS_REGIAO.map((n, i) => (
               <Card key={i} className="flex items-center gap-3 p-3.5">
                 <span className="vm-chip-ico vm-ico-purple"><MapPin className="h-5 w-5" /></span>
@@ -95,6 +104,16 @@ export function SimularEncaixePage() {
   const op = OPORTUNIDADES_VM.find((o) => o.id === id) ?? OPORTUNIDADES_VM[0];
   const r = useMemo(() => simularEncaixe(dados, op), [dados, op]);
   const c = r.comparativo;
+
+  // A simulação usa uma oportunidade de EXEMPLO: só existe no modo demonstração.
+  if (!dados.demo) {
+    return (
+      <VMShell nav={false}>
+        <SubHeader titulo="Simular encaixe" onVoltar={() => navigate('/app/oportunidades')} />
+        <p className="p-6 text-center text-navy-500">Oportunidade não encontrada.</p>
+      </VMShell>
+    );
+  }
 
   const linhas = [
     { label: 'Alunos', antes: c.alunosAntes, depois: c.alunosDepois },

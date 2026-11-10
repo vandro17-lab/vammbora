@@ -7,31 +7,35 @@ exports[`referência do adaptador real (simularEncaixeRota) > golden — encaixe
   "opcao": {
     "alteracoes": [
       {
-        "dif": 0,
+        "dif": -6,
         "id": "emb:ana",
       },
       {
-        "dif": 3,
+        "dif": -2,
         "id": "emb:bruno",
       },
       {
-        "dif": 4,
+        "dif": 0,
         "id": "des:ana",
       },
       {
-        "dif": 4,
+        "dif": 0,
         "id": "des:bruno",
       },
+      {
+        "dif": 0,
+        "id": "escola:e",
+      },
     ],
-    "buscaMin": 405,
+    "buscaMin": 398,
     "desembarque": 3,
     "desvioMetros": 600,
-    "desvioMin": 4,
+    "desvioMin": 6,
     "embarque": 1,
-    "entregaMin": 418,
-    "minutosABordo": 12,
+    "entregaMin": 413,
+    "minutosABordo": 13,
   },
-  "partidaMin": 396,
+  "partidaMin": 394,
   "sentido": "ida",
 }
 `;

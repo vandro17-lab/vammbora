@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 /**
  * Teste ISOLADO do handler server-side (api/buscar-rotas) com MOCK do Supabase
@@ -55,11 +55,26 @@ function rotaRealCanon() {
   };
 }
 
+/** MOCK do provedor viário (Geoapify Route Matrix): 3 min / 900 m por par. */
+function mockProvedorViario(ok = true) {
+  const fetchMock = vi.fn(async (_url: unknown, init?: { body?: string }) => {
+    if (!ok) return { ok: false, status: 502, json: async () => ({}) };
+    const n = (JSON.parse(init?.body ?? '{}').sources ?? []).length as number;
+    const sources_to_targets = Array.from({ length: n }, (_, i) =>
+      Array.from({ length: n }, (_, j) => ({ source_index: i, target_index: j, time: i === j ? 0 : 180, distance: i === j ? 0 : 900 })));
+    return { ok: true, status: 200, json: async () => ({ sources_to_targets }) };
+  });
+  vi.stubGlobal('fetch', fetchMock);
+  return fetchMock;
+}
+
 beforeEach(() => {
   process.env.VITE_SUPABASE_URL = 'https://exemplo.supabase.co';
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-key-teste';
+  process.env.GEOAPIFY_API_KEY = 'geo-key-teste';
   estado.canned = {};
 });
+afterEach(() => { vi.unstubAllGlobals(); });
 
 const pedido = { origem: C.familia, destinoId: 'esc1', sentido: 'ida', turno: 'manha', contratacao: 'mensal' };
 
@@ -72,6 +87,7 @@ describe('api/buscar-rotas (handler, mock Supabase)', () => {
   });
 
   it('rota publicada e concluída => compatível, com nome/van e SEM PII', async () => {
+    const provedor = mockProvedorViario();
     estado.canned = {
       routes: [rotaRealCanon()],
       vehicles: [{ id: 'veic-1', seats_passenger: 6 }],
@@ -85,6 +101,10 @@ describe('api/buscar-rotas (handler, mock Supabase)', () => {
     expect(out.resultados[0].rotaNome).toBe('Rota do Teste');
     expect(out.resultados[0].vanLugares).toBe(6);
     expect(out.resultados[0].status).toBe('compativel');
+    // Confirmado com tempos REAIS do provedor viário (não com a estimativa).
+    expect(out.resultados[0].temposEstimados).toBe(false);
+    expect(provedor).toHaveBeenCalledTimes(1);
+    expect(String(provedor.mock.calls[0][0])).toContain('routematrix');
     // Preço por aluno (valor fixo por aluno da van) é devolvido para o cartão.
     expect(out.resultados[0].precoMensal).toBe(450);
     expect(out.resultados[0].precoTipo).toBe('fixo');
@@ -92,6 +112,40 @@ describe('api/buscar-rotas (handler, mock Supabase)', () => {
     expect(res.body).not.toContain('Segredo');
     expect(res.body).not.toContain('Secreta');
     expect(res.body).not.toContain('identificacao');
+  });
+
+  it('sem chave do provedor viário => tempos estimados NUNCA confirmam (sob confirmação)', async () => {
+    delete process.env.GEOAPIFY_API_KEY;
+    const provedor = mockProvedorViario();
+    estado.canned = { routes: [rotaRealCanon()], vehicles: [{ id: 'veic-1', seats_passenger: 6 }] };
+    const res = fakeRes();
+    await handler(fakeReq(pedido), res as never);
+    const out = JSON.parse(res.body);
+    expect(provedor).not.toHaveBeenCalled();
+    expect(out.resultados).toHaveLength(1);
+    expect(out.resultados[0].status).toBe('sob_confirmacao');
+    expect(out.resultados[0].temposEstimados).toBe(true);
+  });
+
+  it('provedor viário fora do ar => idem: sob confirmação, nunca compatível', async () => {
+    mockProvedorViario(false);
+    estado.canned = { routes: [rotaRealCanon()], vehicles: [{ id: 'veic-1', seats_passenger: 6 }] };
+    const res = fakeRes();
+    await handler(fakeReq(pedido), res as never);
+    const out = JSON.parse(res.body);
+    expect(res.statusCode).toBe(200);
+    expect(out.resultados[0].status).toBe('sob_confirmacao');
+    expect(out.resultados[0].temposEstimados).toBe(true);
+  });
+
+  it('rota de outro turno (ida) não é avaliada', async () => {
+    mockProvedorViario();
+    estado.canned = { routes: [{ ...rotaRealCanon(), turno: 'tarde' }], vehicles: [{ id: 'veic-1', seats_passenger: 6 }] };
+    const res = fakeRes();
+    await handler(fakeReq(pedido), res as never);
+    const out = JSON.parse(res.body);
+    expect(out.resultados).toHaveLength(0);
+    expect(out.totalRotasAvaliadas).toBe(0);
   });
 
   it('sem rotas => vazio (não vaza rota)', async () => {

@@ -11,6 +11,21 @@ export function DemoChip({ className }: { className?: string }) {
   );
 }
 
+/** Aviso de erro REAL de consulta (com opção de tentar de novo). */
+export function AvisoErro({ mensagem, onTentar, className }: { mensagem: string; onTentar?: () => void; className?: string }) {
+  return (
+    <div role="alert" className={cn('rounded-2xl bg-red-50 p-4 text-sm text-red-700 ring-1 ring-red-100', className)}>
+      <p className="font-semibold">Não foi possível carregar os seus dados.</p>
+      <p className="mt-0.5 break-words text-xs text-red-600">{mensagem}</p>
+      {onTentar && (
+        <button onClick={onTentar} className="mt-2 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-red-700 ring-1 ring-red-200">
+          Tentar de novo
+        </button>
+      )}
+    </div>
+  );
+}
+
 /** Tile de indicador (número grande + rótulo + ícone colorido). */
 export function StatTile({ icon: Icon, valor, rotulo, cor = 'green' }: {
   icon: LucideIcon; valor: ReactNode; rotulo: string;

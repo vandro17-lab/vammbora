@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { Users, Armchair, Route as RouteIcon, School, Fuel, Coins, Bell, Star, Sparkles, ChevronRight } from 'lucide-react';
 import { Avatar } from '@/components/brand/Avatar';
 import { VMShell } from '@/components/vm/VMShell';
-import { StatTile, Card, Barra, DemoChip } from '@/components/vm/ui';
+import { StatTile, Card, Barra, DemoChip, AvisoErro } from '@/components/vm/ui';
 import { VanEscolar } from '@/components/vm/VanEscolar';
 import { SlotIlustracao } from '@/components/vm/SlotImagem';
 import { useDadosMotorista } from '@/lib/vm/useDadosMotorista';
@@ -11,7 +11,7 @@ import { MOTORISTA_DEMO } from '@/data/motorista-demo';
 import { formatBRL } from '@/lib/utils';
 
 export function DashboardPage() {
-  const { dados, indicadores: ind, carregando } = useDadosMotorista();
+  const { dados, indicadores: ind, carregando, erro, recarregar } = useDadosMotorista();
   const { session } = useAuth();
   const hora = new Date().getHours();
   const saudacao = hora < 12 ? 'Bom dia' : hora < 18 ? 'Boa tarde' : 'Boa noite';
@@ -62,8 +62,11 @@ export function DashboardPage() {
       <div className="space-y-3.5 px-4 pt-4">
         {dados.demo && <div className="flex justify-end"><DemoChip /></div>}
 
-        {/* Primeiros passos (dados reais, ainda incompletos) */}
-        {!dados.demo && (!dados.veiculo || ind.rotas === 0) && (
+        {erro && <AvisoErro mensagem={erro} onTentar={recarregar} />}
+
+        {/* Primeiros passos (dados reais, ainda incompletos) — só depois de a
+            consulta terminar SEM erro, para não confundir "vazio" com "falhou". */}
+        {!dados.demo && !carregando && !erro && (!dados.veiculo || ind.rotas === 0) && (
           <Card className="p-5 text-center">
             <span className="mx-auto grid h-14 w-14 place-items-center overflow-hidden rounded-2xl bg-mint-50 text-mint-600">
               <SlotIlustracao slot="dash.primeirosPassos" alt="" fallback={<Sparkles className="h-7 w-7" />} />

@@ -7,10 +7,11 @@ import { CIDADE_PADRAO } from '@/data/cidades';
 import { useVitrine } from '@/data/VitrineProvider';
 import { TURNO_LABEL, cn } from '@/lib/utils';
 import { criteriosParaParams } from '@/lib/searchParams';
-import { AutocompleteEndereco } from '@/components/search/AutocompleteEndereco';
-import { locaisDeDestinos, geocodificarPreciso } from '@/lib/geocode';
+import { CampoEndereco } from '@/components/search/CampoEndereco';
+import { ENDERECO_VAZIO, escolherPonto, type EnderecoCampo } from '@/lib/endereco';
+import { locaisDeDestinos, geocodificarPreciso, estimarNumeroNaRua } from '@/lib/geocode';
 import { Loader2 } from 'lucide-react';
-import { SearchLoadingScreen } from '@/components/search/SearchLoadingScreen';
+import { buscaOverlay } from '@/lib/busca-overlay';
 
 const TITULOS = ['De onde vamos sair?', 'Qual é o destino?', 'Como é sua rotina?'];
 const DESCRICOES = ['Comece pelo bairro de embarque.', 'Escolha a escola ou a faculdade.', 'Falta pouco para encontrar suas opções.'];
@@ -24,8 +25,8 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
   const locaisBusca = useMemo(() => locaisDeDestinos(destinos), [destinos]);
 
   const [passo, setPasso] = useState(0);
-  const [endereco, setEndereco] = useState('');
-  const [origemCoord, setOrigemCoord] = useState<{ lat: number; lng: number } | null>(null);
+  // Origem: texto + ponto validado (provedor, sugestão escolhida ou mapa).
+  const [origem, setOrigem] = useState<EnderecoCampo>(ENDERECO_VAZIO);
   const [destinoId, setDestinoId] = useState('');
   const [turno, setTurno] = useState<Turno | ''>('');
   const [contratacao, setContratacao] = useState<Contratacao>('mensal');
@@ -33,7 +34,6 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
   const [modalidade, setModalidade] = useState<ModalidadeTrajeto>('ida');
   const [localizando, setLocalizando] = useState(false);
   const [horario, setHorario] = useState('07:00');
-  const [mostrarBusca, setMostrarBusca] = useState(false);
   const titulo = useRef<HTMLHeadingElement>(null);
   // Ao trocar de passo, focamos o título (acessibilidade). `preventScroll` tenta
   // evitar que a página role ao focar — mas iOS antigo o ignora e a tela "foge
@@ -53,29 +53,35 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
     if (passo < 2) { ir(passo + 1); return; }
     if (localizando) return;
 
-    sessionStorage.setItem('vambora.busca.transicao', '1');
-    sessionStorage.setItem('vambora.busca.iniciadaEm', String(Date.now()));
-    setMostrarBusca(true);
-    const texto = endereco.trim();
-    // Garante uma COORDENADA de origem antes de buscar. Sem ela, o motor de
-    // rotas reais não classifica compatibilidade (era por isso que "nunca
-    // encontrava"). Quando o usuário digita um endereço com número e NÃO
-    // escolhe uma sugestão — ou escolhe só a rua — geocodificamos o texto
-    // respeitando o número da casa (geocodificarPreciso trata "Rua X, 123").
-    let coord = origemCoord;
-    const temNumero = /\d/.test(texto);
-    if (texto.length >= 3 && (!coord || temNumero)) {
+    // A animação de busca aparece JÁ no clique e segue na página de resultados
+    // (é a mesma tela; não reinicia). Cancelar aqui interrompe a localização do
+    // endereço e mantém a pessoa no formulário.
+    let cancelada = false;
+    const ctrl = new AbortController();
+    buscaOverlay.abrir();
+    buscaOverlay.definirCancelamento(() => { cancelada = true; ctrl.abort(); });
+    const texto = origem.texto.trim();
+    // Garante uma COORDENADA de origem antes de buscar (sem ela o motor não
+    // classifica compatibilidade). O campo já valida enquanto a pessoa digita;
+    // se ela enviou antes de terminar, localizamos aqui com a MESMA regra:
+    // número confirmado = exato; só a rua = ponto da rua; nada confiável = sem
+    // ponto (a tela de resultados pede um endereço reconhecido).
+    let coord = origem.coord;
+    if (!coord && texto.length >= 3) {
       setLocalizando(true);
-      const ctrl = new AbortController();
       const limite = window.setTimeout(() => ctrl.abort(), 7000);
       try {
-        const ponto = await geocodificarPreciso(texto, '', ctrl.signal);
-        if (ponto && Number.isFinite(ponto.lat) && Number.isFinite(ponto.lng)) {
-          coord = { lat: ponto.lat, lng: ponto.lng };
+        const ponto = await geocodificarPreciso(texto, '', ctrl.signal, { aceitarSemNumero: true });
+        coord = escolherPonto(ponto, null).coord;
+        // Só a rua: tenta a posição do número pelos vizinhos (mesma regra do campo).
+        if (coord && ponto?.precisao === 'rua') {
+          const estimado = await estimarNumeroNaRua(texto, ponto, ctrl.signal).catch(() => null);
+          if (estimado) coord = { lat: estimado.lat, lng: estimado.lng };
         }
-      } catch { /* serviço de mapas indisponível: segue sem coordenada precisa */ }
+      } catch { /* serviço de mapas indisponível: segue sem coordenada */ }
       finally { clearTimeout(limite); setLocalizando(false); }
     }
+    if (cancelada) return;
 
     const paramsBase = criteriosParaParams({ cidadeId: CIDADE_PADRAO.id, endereco: texto, destinoId: destinoId || null, turno: turno || null, contratacao, dataAvulso: contratacao === 'avulso' ? dataAvulso : undefined, modalidade, origemLat: coord?.lat, origemLng: coord?.lng });
     const params = new URLSearchParams(paramsBase);
@@ -99,7 +105,7 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
         <p className="mt-2 text-sm leading-relaxed text-navy-500">{DESCRICOES[passo]}</p>
         {passo === 0 && <div className="mt-6 space-y-5">
           <div className="flex items-center gap-3 rounded-xl bg-navy-50 p-4"><MapPin className="h-5 w-5 text-mint-700" /><div><span className="block text-xs text-navy-500">Sua cidade</span><span className="text-sm font-semibold">Araçatuba, SP</span></div></div>
-          <div><label className="field-label" htmlFor="endereco">Endereço ou bairro de embarque</label><AutocompleteEndereco id="endereco" value={endereco} locais={locaisBusca} placeholder="Ex.: Rua José Geraldo, 450 — Centro" onChange={(texto, coord) => { setEndereco(texto); setOrigemCoord(coord ?? null); }} /><p className="mt-2 text-xs text-navy-500">Pode incluir o número (ex.: “Rua José Geraldo, 450”). Escolha uma sugestão ou apenas digite — nós localizamos no mapa. O ponto exato você combina com o motorista.</p></div>
+          <div><label className="field-label" htmlFor="endereco">Endereço ou bairro de embarque</label><CampoEndereco id="endereco" valor={origem} onChange={setOrigem} locais={locaisBusca} placeholder="Ex.: Rua José Geraldo, 450 — Centro" /><p className="mt-2 text-xs text-navy-500">Pode incluir o número (ex.: “Rua José Geraldo, 450”). Escolha uma sugestão ou apenas digite: o alfinete aparece no mapa e você pode arrastá-lo. O ponto exato você combina com o motorista.</p></div>
         </div>}
         {passo === 1 && <div className="mt-6">
           <label className="field-label" htmlFor="destino">Escola, faculdade ou destino</label>
@@ -122,7 +128,6 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
         <button type="submit" className="btn btn-lg btn-primary flex-1" disabled={localizando} aria-busy={localizando}>{passo === 2 ? (localizando ? <><Loader2 className="h-4 w-4 animate-spin" /> Localizando endereço…</> : <><Search className="h-4 w-4" /> Encontrar vans</>) : <>Continuar <ArrowRight className="h-4 w-4" /></>}</button>
       </div>
       <p className="mt-4 text-center text-xs text-navy-500">Sem criar conta. No seu tempo.</p>
-      {mostrarBusca && <SearchLoadingScreen cidade={CIDADE_PADRAO.nome} />}
     </form>
   );
 }

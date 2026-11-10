@@ -42,8 +42,12 @@ export default defineConfig({
         clientsClaim: true,
         // Estratégia segura: o app-shell é pré-cacheado; nada de dados privados
         // é armazenado aqui. Dados sensíveis vão para chamadas de rede sem cache.
+        // As animações são pedidas com parâmetros (?capture, ?bg, ?v): o cache
+        // offline deve reconhecê-las mesmo assim.
+        ignoreURLParametersMatching: [/^utm_/, /^fbclid$/, /^capture$/, /^bg$/, /^v$/],
         navigateFallback: 'index.html',
-        navigateFallbackDenylist: [/^\/api\//],
+        // /animacoes: páginas próprias (iframes das animações), não o app-shell.
+        navigateFallbackDenylist: [/^\/api\//, /^\/animacoes\//],
       },
       devOptions: {
         enabled: false,

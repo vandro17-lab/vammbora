@@ -199,11 +199,15 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       const lat = Number(f?.lat), lng = Number(f?.lon);
       if (!f || !Number.isFinite(lat) || !Number.isFinite(lng)) return reply(res, 200, { ponto: null });
       const resultType = String(f.result_type ?? '');
-      const temNumero = f.housenumber != null && String(f.housenumber) !== '';
+      // "Exato" só quando o mapa devolveu O número pedido — um imóvel vizinho
+      // (outro número) é ponto de rua, não o endereço solicitado.
+      const pedido = separarRuaNumero(data.texto?.trim() ?? '', data.numero ?? '').num;
+      const devolvido = f.housenumber != null ? String(f.housenumber).replace(/\D/g, '') : '';
+      const temNumero = devolvido !== '' && (!pedido || devolvido === pedido);
       const confianca = Number((f.rank as { confidence?: number } | undefined)?.confidence ?? 0);
       const precisao: 'exato' | 'rua' | 'aproximado' =
-        (resultType === 'building' || temNumero) ? 'exato'
-        : (resultType === 'street' || resultType === 'street_part') ? 'rua'
+        (temNumero || (resultType === 'building' && !pedido)) ? 'exato'
+        : (resultType === 'street' || resultType === 'street_part' || resultType === 'building') ? 'rua'
         : 'aproximado';
       return reply(res, 200, { ponto: { rotulo: String(f.formatted ?? ''), lat, lng, precisao, confianca } });
     }

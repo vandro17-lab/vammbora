@@ -1,0 +1,622 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VanBora — Animação</title>
+<style>
+  html,body{margin:0;height:100%;background:transparent;overflow:hidden}
+  body.solid{background:#000}
+  canvas{display:block;width:100vw;height:100vh}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+/* =====================================================================
+   VanBora — projeto-fonte da animação (Canvas 2D, sem dependências)
+
+   Parâmetros de URL:
+     ?v=A            Versão A — busca inteligente (loop de 10 s)  [padrão]
+     ?v=B            Versão B — abertura da marca (4,2 s, reprodução única)
+     &bg=transparent fundo transparente (A: cidade com bordas esmaecidas)
+     &loop=1         (apenas B) repete a abertura
+   Toda a cena é função pura do tempo: window.renderAt(segundos).
+   ===================================================================== */
+const Q = new URLSearchParams(location.search);
+const VERSION = (Q.get('v') || 'A').toUpperCase();
+const TRANSPARENT = Q.get('bg') === 'transparent';
+const CAPTURE = Q.has('capture');
+if (!TRANSPARENT) document.body.classList.add('solid');
+
+const YEL = '#FFC700';
+const cv = document.getElementById('c');
+const ctx = cv.getContext('2d');
+let W = 0, H = 0;
+
+/* ---------- utilidades ---------- */
+const TAU = Math.PI * 2;
+const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const sstep = (a, b, t) => { t = clamp((t - a) / (b - a)); return t * t * (3 - 2 * t); };
+const eio = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+const eoc = t => 1 - Math.pow(1 - clamp(t), 3);
+const eoq = t => 1 - (1 - t) * (1 - t);
+const eback = t => { t = clamp(t); const c = 1.9; return 1 + (c + 1) * Math.pow(t - 1, 3) + c * Math.pow(t - 1, 2); };
+function rng(seed) { let a = seed >>> 0; return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const g = (v, k = 1) => { v = Math.round(clamp(v * k, 0, 255)); return `rgb(${v},${v},${v})`; };
+const yel = (k = 1, a = 1) => `rgba(${Math.round(255 * k)},${Math.round(199 * k)},0,${a})`;
+
+/* =====================================================================
+   VERSÃO A — BUSCA INTELIGENTE
+   ===================================================================== */
+const T = 10;                       // duração do ciclo (s)
+const PITCH = 7, BH = 2.5;          // quadra: 5 u; rua: 2 u
+const HOME = [-0.7, -0.2];          // centro da residência (origem do radar)
+const BEACON_Z = 4.0;
+const RINGS = [                     // emissão (s), alcance máximo (u)
+  { te: 1.10, R: 9.5 }, { te: 2.60, R: 15 }, { te: 4.10, R: 21 },
+  { te: 5.60, R: 26 }, { te: 7.10, R: 26 }];
+const RING_LIFE = 2.8;
+
+let S = 30, CX = 0, CY = 0, camX = 0, camY = 0, camZ = 0, K = 1;
+function P(x, y, z = 0) {
+  return [CX + ((x - camX) - (y - camY)) * 0.866 * S,
+          CY + ((x - camX) + (y - camY)) * 0.5 * S - (z - camZ) * S];
+}
+function poly(pts, fill, stroke, lw) {
+  ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]);
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+  ctx.closePath();
+  if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+  if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw || 1; ctx.stroke(); }
+}
+function hull(pts) {
+  pts = pts.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const lo = [], up = [];
+  for (const p of pts) { while (lo.length > 1 && cr(lo[lo.length - 2], lo[lo.length - 1], p) <= 0) lo.pop(); lo.push(p); }
+  for (let i = pts.length - 1; i >= 0; i--) { const p = pts[i]; while (up.length > 1 && cr(up[up.length - 2], up[up.length - 1], p) <= 0) up.pop(); up.push(p); }
+  lo.pop(); up.pop(); return lo.concat(up);
+}
+/* caixas alinhadas aos eixos: faces visíveis +x (direita, sombra), +y (esquerda, luz), topo */
+function box(x0, y0, x1, y1, z0, z1, v) {
+  poly([P(x1, y0, z0), P(x1, y1, z0), P(x1, y1, z1), P(x1, y0, z1)], g(v, .58));
+  poly([P(x0, y1, z0), P(x1, y1, z0), P(x1, y1, z1), P(x0, y1, z1)], g(v, .82));
+  poly([P(x0, y0, z1), P(x1, y0, z1), P(x1, y1, z1), P(x0, y1, z1)], g(v, 1));
+}
+const rectY = (x0, x1, y, z0, z1, f) => poly([P(x0, y, z0), P(x1, y, z0), P(x1, y, z1), P(x0, y, z1)], f);
+const rectX = (x, y0, y1, z0, z1, f) => poly([P(x, y0, z0), P(x, y1, z0), P(x, y1, z1), P(x, y0, z1)], f);
+function hipRoof(x0, y0, x1, y1, z, h, v) {
+  const o = .13; x0 -= o; y0 -= o; x1 += o; y1 += o;
+  const A = P(x0, y0, z), B = P(x1, y0, z), C = P(x1, y1, z), D = P(x0, y1, z);
+  if (x1 - x0 >= y1 - y0) {
+    const i = (y1 - y0) / 2, ym = (y0 + y1) / 2, R1 = P(x0 + i, ym, z + h), R2 = P(x1 - i, ym, z + h);
+    poly([A, B, R2, R1], g(v, .72)); poly([A, D, R1], g(v, .97)); poly([B, C, R2], g(v, .6)); poly([D, C, R2, R1], g(v, .86));
+  } else {
+    const i = (x1 - x0) / 2, xm = (x0 + x1) / 2, R1 = P(xm, y0 + i, z + h), R2 = P(xm, y1 - i, z + h);
+    poly([A, B, R1], g(v, .72)); poly([A, D, R2, R1], g(v, .97)); poly([B, C, R2, R1], g(v, .6)); poly([D, C, R2], g(v, .86));
+  }
+}
+function shadowBox(x0, y0, x1, y1, h) {
+  const dx = .55 * h, dy = -.3 * h;
+  poly(hull([P(x0, y0), P(x1, y0), P(x1, y1), P(x0, y1), P(x0 + dx, y0 + dy), P(x1 + dx, y0 + dy), P(x1 + dx, y1 + dy), P(x0 + dx, y1 + dy)]), 'rgba(0,0,0,.36)');
+}
+function onFaceY(y, fn) { const o = P(0, y, 0); ctx.save(); ctx.setTransform(.866 * S, .5 * S, 0, -S, o[0], o[1]); fn(); ctx.restore(); }
+function onFaceX(x, fn) { const o = P(x, 0, 0); ctx.save(); ctx.setTransform(-.866 * S, .5 * S, 0, -S, o[0], o[1]); fn(); ctx.restore(); }
+
+function tree(x, y, sz, ph, t) {
+  const sw = .035 * Math.sin(TAU * 2 * t / T + ph);
+  const a = P(x, y, 0), b = P(x + sw * .4, y, .75 * sz);
+  ctx.strokeStyle = g(34); ctx.lineWidth = Math.max(1, .07 * S); ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
+  const c = P(x + sw, y - sw * .5, 1.15 * sz), r = .5 * sz * S;
+  ctx.fillStyle = g(50); ctx.beginPath(); ctx.arc(c[0], c[1], r, 0, TAU); ctx.fill();
+  ctx.fillStyle = g(66); ctx.beginPath(); ctx.arc(c[0] - r * .2, c[1] - r * .22, r * .72, 0, TAU); ctx.fill();
+  ctx.fillStyle = g(84); ctx.beginPath(); ctx.arc(c[0] - r * .34, c[1] - r * .38, r * .38, 0, TAU); ctx.fill();
+}
+function treeShadow(x, y, sz) {
+  const c = P(x + .5 * sz, y - .28 * sz, 0);
+  ctx.fillStyle = 'rgba(0,0,0,.3)'; ctx.beginPath(); ctx.ellipse(c[0], c[1], .62 * sz * S, .34 * sz * S, 0, 0, TAU); ctx.fill();
+}
+function pole(x, y) {
+  const a = P(x, y, 0), b = P(x, y, 2.1), c = P(x + .28, y + .28, 2.1);
+  ctx.strokeStyle = g(92); ctx.lineWidth = Math.max(1, .045 * S); ctx.lineCap = 'round';
+  ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.lineTo(c[0], c[1]); ctx.stroke();
+  const r = .5 * S, gr = ctx.createRadialGradient(c[0], c[1], 0, c[0], c[1], r);
+  gr.addColorStop(0, 'rgba(255,255,255,.55)'); gr.addColorStop(.18, 'rgba(255,255,255,.14)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(c[0], c[1], r, 0, TAU); ctx.fill();
+}
+const litLevel = (ph, t) => sstep(-.25, .25, Math.sin(TAU * t / T + ph));
+
+/* ---------- cidade procedural ---------- */
+const OBJ = [];      // {x,y,rad,key,draw(t),shadow()}
+const POOLS = [];    // luz dos postes no chão
+function buildCity() {
+  for (let i = -8; i <= 8; i++) for (let j = -8; j <= 8; j++) {
+    const bx = i * PITCH, by = j * PITCH, r = rng((i + 40) * 977 + (j + 40) * 131 + 7);
+    const px = bx + 2.28, py = by + 2.28;
+    OBJ.push({ x: px, y: py, rad: 3, key: px + py + .2, draw: () => pole(px, py), shadow() { } });
+    POOLS.push([px + .3, py + .3]);
+    if (i === 0 && j === 0) continue;
+    for (const [qx, qy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+      const cx = bx + qx * 1.12, cy = by + qy * 1.12, k = r();
+      if (k < .17) {                                   // jardim / praça
+        const ts = [[cx - .4, cy - .3, .8 + r() * .35, r() * 6], [cx + .45, cy + .35, .7 + r() * .3, r() * 6]];
+        for (const a of ts) OBJ.push({ x: a[0], y: a[1], rad: 2, key: a[0] + a[1], draw: t => tree(a[0], a[1], a[2], a[3], t), shadow: () => treeShadow(a[0], a[1], a[2]) });
+        continue;
+      }
+      const w = .68 + r() * .2, d = .62 + r() * .2;
+      const two = r() < .2, h = two ? 1.75 : .88 + r() * .2, wall = 96 + r() * 44, roof = 58 + r() * 26;
+      const kind = k < .3 ? 2 : (k < .52 ? 1 : 0);     // 2 comércio, 1 laje + caixa d'água, 0 telhado
+      const x0 = cx - w, x1 = cx + w, y0 = cy - d, y1 = cy + d;
+      const ph1 = r() * 6.28, ph2 = r() * 6.28, lit1 = r() < .55, lit2 = r() < .45, dyn = r() < .3, tx = r() < .5;
+      OBJ.push({
+        x: cx, y: cy, rad: 3.4, key: cx + cy,
+        shadow: () => shadowBox(x0, y0, x1, y1, h + (kind === 0 ? .2 : 0)),
+        draw(t) {
+          box(x0, y0, x1, y1, 0, h, wall);
+          const l1 = lit1 ? (dyn ? litLevel(ph1, t) : 1) : 0, l2 = lit2 ? (dyn ? litLevel(ph2, t) : 1) : 0;
+          const wc = l => g(lerp(30, 225, l));
+          if (kind === 2) {                             // vitrine + toldo
+            rectY(x0 + .15, x1 - .15, y1, .12, .62, wc(.75));
+            poly([P(x0 + .05, y1, .72), P(x1 - .05, y1, .72), P(x1 - .05, y1 + .3, .58), P(x0 + .05, y1 + .3, .58)], g(205));
+            rectX(x1, y0 + .2, y1 - .2, .3, .68, wc(l2));
+            box(x0 - .05, y0 - .05, x1 + .05, y1 + .05, h, h + .1, wall * .8);
+          } else {
+            rectY(x0 + .2, x0 + .62, y1, .34, .7, wc(l1));
+            rectY(x1 - .5, x1 - .2, y1, 0, .64, g(wall * .42));
+            rectX(x1, y0 + .28, y0 + .78, .34, .7, wc(l2));
+            if (two) { rectY(x0 + .2, x1 - .25, y1, 1.08, 1.45, wc(l2)); rectX(x1, y0 + .28, y1 - .3, 1.08, 1.45, wc(l1)); }
+            if (kind === 0) hipRoof(x0, y0, x1, y1, h, .46, roof);
+            else {
+              box(x0 - .06, y0 - .06, x1 + .06, y1 + .06, h, h + .09, wall * .78);
+              const wx = tx ? x0 + .2 : x1 - .55, wy = y0 + .2;
+              box(wx, wy, wx + .36, wy + .36, h + .09, h + .44, 168);
+            }
+          }
+        }
+      });
+    }
+    for (let n = 0; n < 2; n++) if (r() < .6) {          // árvores de calçada
+      const side = r() < .5, o = (r() * 2 - 1) * 1.5;
+      const tx = side ? bx + 2.25 : bx + o, ty = side ? by + o : by + 2.25, sz = .55 + r() * .2, ph = r() * 6;
+      OBJ.push({ x: tx, y: ty, rad: 2, key: tx + ty, draw: t => tree(tx, ty, sz, ph, t), shadow: () => treeShadow(tx, ty, sz) });
+    }
+  }
+  OBJ.push(homeObject());
+}
+
+/* ---------- residência central ---------- */
+function homeObject() {
+  const trees = [[-1.75, -1.7, 1.0, 1.2], [1.55, -1.6, .85, 3.1], [-1.75, 1.55, .7, 4.4], [1.6, 1.5, .62, .4]];
+  return {
+    x: 0, y: 0, rad: 6, key: 0,
+    shadow() { shadowBox(-1.7, -1.3, 1.3, .9, 1.45); shadowBox(-1.7, -1.3, .3, .9, 2.87); for (const a of trees) treeShadow(a[0], a[1], a[2]); },
+    draw(t) {
+      tree(...trees[0], t); tree(...trees[1], t);
+      // térreo
+      box(-1.7, -1.3, 1.3, .9, 0, 1.45, 244);
+      rectX(1.3, -1.05, .35, 0, 1.08, g(70));                                   // garagem
+      for (let i = 1; i < 6; i++) { const z = i * .18, a = P(1.3, -1.05, z), b = P(1.3, .35, z); ctx.strokeStyle = g(46); ctx.lineWidth = Math.max(.6, .012 * S); ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); }
+      rectY(.62, 1.02, .9, 0, 1.08, g(42));                                     // porta
+      rectY(.9, .95, .9, .5, .56, g(190));
+      rectY(-1.4, .25, .9, .42, 1.1, g(52));                                    // janela térrea
+      rectY(-1.36, .21, .9, .46, 1.06, g(150));
+      rectY(-.6, -.56, .9, .46, 1.06, g(52));
+      // piso superior
+      box(-1.7, -1.3, .3, .9, 1.45, 2.75, 250);
+      rectX(.3, -.9, .3, 1.5, 2.45, g(48)); rectX(.3, -.85, .25, 1.55, 2.4, g(120)); // porta do terraço
+      drawWindowScene(t);
+      // laje em balanço + placas solares
+      box(-1.88, -1.48, .5, 1.12, 2.75, 2.87, 62);
+      poly([P(-1.5, -1.1, 2.88), P(-.75, -1.1, 2.88), P(-.75, -.2, 2.88), P(-1.5, -.2, 2.88)], g(24), g(80), Math.max(.6, .015 * S));
+      poly([P(-.6, -1.1, 2.88), P(.15, -1.1, 2.88), P(.15, -.2, 2.88), P(-.6, -.2, 2.88)], g(24), g(80), Math.max(.6, .015 * S));
+      // guarda-corpo de vidro do terraço
+      rectY(.3, 1.3, .9, 1.45, 1.82, 'rgba(255,255,255,.16)'); rectX(1.3, -1.3, .9, 1.45, 1.82, 'rgba(255,255,255,.10)');
+      const r1 = P(.3, .9, 1.82), r2 = P(1.3, .9, 1.82), r3 = P(1.3, -1.3, 1.82);
+      ctx.strokeStyle = g(215); ctx.lineWidth = Math.max(.8, .022 * S); ctx.beginPath(); ctx.moveTo(r1[0], r1[1]); ctx.lineTo(r2[0], r2[1]); ctx.lineTo(r3[0], r3[1]); ctx.stroke();
+      // jardim frontal e muro baixo com portão
+      tree(...trees[2], t); tree(...trees[3], t);
+      box(2.06, -2.1, 2.14, 2.14, 0, .42, 205);
+      box(-2.1, 2.06, .35, 2.14, 0, .42, 205); box(1.25, 2.06, 2.14, 2.14, 0, .42, 205);
+      for (let i = 0; i <= 6; i++) { const x = .4 + i * .14, a = P(x, 2.1, 0), b = P(x, 2.1, .4); ctx.strokeStyle = g(120); ctx.lineWidth = Math.max(.6, .02 * S); ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); }
+    }
+  };
+}
+/* janela aberta: pessoa com o celular, toque e brilho amarelo */
+function drawWindowScene(t) {
+  const u0 = -1.5, u1 = .1, v0 = 1.66, v1 = 2.58;
+  const tap = sstep(.45, .8, t) * (1 - sstep(1.05, 1.5, t));          // dedo vai até a tela
+  const flash = sstep(.8, .88, t) * (1 - sstep(.95, 1.9, t));         // clarão do toque
+  const glow = .55 + .45 * flash + .06 * Math.sin(TAU * 3 * t / T);
+  const bob = .012 * Math.sin(TAU * 2 * t / T);
+  onFaceY(.9, () => {
+    const px = 1 / S;
+    ctx.fillStyle = g(38); ctx.fillRect(u0 - .05, v0 - .05, u1 - u0 + .1, v1 - v0 + .1);       // moldura
+    ctx.beginPath(); ctx.rect(u0, v0, u1 - u0, v1 - v0); ctx.clip();
+    const bgG = ctx.createLinearGradient(u0, v1, u1, v0); bgG.addColorStop(0, g(188)); bgG.addColorStop(1, g(126));
+    ctx.fillStyle = bgG; ctx.fillRect(u0, v0, u1 - u0, v1 - v0);
+    ctx.fillStyle = g(108); ctx.fillRect(u0, v0, .16, v1 - v0);                                   // folha de correr aberta
+    ctx.fillStyle = g(160); ctx.fillRect(-.42, 2.2, .34, .24); ctx.fillStyle = g(205); ctx.fillRect(-.39, 2.23, .28, .18); // quadro
+    ctx.strokeStyle = g(70); ctx.lineWidth = 1.2 * px; ctx.beginPath(); ctx.moveTo(-1.18, v1); ctx.lineTo(-1.18, 2.42); ctx.stroke();
+    ctx.fillStyle = g(235); ctx.beginPath(); ctx.arc(-1.18, 2.4, .05, 0, TAU); ctx.fill();    // pendente
+    // pessoa
+    const cx = -.78, hy = 2.3 + bob;
+    ctx.fillStyle = g(20);
+    ctx.beginPath(); ctx.moveTo(cx - .27, v0 - .02); ctx.lineTo(cx - .25, 2.02); ctx.quadraticCurveTo(cx - .23, 2.14, cx - .08, 2.15);
+    ctx.lineTo(cx + .08, 2.15); ctx.quadraticCurveTo(cx + .23, 2.14, cx + .25, 2.02); ctx.lineTo(cx + .27, v0 - .02); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = g(236); ctx.fillRect(cx - .04, 2.13, .08, .08);                               // pescoço
+    ctx.beginPath(); ctx.arc(cx, hy, .115, 0, TAU); ctx.fill();                                   // cabeça
+    ctx.fillStyle = g(14); ctx.beginPath(); ctx.arc(cx, hy + .02, .122, -.15, Math.PI + .15); ctx.closePath(); ctx.fill(); // cabelo
+    // celular
+    const phx = cx + .0, phy = 1.83, pw = .13, ph = .22;
+    ctx.strokeStyle = g(236); ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.lineWidth = .075;
+    ctx.beginPath(); ctx.moveTo(cx - .22, 2.0); ctx.lineTo(cx - .2, 1.8); ctx.lineTo(phx - .03, phy + .03); ctx.stroke();      // braço que segura
+    ctx.fillStyle = g(8); ctx.beginPath(); ctx.roundRect(phx - pw / 2, phy, pw, ph, .025); ctx.fill();
+    ctx.fillStyle = yel(1, .75 + .25 * glow); ctx.beginPath(); ctx.roundRect(phx - pw / 2 + .014, phy + .016, pw - .028, ph - .032, .014); ctx.fill();
+    const fx = lerp(cx + .26, phx + .02, tap), fy = lerp(1.78, phy + .12, tap);                   // braço que toca
+    ctx.strokeStyle = g(236); ctx.lineWidth = .07;
+    ctx.beginPath(); ctx.moveTo(cx + .22, 2.0); ctx.lineTo(cx + .25, 1.76); ctx.lineTo(fx, fy); ctx.stroke();
+    // brilho do aparelho
+    const gr = ctx.createRadialGradient(phx, phy + .12, 0, phx, phy + .12, .55);
+    gr.addColorStop(0, yel(1, .5 * glow)); gr.addColorStop(.4, yel(1, .16 * glow)); gr.addColorStop(1, yel(1, 0));
+    ctx.fillStyle = gr; ctx.fillRect(u0, v0, u1 - u0, v1 - v0);
+    const rp = (t - .82) / .55;                                                                    // ondulação do toque
+    if (rp > 0 && rp < 1) { ctx.strokeStyle = yel(1, (1 - rp) * .95); ctx.lineWidth = .022; ctx.beginPath(); ctx.arc(phx, phy + .12, .04 + .26 * eoq(rp), 0, TAU); ctx.stroke(); }
+  });
+  rectY(u0 - .08, u1 + .08, .9, v0 - .1, v0 - .04, g(205));                                       // peitoril
+}
+
+/* ---------- vans escolares ---------- */
+function circuit(bx, by) {
+  const a = 3.0, rc = .8, Ls = 2 * (a - rc), La = Math.PI * rc / 2, Pm = 4 * (Ls + La);
+  const cc = [[bx + a - rc, by - a + rc], [bx + a - rc, by + a - rc], [bx - a + rc, by + a - rc], [bx - a + rc, by - a + rc]];
+  return u => {
+    let d = (((u % 1) + 1) % 1 * Pm + Ls / 2) % Pm;
+    const k = Math.floor(d / (Ls + La)), e = d - k * (Ls + La), th0 = k * Math.PI / 2, c = cc[k], cp = cc[(k + 3) % 4];
+    if (e < Ls) return { x: cp[0] + Math.sin(th0) * rc + Math.cos(th0) * e, y: cp[1] - Math.cos(th0) * rc + Math.sin(th0) * e, th: th0, d: u * Pm };
+    const th = th0 + (e - Ls) / rc;
+    return { x: c[0] + Math.sin(th) * rc, y: c[1] - Math.cos(th) * rc, th, d: u * Pm };
+  };
+}
+let VANS = [];
+function vanAt(v, t) {                       // mais lenta nas esquinas, contínua no loop
+  const tau = t / T + v.ph;
+  return v.path(tau - .34 * Math.sin(8 * Math.PI * (tau - .125)) / (8 * Math.PI));
+}
+function setupVans() {
+  const portrait = H >= W;
+  const cfg = portrait
+    ? [[0, -1, .19], [1, 1, .39], [-2, -1, .62], [2, 2, .04]]
+    : [[0, -1, .19], [1, 1, .39], [-2, -1, .62], [1, -2, .49]];
+  VANS = cfg.map(([i, j, ph]) => ({ path: circuit(i * PITCH, j * PITCH), ph, td: 1e9 }));
+  // descoberta: instante em que a primeira onda alcança cada van
+  for (const v of VANS) {
+    outer: for (const r of RINGS) for (let a = 0; a < RING_LIFE * .9; a += 1 / 240) {
+      const t = r.te + a, p = vanAt(v, t), dist = Math.hypot(p.x - HOME[0], p.y - HOME[1]);
+      if (r.R * eoq(a / RING_LIFE) >= dist) { v.td = t; break outer; }
+    }
+  }
+  window.__td = VANS.map(v => +v.td.toFixed(2));
+}
+const VL = 2.0, VW = .84, VH = 1.0, VZ = .14;
+function vanPts(p) {
+  const c = Math.cos(p.th), s = Math.sin(p.th);
+  return (a, b, z) => P(p.x + c * a - s * b, p.y + s * a + c * b, z);
+}
+function vanShadow(p) {
+  const c = Math.cos(p.th), s = Math.sin(p.th), q = [];
+  for (const [a, b] of [[-1, -.42], [1, -.42], [1, .42], [-1, .42]]) { const x = p.x + c * a - s * b, y = p.y + s * a + c * b; q.push(P(x, y), P(x + .45, y - .25)); }
+  poly(hull(q), 'rgba(0,0,0,.42)');
+  // facho dos faróis
+  const f0 = P(p.x + c * 1.0, p.y + s * 1.0), f1 = P(p.x + c * 3.2 - s * .9, p.y + s * 3.2 + c * .9), f2 = P(p.x + c * 3.2 + s * .9, p.y + s * 3.2 - c * .9);
+  const gr = ctx.createLinearGradient(f0[0], f0[1], (f1[0] + f2[0]) / 2, (f1[1] + f2[1]) / 2);
+  gr.addColorStop(0, 'rgba(255,255,255,.16)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+  poly([f0, f1, f2], gr);
+}
+function vanSilhouette(p) {
+  const pt = vanPts(p), q = [], hw = VW / 2, hl = VL / 2;
+  for (const b of [-hw, hw]) q.push(pt(-hl, b, VZ), pt(hl, b, VZ), pt(hl, b, .55), pt(hl - .3, b, .62), pt(hl - .55, b, VH), pt(-hl, b, VH));
+  return hull(q);
+}
+function drawVan(p) {
+  const pt = vanPts(p), c = Math.cos(p.th), s = Math.sin(p.th), hw = VW / 2, hl = VL / 2;
+  const sh = (nx, ny) => .78 + .2 * (-nx + ny) * .707;
+  const vis = (nx, ny, nz = 0) => nx + ny + 1.3 * nz > 0;
+  const W_ = k => g(250, k), Yc = k => yel(k);
+  // traseira / dianteira
+  if (vis(-c, -s)) { const k = sh(-c, -s);
+    poly([pt(-hl, -hw, VZ), pt(-hl, hw, VZ), pt(-hl, hw, VH), pt(-hl, -hw, VH)], W_(k));
+    poly([pt(-hl, -hw, .4), pt(-hl, hw, .4), pt(-hl, hw, .54), pt(-hl, -hw, .54)], Yc(k));
+    poly([pt(-hl, -hw + .08, .64), pt(-hl, hw - .08, .64), pt(-hl, hw - .08, .9), pt(-hl, -hw + .08, .9)], g(22));
+  }
+  if (vis(c, s)) { const k = sh(c, s);
+    poly([pt(hl, -hw, VZ), pt(hl, hw, VZ), pt(hl, hw, .55), pt(hl, -hw, .55)], W_(k));
+    poly([pt(hl, -hw + .2, .2), pt(hl, hw - .2, .2), pt(hl, hw - .2, .34), pt(hl, -hw + .2, .34)], g(40));
+    for (const b of [-hw + .04, hw - .2]) poly([pt(hl, b, .38), pt(hl, b + .16, .38), pt(hl, b + .16, .5), pt(hl, b, .5)], '#fff');
+  }
+  // capô, para-brisa, teto
+  poly([pt(hl, -hw, .55), pt(hl, hw, .55), pt(hl - .3, hw, .62), pt(hl - .3, -hw, .62)], W_(.97));
+  if (vis(.38 * c, .38 * s, .25)) {
+    poly([pt(hl - .3, -hw, .62), pt(hl - .3, hw, .62), pt(hl - .55, hw, VH), pt(hl - .55, -hw, VH)], W_(.9));
+    poly([pt(hl - .33, -hw + .06, .66), pt(hl - .33, hw - .06, .66), pt(hl - .52, hw - .06, .96), pt(hl - .52, -hw + .06, .96)], g(26));
+  }
+  poly([pt(hl - .55, -hw, VH), pt(hl - .55, hw, VH), pt(-hl, hw, VH), pt(-hl, -hw, VH)], W_(1));
+  // lateral visível
+  for (const sd of [-1, 1]) {
+    const nx = -s * sd, ny = c * sd; if (!vis(nx, ny)) continue;
+    const b = hw * sd, k = sh(nx, ny);
+    poly([pt(-hl, b, VZ), pt(hl, b, VZ), pt(hl, b, .55), pt(hl - .3, b, .62), pt(hl - .55, b, VH), pt(-hl, b, VH)], W_(k));
+    poly([pt(-hl, b, .4), pt(hl, b, .4), pt(hl, b, .54), pt(-hl, b, .54)], Yc(k));                 // faixa amarela
+    poly([pt(-.42, b, .435), pt(.3, b, .435), pt(.3, b, .505), pt(-.42, b, .505)], 'rgba(0,0,0,.82)'); // "ESCOLAR"
+    poly([pt(-hl + .1, b, .66), pt(.6, b, .66), pt(.45, b, .92), pt(-hl + .1, b, .92)], g(22));  // janelas
+    for (const a of [-.42, .06]) poly([pt(a, b, .66), pt(a + .05, b, .66), pt(a + .05, b, .92), pt(a, b, .92)], W_(k));
+    for (const a of [-.58, .58]) {                                                                 // rodas
+      const tire = [], hub = [];
+      for (let i = 0; i < 14; i++) { const an = i / 14 * TAU; tire.push(pt(a + Math.cos(an) * .2, b, .2 + Math.sin(an) * .2)); hub.push(pt(a + Math.cos(an) * .1, b, .2 + Math.sin(an) * .1)); }
+      poly(tire, g(14)); poly(hub, g(165));
+      const an = -p.d / .2, m = pt(a + Math.cos(an) * .12, b, .2 + Math.sin(an) * .12), m2 = pt(a - Math.cos(an) * .12, b, .2 - Math.sin(an) * .12);
+      ctx.strokeStyle = g(40); ctx.lineWidth = Math.max(.7, .03 * S); ctx.beginPath(); ctx.moveTo(m[0], m[1]); ctx.lineTo(m2[0], m2[1]); ctx.stroke();
+    }
+  }
+}
+
+/* ---------- câmera ---------- */
+function camF(t) {            // 1 = próxima da casa, 0 = plano aberto; periódica e sem saltos
+  const tt = ((t - .9) % T + T) % T;
+  if (tt < 2.3) return 1 - eio(tt / 2.3);
+  if (tt < 7.1) return 0;
+  return eio((tt - 7.1) / 2.9);
+}
+function setCamera(t) {
+  const f = camF(t), sWide = Math.min(W / 25, H / 31), sClose = Math.min(W / 8.7, H / 11);
+  S = sWide * Math.pow(sClose / sWide, f);
+  K = Math.min(W, H) / 780;
+  const ph = TAU * t / T;
+  camX = lerp(.35 * Math.sin(ph), -.35, f); camY = lerp(.3 * Math.cos(ph), .55, f); camZ = lerp(.6, 1.75, f);
+  CX = W / 2; CY = H * (H >= W ? .47 : .5);
+}
+
+/* ---------- quadro da Versão A ---------- */
+function renderA(t) {
+  t = ((t % T) + T) % T;
+  setCamera(t);
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+  ctx.fillStyle = '#131313'; ctx.fillRect(0, 0, W, H);
+  const onScr = (x, y, rad) => { const p = P(x, y, 0), m = rad * S; return p[0] > -m && p[0] < W + m && p[1] > -m && p[1] < H + m; };
+
+  // quadras, calçadas e sinalização
+  const rsq = (bx, by, h, r, z) => { const q = []; for (const [sx, sy, a0] of [[1, -1, -Math.PI / 2], [1, 1, 0], [-1, 1, Math.PI / 2], [-1, -1, Math.PI]]) for (let i = 0; i <= 5; i++) { const a = a0 + i / 5 * Math.PI / 2; q.push(P(bx + sx * (h - r) + Math.cos(a) * r, by + sy * (h - r) + Math.sin(a) * r, z)); } return q; };
+  const vis = [];
+  for (let i = -8; i <= 8; i++) for (let j = -8; j <= 8; j++) if (onScr(i * PITCH, j * PITCH, 6)) vis.push([i, j]);
+  for (const [i, j] of vis) {
+    const bx = i * PITCH, by = j * PITCH;
+    poly(rsq(bx, by, BH, .5, 0), g(22)); poly(rsq(bx, by, BH, .5, .07), g(64)); poly(rsq(bx, by, BH - .32, .3, .07), i || j ? g(44) : g(52));
+    ctx.fillStyle = g(54);
+    for (let n = 0; n < 5; n++) {                         // faixas de pedestres
+      const o = 2.72 + n * .39;
+      poly([P(bx + o, by + 1.75), P(bx + o + .2, by + 1.75), P(bx + o + .2, by + 2.3), P(bx + o, by + 2.3)], g(58));
+      poly([P(bx + 1.75, by + o), P(bx + 2.3, by + o), P(bx + 2.3, by + o + .2), P(bx + 1.75, by + o + .2)], g(58));
+    }
+    ctx.strokeStyle = g(50); ctx.lineWidth = Math.max(1, .06 * S); ctx.setLineDash([.38 * S, .34 * S]); ctx.lineCap = 'butt';
+    let a = P(bx + 3.5, by - 1.55), b = P(bx + 3.5, by + 1.55); ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]);
+    a = P(bx - 1.55, by + 3.5); b = P(bx + 1.55, by + 3.5); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); ctx.setLineDash([]);
+  }
+  // caminho de entrada da casa
+  poly([P(.5, 2.1), P(1.1, 2.1), P(1.1, .9), P(.5, .9)].map(p => [p[0], p[1] - .07 * S]), g(78));
+  poly([P(1.3, -1.0), P(2.1, -1.0), P(2.1, .3), P(1.3, .3)].map(p => [p[0], p[1] - .07 * S]), g(70));
+  // luz dos postes
+  for (const [x, y] of POOLS) if (onScr(x, y, 3)) {
+    const c = P(x, y, 0); ctx.save(); ctx.translate(c[0], c[1]); ctx.scale(1.2247, .7071);
+    const gr = ctx.createRadialGradient(0, 0, 0, 0, 0, 1.9 * S); gr.addColorStop(0, 'rgba(255,255,255,.10)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(0, 0, 1.9 * S, 0, TAU); ctx.fill(); ctx.restore();
+  }
+  // objetos visíveis + vans, sombras
+  const vp = VANS.map(v => vanAt(v, t));
+  const list = OBJ.filter(o => onScr(o.x, o.y, o.rad));
+  for (const o of list) o.shadow();
+  for (const p of vp) vanShadow(p);
+
+  const FADE = 1 - sstep(8.7, 9.6, t);                    // rede se desfaz antes do novo ciclo
+  const hc = P(HOME[0], HOME[1], 0);
+  const rings = (mul) => {
+    for (const r of RINGS) {
+      const p = (t - r.te) / RING_LIFE; if (p <= 0 || p >= 1) continue;
+      const rad = r.R * eoq(p) * S, al = Math.min(1, p * 9) * Math.pow(1 - p, 1.35) * mul;
+      ctx.beginPath(); ctx.ellipse(hc[0], hc[1], rad * 1.2247, rad * .7071, 0, 0, TAU);
+      ctx.strokeStyle = yel(1, .07 * al); ctx.lineWidth = 16 * K; ctx.stroke();
+      ctx.strokeStyle = yel(1, .16 * al); ctx.lineWidth = 6 * K; ctx.stroke();
+      ctx.strokeStyle = yel(1, .9 * al); ctx.lineWidth = 1.7 * K; ctx.stroke();
+    }
+  };
+  rings(1);
+  // halo no chão sob a casa durante a busca
+  const search = sstep(.95, 1.25, t) * FADE;
+  if (search > 0) { ctx.save(); ctx.translate(hc[0], hc[1]); ctx.scale(1.2247, .7071); const gr = ctx.createRadialGradient(0, 0, 0, 0, 0, 4.2 * S); gr.addColorStop(0, yel(1, .16 * search)); gr.addColorStop(1, yel(1, 0)); ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(0, 0, 4.2 * S, 0, TAU); ctx.fill(); ctx.restore(); }
+
+  const all = list.map(o => ({ key: o.key, draw: () => o.draw(t) }));
+  vp.forEach(p => all.push({ key: p.x + p.y, draw: () => drawVan(p) }));
+  all.sort((a, b) => a.key - b.key);
+  for (const o of all) o.draw();
+
+  // ---------- camada de descoberta ----------
+  rings(.3);
+  const bob = .06 * Math.sin(TAU * 4 * t / T);
+  const rise = eoc((t - .86) / .32);                       // sinal sobe do celular até o ponto
+  const bz = lerp(2.2, BEACON_Z, rise) + bob * search;
+  const bp = P(HOME[0], HOME[1], bz), roofP = P(HOME[0], HOME[1], 2.87);
+  const bOn = sstep(.86, .95, t) * FADE;
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+
+  VANS.forEach((v, n) => {
+    const p = vp[n], since = t - v.td; if (since < 0 || FADE <= 0) return;
+    const hl = sstep(0, .22, since) * FADE, sil = vanSilhouette(p);
+    // reação precisa no instante do contato
+    const pg = since / .7; if (pg < 1) { const c = P(p.x, p.y, 0), rr = (.4 + 2.2 * eoq(pg)) * S; ctx.beginPath(); ctx.ellipse(c[0], c[1], rr * 1.2247, rr * .7071, 0, 0, TAU); ctx.strokeStyle = yel(1, (1 - pg) * .85); ctx.lineWidth = 2.2 * K; ctx.stroke(); }
+    ctx.save(); ctx.shadowColor = yel(1, .95); ctx.shadowBlur = 9 * K;
+    poly(sil, null, yel(1, .95 * hl), Math.max(1.4, 1.8 * K * Math.sqrt(S / 28))); ctx.restore();
+    // conexão: possibilidade encontrada (arco leve, não é rota)
+    const top = P(p.x, p.y, 1.75), grow = eoc(since / .55);
+    const mx = (bp[0] + top[0]) / 2, my = (bp[1] + top[1]) / 2 - Math.hypot(top[0] - bp[0], top[1] - bp[1]) * .16;
+    const qp = u => [(1 - u) * (1 - u) * bp[0] + 2 * u * (1 - u) * mx + u * u * top[0], (1 - u) * (1 - u) * bp[1] + 2 * u * (1 - u) * my + u * u * top[1]];
+    // a linha nasce na van e corre até a origem da busca
+    ctx.beginPath(); for (let i = 0; i <= 28; i++) { const q = qp(1 - grow * i / 28); i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1]); }
+    ctx.strokeStyle = yel(1, .13 * hl); ctx.lineWidth = 6 * K; ctx.stroke();
+    ctx.strokeStyle = yel(1, .62 * hl); ctx.lineWidth = 1.5 * K; ctx.stroke();
+    if (grow >= 1) { const u = ((t / 2.5 + n * .27) % 1), q = qp(u), a = Math.sin(Math.PI * u) * hl; ctx.fillStyle = yel(1, a); ctx.beginPath(); ctx.arc(q[0], q[1], 3.2 * K, 0, TAU); ctx.fill(); }
+    // marcador de localização: aparece e depois se recolhe a um ponto
+    const sc = eback(since / .38) * lerp(1, .5, sstep(1.5, 2.0, since)) * FADE;
+    if (sc > 0.01) {
+      const r = 10.5 * K * sc; ctx.save(); ctx.translate(top[0], top[1]);
+      ctx.shadowColor = yel(1, .8); ctx.shadowBlur = 12 * K; ctx.fillStyle = YEL;
+      ctx.beginPath(); ctx.moveTo(0, 0); ctx.bezierCurveTo(-r * .5, -r * .9, -r, -r * 1.25, -r, -r * 1.95);
+      ctx.arc(0, -r * 1.95, r, Math.PI, 0); ctx.bezierCurveTo(r, -r * 1.25, r * .5, -r * .9, 0, 0); ctx.fill();
+      ctx.shadowBlur = 0; ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(0, -r * 1.95, r * .4, 0, TAU); ctx.fill(); ctx.restore();
+    }
+  });
+  // ponto de busca sobre a casa
+  if (bOn > 0) {
+    ctx.strokeStyle = yel(1, .4 * bOn * rise); ctx.lineWidth = 1.4 * K; ctx.beginPath(); ctx.moveTo(roofP[0], roofP[1]); ctx.lineTo(bp[0], bp[1]); ctx.stroke();
+    const pop = eback((t - .95) / .4), r = 7.5 * K * Math.max(.45, pop);
+    const pulse = .5 + .5 * Math.sin(TAU * (t - 1.1) / 1.5);
+    const gr = ctx.createRadialGradient(bp[0], bp[1], 0, bp[0], bp[1], r * 6);
+    gr.addColorStop(0, yel(1, .55 * bOn)); gr.addColorStop(.3, yel(1, (.14 + .06 * pulse) * bOn)); gr.addColorStop(1, yel(1, 0));
+    ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(bp[0], bp[1], r * 6, 0, TAU); ctx.fill();
+    ctx.fillStyle = yel(1, bOn); ctx.beginPath(); ctx.arc(bp[0], bp[1], r, 0, TAU); ctx.fill();
+    ctx.fillStyle = `rgba(255,255,255,${.9 * bOn})`; ctx.beginPath(); ctx.arc(bp[0], bp[1], r * .38, 0, TAU); ctx.fill();
+  }
+  // vinheta / máscara
+  const R = Math.hypot(W, H) / 2, vg = ctx.createRadialGradient(W / 2, CY, R * .28, W / 2, CY, R * 1.02);
+  if (TRANSPARENT) { vg.addColorStop(0, 'rgba(0,0,0,1)'); vg.addColorStop(.75, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,0)'); ctx.globalCompositeOperation = 'destination-in'; }
+  else { vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(.7, 'rgba(0,0,0,.72)'); vg.addColorStop(1, 'rgba(0,0,0,1)'); }
+  ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H); ctx.globalCompositeOperation = 'source-over';
+}
+
+/* =====================================================================
+   VERSÃO B — ABERTURA DA MARCA
+   ===================================================================== */
+const TB = 4.2;
+const FONT = '"Montserrat","Poppins","Inter","Segoe UI","Helvetica Neue",Arial,sans-serif';
+function van2D(w, wheelA) {
+  const X = v => v * w, k = w;
+  ctx.lineJoin = 'round';
+  const body = new Path2D();
+  body.moveTo(X(-.5), X(-.03)); body.lineTo(X(-.5), X(-.33)); body.quadraticCurveTo(X(-.5), X(-.41), X(-.42), X(-.41));
+  body.lineTo(X(.2), X(-.41)); body.quadraticCurveTo(X(.25), X(-.41), X(.29), X(-.36)); body.lineTo(X(.4), X(-.215));
+  body.quadraticCurveTo(X(.495), X(-.2), X(.5), X(-.13)); body.lineTo(X(.5), X(-.03)); body.closePath();
+  ctx.fillStyle = '#fff'; ctx.fill(body);
+  ctx.save(); ctx.clip(body);
+  ctx.fillStyle = YEL; ctx.fillRect(X(-.5), X(-.2), k, X(.115));
+  ctx.fillStyle = g(205); ctx.fillRect(X(-.5), X(-.055), k, X(.03));
+  ctx.fillStyle = g(120); ctx.fillRect(X(-.5), X(-.2), X(.022), X(.1));
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(X(.47), X(-.15), X(.03), X(.02), -.3, 0, TAU); ctx.fill();
+  ctx.restore();
+  ctx.fillStyle = g(18);
+  ctx.beginPath(); ctx.roundRect(X(-.44), X(-.365), X(.2), X(.135), X(.02)); ctx.fill();
+  ctx.beginPath(); ctx.roundRect(X(-.215), X(-.365), X(.215), X(.135), X(.02)); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(X(.03), X(-.365)); ctx.lineTo(X(.2), X(-.365)); ctx.quadraticCurveTo(X(.24), X(-.36), X(.265), X(-.325)); ctx.lineTo(X(.34), X(-.23)); ctx.lineTo(X(.03), X(-.23)); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#000'; ctx.font = `800 ${X(.082)}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  try { ctx.letterSpacing = X(.004) + 'px'; } catch (e) { }
+  ctx.fillText('ESCOLAR', X(-.03), X(-.14)); try { ctx.letterSpacing = '0px'; } catch (e) { }
+  ctx.strokeStyle = '#000'; ctx.lineWidth = X(.012); ctx.stroke(body);
+  for (const cx of [-.3, .3]) {
+    ctx.save(); ctx.translate(X(cx), X(-.03));
+    ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(0, 0, X(.095), 0, TAU); ctx.fill();
+    ctx.fillStyle = g(14); ctx.beginPath(); ctx.arc(0, 0, X(.078), 0, TAU); ctx.fill();
+    ctx.fillStyle = g(200); ctx.beginPath(); ctx.arc(0, 0, X(.045), 0, TAU); ctx.fill();
+    ctx.rotate(wheelA); ctx.strokeStyle = g(90); ctx.lineWidth = X(.01);
+    for (let i = 0; i < 3; i++) { ctx.rotate(TAU / 6); ctx.beginPath(); ctx.moveTo(-X(.042), 0); ctx.lineTo(X(.042), 0); ctx.stroke(); }
+    ctx.restore();
+  }
+}
+function renderB(t) {
+  t = clamp(t, 0, TB);
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+  ctx.clearRect(0, 0, W, H);
+  const out = sstep(3.72, 4.2, t);
+  if (!TRANSPARENT) { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H); }
+  const m = Math.min(W * .98, H * .62), R = m * .3, cx = W / 2 + R * .12, cy = H * .5 - R * .62;
+  ctx.save();
+  ctx.globalAlpha = 1 - out;
+  ctx.translate(W / 2, H / 2); ctx.scale(1 + .07 * out * out, 1 + .07 * out * out); ctx.translate(-W / 2, -H / 2);
+  // símbolo amarelo desenhado progressivamente
+  const tri = [[-.66, -.98], [1.02, 0], [-.66, .98]].map(p => [cx + p[0] * R, cy + p[1] * R]);
+  const draw = eio(clamp(t / 1.25));
+  const len = tri.reduce((s, p, i) => s + Math.hypot(tri[(i + 1) % 3][0] - p[0], tri[(i + 1) % 3][1] - p[1]), 0);
+  const gy = ctx.createLinearGradient(cx - R, cy - R, cx + R, cy + R);
+  gy.addColorStop(0, '#FFD83A'); gy.addColorStop(.5, YEL); gy.addColorStop(1, '#F7A600');
+  ctx.save(); ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.strokeStyle = gy; ctx.lineWidth = R * .36 * (.35 + .65 * eoc(t / .9));
+  ctx.setLineDash([len * draw, len]); ctx.shadowColor = yel(1, .35 * sstep(.9, 1.4, t)); ctx.shadowBlur = R * .25;
+  ctx.beginPath(); ctx.moveTo((tri[2][0] + tri[0][0]) / 2, (tri[2][1] + tri[0][1]) / 2); ctx.lineTo(tri[0][0], tri[0][1]); ctx.lineTo(tri[1][0], tri[1][1]); ctx.lineTo(tri[2][0], tri[2][1]); ctx.closePath();
+  if (draw > .001) ctx.stroke(); ctx.restore();
+  // van em movimento
+  const vw = R * 1.72, mv = eoc((t - .75) / 1.2), vx = lerp(-vw * .8, cx - R * .3, mv), vy = cy + R * .38;
+  const speed = t < .75 ? 1 : Math.pow(1 - clamp((t - .75) / 1.2), 2);
+  if (t > .7) {
+    const ln = lerp(.42, 1.5, speed) * vw * sstep(.75, .95, t);
+    [[-.36, 1, YEL], [-.285, .8, '#fff'], [-.21, 1.15, YEL], [-.135, .75, '#fff'], [-.06, .95, YEL]].forEach(([dy, l, col], i) => {
+      const y = vy + dy * vw, x1 = vx - vw * .5 - vw * .02 - (i % 2) * vw * .03, x0 = x1 - ln * l;
+      const gr = ctx.createLinearGradient(x0, 0, x1, 0); gr.addColorStop(0, col === YEL ? yel(1, 0) : 'rgba(255,255,255,0)'); gr.addColorStop(1, col);
+      ctx.fillStyle = gr; ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y - vw * .016); ctx.lineTo(x1, y + vw * .016); ctx.closePath(); ctx.fill();
+    });
+    ctx.save(); ctx.translate(vx, vy + Math.sin(clamp((t - 1.85) / .5) * Math.PI) * -vw * .008);
+    ctx.rotate(-.012 * Math.sin(clamp((t - 1.8) / .45) * Math.PI));
+    van2D(vw, (vx / (vw * .095)));
+    ctx.restore();
+  }
+  // nome
+  let fs = R * .74; const ty = cy + R * 1.78;
+  ctx.font = `italic 900 ${fs}px ${FONT}`; fs *= Math.min(1, W * .8 / ctx.measureText('VanBora').width);
+  ctx.font = `italic 900 ${fs}px ${FONT}`; ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
+  const w1 = ctx.measureText('Van').width, w2 = ctx.measureText('Bora').width, tx = W / 2 - (w1 + w2) / 2;
+  const rv = eoc((t - 1.85) / .75);
+  if (rv > 0) {
+    ctx.save(); ctx.beginPath(); ctx.rect(0, ty - fs * 1.2, tx + (w1 + w2 + fs * .2) * rv, fs * 1.7); ctx.clip();
+    ctx.translate(0, (1 - rv) * fs * .18);
+    ctx.fillStyle = '#fff'; ctx.fillText('Van', tx, ty); ctx.fillStyle = YEL; ctx.fillText('Bora', tx + w1, ty); ctx.restore();
+  }
+  // traço e slogan
+  const sw = eoc((t - 2.4) / .6);
+  if (sw > 0) {
+    const x0 = tx - fs * .02, x1 = tx + w1 + w2 + fs * .05, y = ty + fs * .34;
+    ctx.save(); ctx.beginPath(); ctx.rect(0, y - fs, x0 + (x1 - x0) * sw, fs * 2); ctx.clip();
+    ctx.fillStyle = YEL; ctx.beginPath(); ctx.moveTo(x0, y + fs * .1); ctx.quadraticCurveTo((x0 + x1) / 2, y - fs * .2, x1, y);
+    ctx.quadraticCurveTo((x0 + x1) / 2, y - fs * .09, x0, y + fs * .1); ctx.fill(); ctx.restore();
+  }
+  const sl = sstep(2.65, 3.2, t);
+  if (sl > 0) {
+    ctx.globalAlpha = (1 - out) * sl; ctx.fillStyle = '#fff'; ctx.textAlign = 'center';
+    const ss = fs * .235; ctx.font = `600 ${ss}px ${FONT}`; try { ctx.letterSpacing = ss * .22 + 'px'; } catch (e) { }
+    const yy = ty + fs * .78 + (1 - sl) * ss * .5;
+    ctx.fillText('MAIS VAGAS,', W / 2 + ss * .11, yy); ctx.fillText('MAIS CONEXÕES', W / 2 + ss * .11, yy + ss * 1.42);
+    try { ctx.letterSpacing = '0px'; } catch (e) { }
+  }
+  ctx.restore();
+}
+
+/* =====================================================================
+   execução
+   ===================================================================== */
+function resize() {
+  const dpr = CAPTURE ? 1 : Math.min(window.devicePixelRatio || 1, 2);
+  W = cv.width = Math.round(innerWidth * dpr); H = cv.height = Math.round(innerHeight * dpr);
+  if (VERSION === 'A') setupVans();
+}
+window.renderAt = t => (VERSION === 'B' ? renderB(t) : renderA(t));
+window.DURATION = VERSION === 'B' ? TB : T;
+buildCity(); resize(); addEventListener('resize', resize);
+const ready = (document.fonts && document.fonts.ready) || Promise.resolve();
+ready.then(() => {
+  window.__ready = true;
+  if (CAPTURE) { renderAt(0); return; }
+  const t0 = performance.now(), loopB = Q.get('loop') === '1';
+  (function frame(now) {
+    let t = (now - t0) / 1000;
+    if (VERSION === 'B') { if (loopB) t %= (TB + .6); else if (t > TB) { renderB(TB); return; } }
+    renderAt(t); requestAnimationFrame(frame);
+  })(t0);
+});
+</script>
+</body>
+</html>

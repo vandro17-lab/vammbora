@@ -7,23 +7,23 @@ import {
 import { Path } from '@phosphor-icons/react';
 import { VMShell } from '@/components/vm/VMShell';
 import { VMSectionHeader } from '@/components/vm/VMHeader';
-import { Card, SubHeader, DemoChip, EstadoVazio } from '@/components/vm/ui';
+import { Card, SubHeader, DemoChip, EstadoVazio, AvisoErro } from '@/components/vm/ui';
 import { MapaInterativoRota } from '@/components/motorista/MapaInterativoRota';
+import { SugestaoRotaMelhor } from '@/components/motorista/SugestaoRotaMelhor';
 import { useDadosMotorista } from '@/lib/vm/useDadosMotorista';
 import { publicarRota } from '@/data/motorista-store';
-import { distanciaRotaKm } from '@/lib/vm/cenario';
+import { distanciaRotaKm, tempoRotaMin } from '@/lib/vm/cenario';
 import { minutosParaTextoHora, cn } from '@/lib/utils';
 import { planejarRotaDoCadastro } from '@/lib/rota-para-motor';
 import type { Rota } from '@/types/motorista';
 
-const tempoMin = (km: number) => Math.max(5, Math.round((km / 35) * 60));
 const trajeto = (r: Rota) => (r.sentido === 'ida' ? 'Casas → Colégio Paineiras' : 'Colégio Paineiras → Casas');
 const horario = (r: Rota) => (r.ultimoDesembarqueMin != null ? minutosParaTextoHora(r.ultimoDesembarqueMin).replace(':', 'h') : '—');
 const IconeTurno = (r: Rota) => (r.sentido === 'ida' ? Sunrise : Sunset);
 
 /* ============================ TELA 1 — Minhas Rotas ============================ */
 export function RotasPage() {
-  const { dados } = useDadosMotorista();
+  const { dados, carregando, erro, recarregar } = useDadosMotorista();
   const [aba, setAba] = useState<'ativas' | 'simulacoes'>('ativas');
   const ativas = dados.rotas.length;
 
@@ -54,7 +54,10 @@ export function RotasPage() {
 
         {aba === 'ativas' ? (
           <div className="mt-3 space-y-3">
-            {ativas === 0 && !dados.demo ? (
+            {erro && <AvisoErro mensagem={erro} onTentar={recarregar} />}
+            {ativas === 0 && (carregando || erro) ? (
+              !erro && <p className="py-10 text-center text-sm text-navy-400">Carregando…</p>
+            ) : ativas === 0 && !dados.demo ? (
               <EstadoVazio
                 icon={RouteIcon}
                 titulo="Nenhuma rota ainda"
@@ -141,8 +144,9 @@ function BotaoMontarRota({ to }: { to: string }) {
 export function RotaDetalhePage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { dados, recarregar } = useDadosMotorista();
-  const rota = dados.rotas.find((r) => r.id === id) ?? dados.rotas[0];
+  const { dados, recarregar, carregando, erro } = useDadosMotorista();
+  // Só o cenário de exemplo cai na 1ª rota; no fluxo real, id desconhecido = não encontrada.
+  const rota = dados.rotas.find((r) => r.id === id) ?? (dados.demo ? dados.rotas[0] : undefined);
   const [todas, setTodas] = useState(false);
   const [mapaGrande, setMapaGrande] = useState(false);
   const [publicando, setPublicando] = useState(false);
@@ -167,7 +171,9 @@ export function RotaDetalhePage() {
     return (
       <VMShell nav={false}>
         <SubHeader titulo="Detalhes da Rota" onVoltar={() => navigate('/app/rotas')} />
-        <p className="p-6 text-center text-navy-500">Rota não encontrada.</p>
+        {erro
+          ? <div className="p-4"><AvisoErro mensagem={erro} onTentar={recarregar} /></div>
+          : <p className="p-6 text-center text-navy-500">{carregando ? 'Carregando…' : 'Rota não encontrada.'}</p>}
       </VMShell>
     );
   }
@@ -201,8 +207,9 @@ export function RotaDetalhePage() {
           <div className="mt-3 flex items-center gap-5 border-t border-navy-50 pt-3 text-sm font-semibold text-navy-700">
             <span className="inline-flex items-center gap-1.5"><Users className="h-4 w-4 text-navy-400" /> {rota.passageiros.length}</span>
             <span className="inline-flex items-center gap-1.5"><Navigation className="h-4 w-4 text-navy-400" /> {km.toFixed(1).replace('.', ',')} km</span>
-            <span className="inline-flex items-center gap-1.5"><Clock className="h-4 w-4 text-navy-400" /> {tempoMin(km)} min</span>
+            <span className="inline-flex items-center gap-1.5"><Clock className="h-4 w-4 text-navy-400" /> {tempoRotaMin(rota).total} min</span>
           </div>
+          <p className="mt-2 text-[11px] text-navy-400">Tempo estimado: {tempoRotaMin(rota).dirigindo} min dirigindo + {tempoRotaMin(rota).parado} min parado nas paradas (embarque e desembarque).</p>
           {planejamento.plano?.valido && <p className="mt-3 rounded-xl bg-mint-50 px-3 py-2 text-xs font-semibold text-mint-800">Saída calculada: {minutosParaTextoHora(planejamento.plano.saida ?? 0).replace(':', 'h')} · chegada final: {horario(rota)}</p>}
           {!dados.demo && (
             <Link to={`/painel/rota-real/${rota.id}`} className="btn btn-lg btn-primary mt-4 w-full">
@@ -210,6 +217,19 @@ export function RotaDetalhePage() {
             </Link>
           )}
         </Card>
+
+        {/* Volta sugerida a partir desta ida */}
+        {!dados.demo && rota.sentido === 'ida' && rota.passageiros.length > 0 && (
+          <Card className="p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="font-display font-bold text-navy-900">Rota de volta</p>
+                <p className="mt-0.5 text-xs leading-snug text-navy-500">Montamos a volta a partir desta ida. Você só confere quem volta e ajusta a ordem arrastando.</p>
+              </div>
+              <Link to={`/app/rotas/${rota.id}/volta`} className="shrink-0 rounded-full bg-navy-900 px-4 py-2 text-sm font-bold text-white transition active:scale-95">Montar volta</Link>
+            </div>
+          </Card>
+        )}
 
         {/* Publicar na busca pública (ação explícita do motorista) */}
         <Card className="p-4">
@@ -248,11 +268,14 @@ export function RotaDetalhePage() {
           <p className="mt-2 text-[11px] leading-snug text-navy-400">Fonte: OpenStreetMap / OSRM — tempos são estimativas. Endereços permanecem privados.</p>
         </Card>
 
+        {/* VanBora 2.0: sugestão de ordem melhor (somente leitura) */}
+        <SugestaoRotaMelhor rota={rota} veiculo={dados.veiculo} />
+
         {/* Indicadores */}
         <Card className="grid grid-cols-3 divide-x divide-navy-50 p-0">
           <Indicador icon={MapPin} cor="text-mint-600" valor={String(rota.paradas.length)} rotulo="Paradas" />
           <Indicador icon={Car} cor="text-blue-600" valor={`${km.toFixed(1).replace('.', ',')} km`} rotulo="Percurso" />
-          <Indicador icon={Clock} cor="text-amber-600" valor={`${tempoMin(km)} min`} rotulo="Tempo estimado" />
+          <Indicador icon={Clock} cor="text-amber-600" valor={`${tempoRotaMin(rota).total} min`} rotulo="Tempo estimado" />
         </Card>
 
         {/* Lista de paradas */}

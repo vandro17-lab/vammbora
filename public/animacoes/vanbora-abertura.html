@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>VanBora — Abertura</title>
+<style>
+@font-face{font-family:'VanBoraSans';font-style:italic;font-weight:700;src:url(data:font/woff;base64,d09GRgABAAAAAAUYAAwAAAAABSgABAEGAAAAAAAAAAAAAAAAAAAAAAAAAABHUE9TAAAEyAAAACAAAAAgRHZMdUdTVUIAAAToAAAAMAAAADAfSCdrT1MvMgAAAZgAAABPAAAAYFrOYJBjbWFwAAACBAAAAEYAAABUAOQBl2dseWYAAAJcAAACEQAAAkw82GYgaGVhZAAAARwAAAA2AAAANiH0XYNoaGVhAAABVAAAACIAAAAkCEsFK2htdHgAAAHoAAAAHAAAABwQ0wCdbG9jYQAAAkwAAAAQAAAAEAImAqVtYXhwAAABeAAAACAAAAAgAHkASG5hbWUAAARwAAAAPQAAAEIDjwvAcG9zdAAABLAAAAAXAAAAIP+uADIAAQAAAAQBBpyDiJRfDzz1AAMD6AAAAADYpK5WAAAAAOcYao0AAP/4AxoCvgADAAcAAgAAAAAAAHicY2BkYGCR+reIIYXpFgPD/wPMUswvGDYwIAN2AJXeBn4AAAABAAAABwApAAUAAAAAAAEAAgAeAAYAAABkAAAAAAAAeJxjYGHOYtrDwMrAwNTFFPH/M4M3iGawY4xjMGL0Y2BgYOBggANGBiTgGeLmz7CQwYmhiEXq3yKGFJZ8pmKYGiY9poMMDAwKDCwAqcQNDgAB9AAAApMACwLaAFICpwAVAqIACwJ9ABUBrAALeJw9y7ENQEAYQOHP3RUKpYHEEHoLkJhFDKC2g9F+cRGveXnFQ0JGL2uqiwGdVlKMJrPVFsFXy1txxxVnHLHX7+cB0W8QcgAAAAAAJgBmAHsAtADeAQwBJnicLZBNTxNRGIXPvRPuIC0OnbaDITR2mH5AKS2dmd7ph5IKtFE0Ak0XVRILJQ2GBeLGVXXhEo0xMTExGtzoZupWEw2piSs1rIzxX+iKhYnp1LR09Z7Ve57nYAgAyAk9ggCGM3BDAjyqRyXquGBFiUf0RkVy4rjJG+ed/dW2yVP7sW3To84yPeg6P7tdhxKnHyDABdAD2oaMAKYBMFFR/D6RMU31qno/counzYimiYYyuDq3aHMto+cE6cme87FJLtRuC79NRiLh/Yk7pVi4Ofkgborke3nMdc0Yk6o7tH296JF3IiE2Ejj//DMLqIfTEYCgDAgTtA0GEC8xiCaQ4XXi+uA8+nWftjt/qNxZpG2Awt/9S19QDh9CgMy5oSvjliFoFmPaVCSSNq1QD2+KiczvU3qMsWqzmF+Tz7a2W1Kwns9v6Iy8zcaNikvIzhoVN9l7WJqPrnZ+rEbn+fZSMOSRUpkrBVlKZVcKIP1t7lET5wD0lhA0Lx9UpAXNa4icG1TZZDmbC8mYvjzCW/XWqFqzqHmrMhl0PpGkZzSWWMgMOcc0cTUcH1g0KIeEAKD0sPsmit/HmLZAT9/3Bb7sX7x5uHX57sLG663FpTCfmb0UMmeGc7ul2qsb+d3S5svqM2M9rnOjPJdK45SXfKMm3AC4IfY4+5hkrmEFk4UVd6JVb8nkX/a9VXQ6NNH4D2sihTUAAAB4nC3GIQ6AIAAAwAMtFqLR+RabzS84KWxM2PT/s3jpEC0GYZwEif/RLDk0XVfcHpumyla716kqrg+UyQdYAAAAeJxjYGZg+P+NgeH/VgYjBiwAAGKYA98AAAEAAAAKABwAHgABREZMVAAIAAQAAAAA//8AAAAAAAAAAQAAAAoALAAuAANERkxUABRkZXYyAB5kZXZhAB4ABAAAAAD//wAAAAAAAAAAAAA=) format('woff')}
+@font-face{font-family:'VanBoraSans';font-style:normal;font-weight:700;src:url(data:font/woff;base64,d09GRgABAAAAAAUMAAwAAAAABSQABAEGAAAAAAAAAAAAAAAAAAAAAAAAAABHUE9TAAAEvAAAACAAAAAgRHZMdUdTVUIAAATcAAAAMAAAADAfSCdrT1MvMgAAAZQAAABNAAAAYFrMYD5jbWFwAAACBAAAAEUAAABcARIBWWdseWYAAAJgAAACEgAAAkbet3HvaGVhZAAAARwAAAA2AAAANiHJWQBoaGVhAAABVAAAACAAAAAkB3EBvWhtdHgAAAHkAAAAIAAAACATzgE2bG9jYQAAAkwAAAASAAAAEgKgAgZtYXhwAAABdAAAACAAAAAgAHoASm5hbWUAAAR0AAAANAAAADQCLAqfcG9zdAAABKgAAAATAAAAIP+4ADIAAQAAAAQBBlY9hChfDzz1AAMD6AAAAADYpKnIAAAAAOcYao0AAP/5AvECyAABAAcAAgAAAAAAAHicY2BkYGCR+reIIYVZiIGBgYHpIwMjAyrgAABSywM1AAEAAAAIACsABQAAAAAAAQACAB4ABgAAAGQAAAAAAAB4nGNgYc5k2sPAysDA1MUUwcDA4A2hGeMYjBj9GBgYGDgY4ICRAQl4hrj5MyxgcGQIZpH6t4ghhSWfqRimhkmP6SADA4MCAwsA9VYKvAAAAAH0AAAC4QAQAvoAIQIdAD4B3QA+AxIAIQKMAD4CZwAqeJxNy80KRQAABeHPT7Kyui8kKQuleFXprvBmR1mZzTSLQYkKP5XidW1Cp1Vq9Aaj2WJL+PSa5M6VM/8c2d/7wwNAiBJfAAAAAAAAJgBAAGsAgQCQALwA5QEjAAB4nFWQv2sTYRzGn/ebNkdtaT3Tu4BCw5uzdzaEC83lB4QapUTBoURqE6G9qk1IIx0SCe0i7aJZKlLEUVxakyUVh4qCEG4scRLEP8ClQ0UQsSBV+p401cHtGR4+fJ4HvQDADqgND7zowwCGAJnLnHG/J2kwWfIZEjsQA6whXrY6rRZ70nrcalH7KEOPXPHJdQUx0Q0gnAboIzmQcAoY5ZLms3xaP7Ef4lfotdgVb/I386ur5BxNMjAmXICBu7/pA+3iHHAmkbCiql/TdS3oVYZVK5pIWl6vFtT1OJ/dXFzbGWkrU+PZQiE7PqW0R3bWFjdnWefFXL0WNiu2XTHDtYdzW3fBkAbYV3LQD/gUS9EUrnCZK/t7e8wjptkrim/Un62Ts/63+54c9AJJS+Gytf9ZrGzX6+QABO4e0nfqYOjYsEfX47GupaoMe71aIhGP/ZNlRnNhoVksNm/faRRnSqWZXKmUk+xmudyw7Ua53LSf37Pnq5Vb89VjbhqgEjkYhB/gHk3WZH6ClXzMinbBGms8HdtmgRsrqezUlqgvRSKRyBLrEz/JSZXSVyt+8YU9MEMXzOMnQ+4hTVAHIUDVdcNS1ROMbpgUj/1/rX+EugO+3b9Gb3vMUT2sWZFMPr1RW97ofUfm+YB+OZPJpS8uZ6Vo4YoxpgXOBtVBJTQ9WahWi0GDB4K66g9dvzRRSP0BmaGefgAAAAAAAgAeAAMAAQQJAAEADgAAAAMAAQQJAAIACAAOAFAAbwBwAHAAaQBuAHMAQgBvAGwAZHicY2BmAIP/WxmMGLAAACzCAeoAAAEAAAAKABwAHgABREZMVAAIAAQAAAAA//8AAAAAAAAAAQAAAAoALAAuAANERkxUABRkZXYyAB5kZXZhAB4ABAAAAAD//wAAAAAAAAAAAAA=) format('woff')}
+@font-face{font-family:'VanBoraSans';font-style:normal;font-weight:500;src:url(data:font/woff;base64,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) format('woff')}
+  html,body{margin:0;height:100%;background:transparent;overflow:hidden}
+  body.solid{background:#000}
+  canvas{display:block;width:100vw;height:100vh}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<script>
+/* =====================================================================
+   VanBora — abertura da marca (Canvas 2D, arquivo único, sem rede)
+
+   Duração: 4,2 s, reprodução única; termina em tela vazia para revelar
+   a interface. Fontes embutidas (Poppins, licença OFL).
+
+   Parâmetros de URL:
+     ?bg=transparent  fundo transparente (padrão: preto)
+     ?loop=1          repete (para testes)
+   Ao terminar, dispara o evento "vanbora:fim" em window e envia
+   postMessage({type:'vanbora:fim'}) para a página que o incorporar.
+   ===================================================================== */
+const Q = new URLSearchParams(location.search);
+const TRANSPARENT = Q.get('bg') === 'transparent';
+const CAPTURE = Q.has('capture');
+if (!TRANSPARENT) document.body.classList.add('solid');
+const YEL = '#FFC700';
+const cv = document.getElementById('c');
+const ctx = cv.getContext('2d');
+let W = 0, H = 0;
+
+/* ---------- utilidades ---------- */
+const TAU = Math.PI * 2;
+const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const sstep = (a, b, t) => { t = clamp((t - a) / (b - a)); return t * t * (3 - 2 * t); };
+const eio = t => t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+const eoc = t => 1 - Math.pow(1 - clamp(t), 3);
+const eoq = t => 1 - (1 - t) * (1 - t);
+const eback = t => { t = clamp(t); const c = 1.9; return 1 + (c + 1) * Math.pow(t - 1, 3) + c * Math.pow(t - 1, 2); };
+function rng(seed) { let a = seed >>> 0; return () => { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const g = (v, k = 1) => { v = Math.round(clamp(v * k, 0, 255)); return `rgb(${v},${v},${v})`; };
+const yel = (k = 1, a = 1) => `rgba(${Math.round(255 * k)},${Math.round(199 * k)},0,${a})`;
+
+/* ---------- cena ---------- */
+const TB = 4.2;
+const FONT = '"VanBoraSans","Poppins","Segoe UI","Helvetica Neue",Arial,sans-serif';
+function van2D(w, wheelA) {
+  const X = v => v * w, k = w;
+  ctx.lineJoin = 'round';
+  const body = new Path2D();
+  body.moveTo(X(-.5), X(-.03)); body.lineTo(X(-.5), X(-.33)); body.quadraticCurveTo(X(-.5), X(-.41), X(-.42), X(-.41));
+  body.lineTo(X(.2), X(-.41)); body.quadraticCurveTo(X(.25), X(-.41), X(.29), X(-.36)); body.lineTo(X(.4), X(-.215));
+  body.quadraticCurveTo(X(.495), X(-.2), X(.5), X(-.13)); body.lineTo(X(.5), X(-.03)); body.closePath();
+  ctx.fillStyle = '#fff'; ctx.fill(body);
+  ctx.save(); ctx.clip(body);
+  ctx.fillStyle = YEL; ctx.fillRect(X(-.5), X(-.2), k, X(.115));
+  ctx.fillStyle = g(205); ctx.fillRect(X(-.5), X(-.055), k, X(.03));
+  ctx.fillStyle = g(120); ctx.fillRect(X(-.5), X(-.2), X(.022), X(.1));
+  ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.ellipse(X(.47), X(-.15), X(.03), X(.02), -.3, 0, TAU); ctx.fill();
+  ctx.restore();
+  ctx.fillStyle = g(18);
+  ctx.beginPath(); ctx.roundRect(X(-.44), X(-.365), X(.2), X(.135), X(.02)); ctx.fill();
+  ctx.beginPath(); ctx.roundRect(X(-.215), X(-.365), X(.215), X(.135), X(.02)); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(X(.03), X(-.365)); ctx.lineTo(X(.2), X(-.365)); ctx.quadraticCurveTo(X(.24), X(-.36), X(.265), X(-.325)); ctx.lineTo(X(.34), X(-.23)); ctx.lineTo(X(.03), X(-.23)); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#000'; ctx.font = `700 ${X(.082)}px ${FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  try { ctx.letterSpacing = X(.004) + 'px'; } catch (e) { }
+  ctx.fillText('ESCOLAR', X(-.03), X(-.14)); try { ctx.letterSpacing = '0px'; } catch (e) { }
+  ctx.strokeStyle = '#000'; ctx.lineWidth = X(.012); ctx.stroke(body);
+  for (const cx of [-.3, .3]) {
+    ctx.save(); ctx.translate(X(cx), X(-.03));
+    ctx.fillStyle = '#000'; ctx.beginPath(); ctx.arc(0, 0, X(.095), 0, TAU); ctx.fill();
+    ctx.fillStyle = g(14); ctx.beginPath(); ctx.arc(0, 0, X(.078), 0, TAU); ctx.fill();
+    ctx.fillStyle = g(200); ctx.beginPath(); ctx.arc(0, 0, X(.045), 0, TAU); ctx.fill();
+    ctx.rotate(wheelA); ctx.strokeStyle = g(90); ctx.lineWidth = X(.01);
+    for (let i = 0; i < 3; i++) { ctx.rotate(TAU / 6); ctx.beginPath(); ctx.moveTo(-X(.042), 0); ctx.lineTo(X(.042), 0); ctx.stroke(); }
+    ctx.restore();
+  }
+}
+function renderB(t) {
+  t = clamp(t, 0, TB);
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+  ctx.clearRect(0, 0, W, H);
+  const out = sstep(3.72, 4.2, t);
+  if (!TRANSPARENT) { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H); }
+  const m = Math.min(W * .98, H * .62), R = m * .3, cx = W / 2 + R * .12, cy = H * .5 - R * .62;
+  ctx.save();
+  ctx.globalAlpha = 1 - out;
+  ctx.translate(W / 2, H / 2); ctx.scale(1 + .07 * out * out, 1 + .07 * out * out); ctx.translate(-W / 2, -H / 2);
+  // símbolo amarelo desenhado progressivamente
+  const tri = [[-.66, -.98], [1.02, 0], [-.66, .98]].map(p => [cx + p[0] * R, cy + p[1] * R]);
+  const draw = eio(clamp(t / 1.25));
+  const len = tri.reduce((s, p, i) => s + Math.hypot(tri[(i + 1) % 3][0] - p[0], tri[(i + 1) % 3][1] - p[1]), 0);
+  const gy = ctx.createLinearGradient(cx - R, cy - R, cx + R, cy + R);
+  gy.addColorStop(0, '#FFD83A'); gy.addColorStop(.5, YEL); gy.addColorStop(1, '#F7A600');
+  ctx.save(); ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.strokeStyle = gy; ctx.lineWidth = R * .36 * (.35 + .65 * eoc(t / .9));
+  ctx.setLineDash([len * draw, len]); ctx.shadowColor = yel(1, .35 * sstep(.9, 1.4, t)); ctx.shadowBlur = R * .25;
+  ctx.beginPath(); ctx.moveTo((tri[2][0] + tri[0][0]) / 2, (tri[2][1] + tri[0][1]) / 2); ctx.lineTo(tri[0][0], tri[0][1]); ctx.lineTo(tri[1][0], tri[1][1]); ctx.lineTo(tri[2][0], tri[2][1]); ctx.closePath();
+  if (draw > .001) ctx.stroke(); ctx.restore();
+  // van em movimento
+  const vw = R * 1.72, mv = eoc((t - .75) / 1.2), vx = lerp(-vw * .8, cx - R * .3, mv), vy = cy + R * .38;
+  const speed = t < .75 ? 1 : Math.pow(1 - clamp((t - .75) / 1.2), 2);
+  if (t > .7) {
+    const ln = lerp(.42, 1.5, speed) * vw * sstep(.75, .95, t);
+    [[-.36, 1, YEL], [-.285, .8, '#fff'], [-.21, 1.15, YEL], [-.135, .75, '#fff'], [-.06, .95, YEL]].forEach(([dy, l, col], i) => {
+      const y = vy + dy * vw, x1 = vx - vw * .5 - vw * .02 - (i % 2) * vw * .03, x0 = x1 - ln * l;
+      const gr = ctx.createLinearGradient(x0, 0, x1, 0); gr.addColorStop(0, col === YEL ? yel(1, 0) : 'rgba(255,255,255,0)'); gr.addColorStop(1, col);
+      ctx.fillStyle = gr; ctx.beginPath(); ctx.moveTo(x0, y); ctx.lineTo(x1, y - vw * .016); ctx.lineTo(x1, y + vw * .016); ctx.closePath(); ctx.fill();
+    });
+    ctx.save(); ctx.translate(vx, vy + Math.sin(clamp((t - 1.85) / .5) * Math.PI) * -vw * .008);
+    ctx.rotate(-.012 * Math.sin(clamp((t - 1.8) / .45) * Math.PI));
+    van2D(vw, (vx / (vw * .095)));
+    ctx.restore();
+  }
+  // nome
+  let fs = R * .74; const ty = cy + R * 1.78;
+  ctx.font = `italic 700 ${fs}px ${FONT}`; fs *= Math.min(1, W * .8 / ctx.measureText('VanBora').width);
+  ctx.font = `italic 700 ${fs}px ${FONT}`; ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
+  const w1 = ctx.measureText('Van').width, w2 = ctx.measureText('Bora').width, tx = W / 2 - (w1 + w2) / 2;
+  const rv = eoc((t - 1.85) / .75);
+  if (rv > 0) {
+    ctx.save(); ctx.beginPath(); ctx.rect(0, ty - fs * 1.2, tx + (w1 + w2 + fs * .2) * rv, fs * 1.7); ctx.clip();
+    ctx.translate(0, (1 - rv) * fs * .18);
+    ctx.fillStyle = '#fff'; ctx.fillText('Van', tx, ty); ctx.fillStyle = YEL; ctx.fillText('Bora', tx + w1, ty); ctx.restore();
+  }
+  // traço e slogan
+  const sw = eoc((t - 2.4) / .6);
+  if (sw > 0) {
+    const x0 = tx - fs * .02, x1 = tx + w1 + w2 + fs * .05, y = ty + fs * .34;
+    ctx.save(); ctx.beginPath(); ctx.rect(0, y - fs, x0 + (x1 - x0) * sw, fs * 2); ctx.clip();
+    ctx.fillStyle = YEL; ctx.beginPath(); ctx.moveTo(x0, y + fs * .1); ctx.quadraticCurveTo((x0 + x1) / 2, y - fs * .2, x1, y);
+    ctx.quadraticCurveTo((x0 + x1) / 2, y - fs * .09, x0, y + fs * .1); ctx.fill(); ctx.restore();
+  }
+  const sl = sstep(2.65, 3.2, t);
+  if (sl > 0) {
+    ctx.globalAlpha = (1 - out) * sl; ctx.fillStyle = '#fff'; ctx.textAlign = 'center';
+    const ss = fs * .235; ctx.font = `500 ${ss}px ${FONT}`; try { ctx.letterSpacing = ss * .22 + 'px'; } catch (e) { }
+    const yy = ty + fs * .78 + (1 - sl) * ss * .5;
+    ctx.fillText('MAIS VAGAS,', W / 2 + ss * .11, yy); ctx.fillText('MAIS CONEXÕES', W / 2 + ss * .11, yy + ss * 1.42);
+    try { ctx.letterSpacing = '0px'; } catch (e) { }
+  }
+  ctx.restore();
+}
+
+/* ---------- execução ---------- */
+function resize() {
+  const dpr = CAPTURE ? 1 : Math.min(window.devicePixelRatio || 1, 3);
+  W = cv.width = Math.round(innerWidth * dpr); H = cv.height = Math.round(innerHeight * dpr);
+  if (window.__t !== undefined) renderB(window.__t);
+}
+window.renderAt = t => { window.__t = t; renderB(t); };
+window.DURATION = TB;
+resize(); addEventListener('resize', resize);
+const fonts = document.fonts
+  ? Promise.all(['italic 700 40px VanBoraSans', '700 40px VanBoraSans', '500 40px VanBoraSans'].map(f => document.fonts.load(f))).catch(() => {})
+  : Promise.resolve();
+fonts.then(() => {
+  window.__ready = true;
+  if (CAPTURE) { renderAt(0); return; }
+  const loop = Q.get('loop') === '1'; let t0 = performance.now();
+  (function frame(now) {
+    let t = (now - t0) / 1000;
+    if (t >= TB) {
+      if (loop) { if (t > TB + .6) t0 = now; t = TB; }
+      else {
+        renderAt(TB);
+        window.dispatchEvent(new CustomEvent('vanbora:fim'));
+        if (window.parent !== window) window.parent.postMessage({ type: 'vanbora:fim' }, '*');
+        return;
+      }
+    }
+    renderAt(Math.max(0, t)); requestAnimationFrame(frame);
+  })(t0);
+});
+</script>
+</body>
+</html>

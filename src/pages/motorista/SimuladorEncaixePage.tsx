@@ -1,35 +1,20 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Loader2, MapPin, School, Home, Clock, Users, Route as RouteIcon, ShieldCheck, AlertTriangle,
-  CheckCircle2, ArrowRight, Lock, Search,
+  Loader2, School, Home, Clock, Users, Route as RouteIcon, ShieldCheck, AlertTriangle,
+  ArrowRight, Lock,
 } from 'lucide-react';
 import { MotoristaShell, ExigirMotorista } from './MotoristaShell';
 import { listarRotas, listarVeiculos } from '@/data/motorista-store';
 import type { Rota, Veiculo } from '@/types/motorista';
 import type { PontoGeo, MatrizViaria } from '@/engine/encaixe-geografico';
-import { supabase } from '@/lib/supabase';
+import { CampoEndereco } from '@/components/search/CampoEndereco';
+import { ENDERECO_VAZIO, type EnderecoCampo } from '@/lib/endereco';
 import {
   simularEncaixeRota, coletarPontos, limitePadraoDoTurno, MARGEM_OPERACIONAL_MIN,
   type ResultadoSimulacao, type AlunoNovo,
 } from '@/lib/rota-para-encaixe';
 import { obterMatrizViaria, FalhaMatriz } from '@/lib/matriz-viaria';
 import { minutosParaTextoHora, horaParaMinutos, TURNO_LABEL, nomeDestinoParaExibicao } from '@/lib/utils';
-
-type Sugestao = { rotulo: string; lat: number; lng: number };
-
-/** Geocodificação via proxy privado (/api/mapas). Restrita a Araçatuba. */
-async function buscarEndereco(texto: string): Promise<Sugestao[]> {
-  const sessao = (await supabase?.auth.getSession())?.data.session ?? null;
-  const resp = await fetch('/api/mapas', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...(sessao?.access_token ? { Authorization: 'Bearer ' + sessao.access_token } : {}) },
-    body: JSON.stringify({ operacao: 'buscar', texto }),
-    cache: 'no-store',
-  });
-  const data = (await resp.json().catch(() => ({}))) as { resultados?: Sugestao[]; erro?: string };
-  if (!resp.ok) throw new Error(data.erro ?? 'Não foi possível buscar o endereço.');
-  return data.resultados ?? [];
-}
 
 function escolasDaRota(rota: Rota): { id: string; nome: string }[] {
   const vistos = new Map<string, string>();
@@ -56,12 +41,17 @@ function Simulador() {
 
   const [rotaId, setRotaId] = useState('');
   const [nomeAluno, setNomeAluno] = useState('');
-  const [enderecoTexto, setEnderecoTexto] = useState('');
-  const [sugestoes, setSugestoes] = useState<Sugestao[]>([]);
-  const [casa, setCasa] = useState<PontoGeo | null>(null);
+  // Casa do novo aluno: mesmo campo de endereço do resto do app. Só há ponto
+  // (e só dá para simular) com o endereço localizado ou marcado no mapa.
+  const [endereco, setEndereco] = useState<EnderecoCampo>(ENDERECO_VAZIO);
+  const casa = useMemo<PontoGeo | null>(
+    () => (endereco.coord && !endereco.validando
+      ? { id: 'novo-aluno-casa', nome: endereco.texto.trim() || 'Casa do novo aluno', lat: endereco.coord.lat, lng: endereco.coord.lng }
+      : null),
+    [endereco],
+  );
   const [escolaId, setEscolaId] = useState('');
   const [horario, setHorario] = useState('');
-  const [buscando, setBuscando] = useState(false);
   const [simulando, setSimulando] = useState(false);
   const [erro, setErro] = useState('');
   const [resultado, setResultado] = useState<ResultadoSimulacao | null>(null);
@@ -97,27 +87,6 @@ function Simulador() {
     const min = rota.ultimoDesembarqueMin ?? limitePadraoDoTurno(rota.turno);
     setHorario(min != null ? minutosParaTextoHora(min).replace('h', ':') : '');
   }, [rota]);
-
-  async function onBuscar() {
-    if (enderecoTexto.trim().length < 5) return;
-    setBuscando(true); setErro(''); setSugestoes([]);
-    try {
-      const r = await buscarEndereco(enderecoTexto.trim());
-      setSugestoes(r);
-      if (r.length === 0) setErro('Nenhum endereço encontrado. Informe rua, número e bairro.');
-    } catch (e) {
-      setErro((e as Error).message);
-    } finally {
-      setBuscando(false);
-    }
-  }
-
-  function selecionarEndereco(s: Sugestao) {
-    setCasa({ id: 'novo-aluno-casa', nome: s.rotulo, lat: s.lat, lng: s.lng });
-    setEnderecoTexto(s.rotulo);
-    setSugestoes([]);
-    setResultado(null);
-  }
 
   const horarioMin = /^\d{1,2}:\d{2}$/.test(horario) ? horaParaMinutos(horario) : null;
   const prontoParaSimular = !!rota && !!casa && !!escolaId && horarioMin != null && nomeAluno.trim().length > 0;
@@ -201,33 +170,10 @@ function Simulador() {
             <input className="field-input" placeholder="Ex.: João, Duda…" value={nomeAluno} onChange={(e) => setNomeAluno(e.target.value)} />
 
             <label className="field-label mt-4">Endereço de casa do novo aluno</label>
-            <div className="flex gap-2">
-              <input
-                className="field-input flex-1" placeholder="Rua, número e bairro — Araçatuba"
-                value={enderecoTexto} autoComplete="street-address"
-                onChange={(e) => { setEnderecoTexto(e.target.value); setCasa(null); }}
-                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); onBuscar(); } }}
-              />
-              <button type="button" className="btn btn-primary" disabled={buscando || enderecoTexto.trim().length < 5} onClick={onBuscar}>
-                {buscando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
-              </button>
-            </div>
-            {sugestoes.length > 0 && (
-              <div className="mt-2 space-y-2">
-                {sugestoes.map((s, i) => (
-                  <button key={i} type="button" onClick={() => selecionarEndereco(s)}
-                    className="w-full rounded-lg border border-navy-200 p-3 text-left text-sm hover:bg-mint-50">
-                    <MapPin className="mr-1 inline h-4 w-4 text-mint-600" />{s.rotulo}
-                    <span className="mt-1 block text-xs text-navy-500">Usar este endereço</span>
-                  </button>
-                ))}
-              </div>
-            )}
-            {casa && (
-              <p className="mt-2 inline-flex items-center gap-1.5 text-sm text-mint-700">
-                <CheckCircle2 className="h-4 w-4" /> Endereço localizado no mapa
-              </p>
-            )}
+            <CampoEndereco
+              valor={endereco} placeholder="Rua e número — Araçatuba"
+              onChange={(e) => { setEndereco(e); setResultado(null); }}
+            />
           </div>
 
           {/* 4. Escola + turno/horário */}
@@ -295,6 +241,7 @@ function ResultadoEncaixe({ resultado, nomeAluno, sentido }: { resultado: Result
               </li>
             ))}
           </ul>
+          <Explicacao linhas={resultado.explicacao} />
           <ConfirmacaoBloqueada elegivel={false} />
         </div>
       </section>
@@ -318,6 +265,15 @@ function ResultadoEncaixe({ resultado, nomeAluno, sentido }: { resultado: Result
       </div>
 
       <div className="space-y-5 p-5">
+        {resultado.classe && resultado.classe !== 'imediato' && (
+          <p className={resultado.classe === 'pre_autorizado' ? 'rounded-xl bg-mint-50 p-3 text-sm text-mint-900' : 'rounded-xl bg-amber-50 p-3 text-sm text-amber-900'}>
+            {resultado.classe === 'pre_autorizado'
+              ? `Exige sair ${resultado.antecipacaoMin} min mais cedo — dentro da antecipação que você já cadastrou para esta rota.`
+              : (resultado.antecipacaoMin ?? 0) > 0
+                ? `Só cabe se você sair ${resultado.antecipacaoMin} min mais cedo, além do limite de antecipação cadastrado. A decisão é sua.`
+                : 'Só cabe mudando a ordem das paradas atuais. A decisão é sua.'}
+          </p>
+        )}
         <div className="grid grid-cols-2 gap-3">
           <Metrica rotulo={sentido === 'ida' ? 'Busca em casa' : 'Busca na escola'} valor={horaBusca} icon={sentido === 'ida' ? Home : School} />
           <Metrica rotulo={sentido === 'ida' ? 'Chegada à escola' : 'Chegada em casa'} valor={horaEntrega} icon={sentido === 'ida' ? School : Home} />
@@ -366,6 +322,8 @@ function ResultadoEncaixe({ resultado, nomeAluno, sentido }: { resultado: Result
           <div><p className="text-navy-500">Distância do aluno na van</p><strong>{(o.distanciaABordoMetros / 1000).toFixed(1)} km</strong></div>
         </div>
 
+        <Explicacao linhas={resultado.explicacao} />
+
         <p className="text-xs text-navy-500">
           Cálculo feito sobre os trajetos reais das ruas (estimativa, não garantia de trânsito). Esta simulação não reserva vaga nem matricula o aluno.
         </p>
@@ -389,6 +347,18 @@ function ConfirmacaoBloqueada({ elegivel }: { elegivel: boolean }) {
           ? 'A confirmação definitiva ainda está desativada. Ela depende de uma gravação transacional no banco (migração já incluída no projeto) que precisa ser revisada e aplicada com segurança antes de liberar a reserva de vaga.'
           : 'Uma simulação inviável nunca pode ser confirmada.'}
       </p>
+    </div>
+  );
+}
+
+function Explicacao({ linhas }: { linhas?: string[] }) {
+  if (!linhas?.length) return null;
+  return (
+    <div className="mt-4 rounded-xl border border-navy-100 p-4">
+      <h3 className="text-sm font-bold text-navy-800">Por que este resultado</h3>
+      <ul className="mt-2 space-y-1 text-sm text-navy-600">
+        {linhas.map((l, i) => <li key={i}>• {l}</li>)}
+      </ul>
     </div>
   );
 }

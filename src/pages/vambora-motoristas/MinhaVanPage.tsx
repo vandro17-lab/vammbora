@@ -1,25 +1,36 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Gauge, Fuel, Coins, Route as RouteIcon, FileText, Wrench, Pencil, ChevronRight, Check, Bus, Plus,
   Minus, CalendarDays, Hash, Lock, Users, Snowflake, ShieldCheck, Accessibility, type LucideIcon,
 } from 'lucide-react';
 import { VMShell } from '@/components/vm/VMShell';
-import { Card, SubHeader, LinhaValor, DemoChip, EstadoVazio } from '@/components/vm/ui';
+import { Card, SubHeader, LinhaValor, DemoChip, EstadoVazio, AvisoErro } from '@/components/vm/ui';
 import { VanEscolar } from '@/components/vm/VanEscolar';
 import { SlotIlustracao } from '@/components/vm/SlotImagem';
 import { useDadosMotorista, lerPrefs, salvarPrefs } from '@/lib/vm/useDadosMotorista';
 import { salvarVeiculo } from '@/data/motorista-store';
-import { USE_SUPABASE } from '@/lib/supabase';
 import { formatBRL, cn } from '@/lib/utils';
 import type { Veiculo } from '@/types/motorista';
 
 /* ============================= TELA 9 — Minha Van ============================= */
 export function MinhaVanPage() {
   const navigate = useNavigate();
-  const { dados, indicadores: ind } = useDadosMotorista();
+  const { dados, indicadores: ind, carregando, erro, recarregar } = useDadosMotorista();
   const v = dados.veiculo;
   const prefs = lerPrefs();
+
+  // Ainda consultando, ou a consulta falhou: não é "sem van".
+  if (!v && (carregando || erro)) {
+    return (
+      <VMShell>
+        <SubHeader titulo="Minha Van" />
+        <div className="px-4 pt-4">
+          {erro ? <AvisoErro mensagem={erro} onTentar={recarregar} /> : <p className="py-10 text-center text-sm text-navy-400">Carregando…</p>}
+        </div>
+      </VMShell>
+    );
+  }
 
   // Dados reais, mas o motorista ainda não cadastrou a van.
   if (!dados.demo && !v) {
@@ -94,7 +105,7 @@ const MODELOS = ['Mercedes-Benz Sprinter', 'Renault Master', 'Fiat Ducato', 'Ive
 
 export function CadastroVanPage() {
   const navigate = useNavigate();
-  const { dados } = useDadosMotorista();
+  const { dados, carregando, erro: erroCarga } = useDadosMotorista();
   const prefs = lerPrefs();
   const [passo, setPasso] = useState(1);
   const [salvo, setSalvo] = useState(false);
@@ -112,21 +123,36 @@ export function CadastroVanPage() {
   const [cintosEl, setCintos] = useState(dados.veiculo?.cintos ?? true);
   const [acessivelEl, setAcessivel] = useState(dados.veiculo?.acessivel ?? false);
 
+  // Os dados reais chegam DEPOIS do 1º render (que nasce com o cenário de
+  // exemplo). Ao terminar de carregar, o formulário passa a mostrar a van
+  // realmente cadastrada — senão editar gravaria os valores de exemplo por cima.
+  const [sincronizado, setSincronizado] = useState(false);
+  useEffect(() => {
+    if (carregando || erroCarga || sincronizado) return;
+    setSincronizado(true);
+    const v = dados.demo ? null : dados.veiculo;
+    if (!v) return;
+    setModelo(v.modelo); setAno(v.ano ?? 0); setPlaca(v.placa ?? ''); setLugares(v.lugaresPassageiro);
+    setAc(v.arCondicionado); setCintos(v.cintos); setAcessivel(v.acessivel);
+  }, [carregando, erroCarga, sincronizado, dados]);
+
   async function concluir() {
+    // Só edita uma van REAL do motorista; a van do cenário de exemplo vira cadastro novo.
+    const existente = dados.demo ? null : dados.veiculo;
     const veic: Veiculo = {
-      id: dados.veiculo?.id ?? '',
-      modelo, ano, placa: placa.trim() || undefined,
+      id: existente?.id ?? '',
+      modelo, ano: ano || undefined, placa: placa.trim() || undefined,
       lugaresPassageiro: lugares, arCondicionado: acEl, acessivel: acessivelEl, cintos: cintosEl,
-      fotos: dados.veiculo?.fotos ?? [],
+      fotos: existente?.fotos ?? [],
     };
     setErro(null); setSalvando(true);
     try {
       await salvarVeiculo(veic);
     } catch (e) {
+      // Qualquer falha real precisa aparecer (nunca "Van salva!" sem ter salvo).
       setSalvando(false);
-      // Com banco conectado, uma falha real precisa aparecer (não some em silêncio).
-      if (USE_SUPABASE) { setErro('Não foi possível salvar a van: ' + (e as Error).message); return; }
-      // Modo demonstração (sem backend): segue mesmo assim.
+      setErro('Não foi possível salvar a van: ' + (e as Error).message);
+      return;
     }
     salvarPrefs({ consumoKmL: consumo, precoDiesel: preco, mensalidade });
     setSalvando(false);
@@ -238,7 +264,7 @@ export function CadastroVanPage() {
                 <VanEscolar className="mx-auto w-32" />
                 <p className="mt-2 font-display text-lg font-bold">Confira e conclua</p>
                 <div className="mt-3 space-y-1.5 text-left text-sm">
-                  {[['Modelo', modelo], ['Ano', ano], ['Lugares', lugares], ['Rendimento', `${String(consumo).replace('.', ',')} km/l`], ['Diesel', `${formatBRL(preco)}/l`], ['Mensalidade', formatBRL(mensalidade)]].map(([k, val]) => (
+                  {[['Modelo', modelo], ['Ano', ano || '—'], ['Lugares', lugares], ['Rendimento', `${String(consumo).replace('.', ',')} km/l`], ['Diesel', `${formatBRL(preco)}/l`], ['Mensalidade', formatBRL(mensalidade)]].map(([k, val]) => (
                     <div key={k as string} className="flex justify-between border-b border-navy-50 pb-1.5"><span className="text-navy-500">{k}</span><span className="font-semibold text-navy-800">{String(val)}</span></div>
                   ))}
                 </div>
@@ -250,7 +276,7 @@ export function CadastroVanPage() {
         {erro && <p className="mt-3 rounded-xl bg-red-50 p-2.5 text-sm font-medium text-red-600">{erro}</p>}
 
         {!salvo && (
-          <button onClick={() => (passo < 3 ? setPasso(passo + 1) : concluir())} disabled={salvando}
+          <button onClick={() => (passo < 3 ? setPasso(passo + 1) : concluir())} disabled={salvando || carregando}
             className="mt-4 flex h-14 w-full items-center justify-center gap-2 rounded-full bg-mint-500 text-base font-bold text-white shadow-float transition active:scale-[0.98] disabled:opacity-60">
             {passo < 3 ? 'Continuar →' : (salvando ? 'Salvando…' : 'Salvar van')}
           </button>

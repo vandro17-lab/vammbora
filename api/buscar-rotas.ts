@@ -10,9 +10,15 @@
  * Configuração (variáveis de ambiente do servidor):
  *   - VITE_SUPABASE_URL           (já usada pelo app)
  *   - SUPABASE_SERVICE_ROLE_KEY   (SEGREDO — nunca vai ao frontend)
+ *   - GEOAPIFY_API_KEY            (SEGREDO — tempos REAIS de trajeto pelas ruas)
+ *   - BUSCAR_ROTAS_MAX_VIARIAS    (opcional — nº máx. de rotas com consulta viária por busca; padrão 8)
  *
- * Elegibilidade (decisão de produto A): rota `concluida`, não-demo, cujo
- * motorista tem anúncio ATIVO (drivers.anuncio_ativo, is_published, não suspenso).
+ * Elegibilidade: rota `concluida`, não-demo, do sentido (e turno) pedido.
+ *
+ * TEMPOS DE TRAJETO: um encaixe só é CONFIRMADO ("compatível") com tempos reais
+ * do provedor viário. Sem chave, com falha do provedor ou além do limite de
+ * consultas, a rota é avaliada por ESTIMATIVA e sai, no máximo, como "sob
+ * confirmação" (`temposEstimados: true`) — nunca como encaixe confirmado.
  *
  * MODO DEMONSTRAÇÃO (§6.1): por padrão a busca IGNORA rotas de demonstração
  * (`is_demo = true`), preservando o comportamento de produção. O modo demo é
@@ -24,7 +30,12 @@
  */
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { createClient } from '@supabase/supabase-js';
-import { buscarEmRotasReais, type PedidoFamilia, type EntradaBuscaReal } from '../src/lib/busca-rotas-reais';
+import {
+  buscarEmRotasReais, candidatasParaBusca, compararResultados,
+  type PedidoFamilia, type EntradaBuscaReal, type ResultadoRotaReal,
+} from '../src/lib/busca-rotas-reais';
+import { criarMatrizDemo } from '../src/lib/encaixe';
+import { MatrizPorCoordenadas, consultarTabelasViarias, pontosDistintos } from '../src/lib/matriz-viaria-servidor';
 import type { Rota, Veiculo, ParadaRota, PassageiroRota } from '../src/types/motorista';
 
 function reply(res: ServerResponse, status: number, data: unknown) {
@@ -39,10 +50,10 @@ const coordOk = (n: unknown): n is number => typeof n === 'number' && Number.isF
 
 /* --------- Mapeadores de linha do banco -> domínio (mínimos, sem PII extra) --------- */
 interface LinhaStop { id: string; ordem: number; type: string; label: string | null; lat: number | null; lng: number | null; confirmed: boolean; destination_id: string | null; leg_time_min: number | null; habitual_arrival_min: number | null }
-interface LinhaPax { id: string; identificacao: string; board_stop_id: string | null; alight_stop_id: string | null; destination_id: string | null; horario_habitual_min: number | null }
+interface LinhaPax { id: string; identificacao: string; board_stop_id: string | null; alight_stop_id: string | null; destination_id: string | null; horario_habitual_min: number | null; ajuste_antes_min?: number | null; ajuste_depois_min?: number | null; atendimento_min?: number | null }
 interface LinhaRota {
   id: string; name: string | null; owner_id: string; vehicle_id: string | null; direction: string; turno: string | null;
-  monitor: boolean; monitor_ocupa_lugar: boolean; reserved_seats: number; last_dropoff_min: number | null;
+  monitor: boolean; monitor_ocupa_lugar: boolean; reserved_seats: number; last_dropoff_min: number | null; early_leave_limit_min?: number | null;
   status: string; is_demo: boolean; is_published: boolean; price_month: number | null; price_type: string | null;
   route_stops: LinhaStop[]; route_passengers: LinhaPax[];
 }
@@ -58,11 +69,12 @@ function mapRota(r: LinhaRota): Rota {
   const passageiros: PassageiroRota[] = (r.route_passengers ?? []).map((p) => ({
     id: p.id, identificacao: p.identificacao, embarqueParadaId: p.board_stop_id, desembarqueParadaId: p.alight_stop_id,
     destinoId: p.destination_id, horarioHabitualMin: p.horario_habitual_min ?? null,
+    ajusteAntesMin: p.ajuste_antes_min ?? null, ajusteDepoisMin: p.ajuste_depois_min ?? null, atendimentoMin: p.atendimento_min ?? null,
   }));
   return {
     id: r.id, nome: r.name ?? '', sentido: (r.direction as Rota['sentido']) ?? 'ida', turno: (r.turno as Rota['turno']) ?? null,
     dias: [], veiculoId: r.vehicle_id, monitor: r.monitor, monitorOcupaLugar: r.monitor_ocupa_lugar,
-    lugaresReservados: r.reserved_seats, ultimoDesembarqueMin: r.last_dropoff_min, limiteAntecipacaoMin: null,
+    lugaresReservados: r.reserved_seats, ultimoDesembarqueMin: r.last_dropoff_min, limiteAntecipacaoMin: r.early_leave_limit_min ?? null,
     status: (r.status as Rota['status']) ?? 'rascunho', isPublished: r.is_published, paradas, passageiros, atualizadoEm: '',
   };
 }
@@ -73,8 +85,64 @@ function mapVeiculo(v: LinhaVeiculo | undefined): Veiculo | null {
   return { id: v.id, modelo: 'Van', lugaresPassageiro: v.seats_passenger ?? 0, arCondicionado: false, acessivel: false, cintos: false, fotos: [] };
 }
 
+// Limite por IP (best-effort, por instância serverless): a busca é anônima e
+// cada uma consome cota do provedor de mapas.
+const BUCKETS = new Map<string, { count: number; reset: number }>();
+function limitado(ip: string, max = 20, janelaMs = 60_000): boolean {
+  const agora = Date.now();
+  const b = BUCKETS.get(ip);
+  if (!b || agora > b.reset) { BUCKETS.set(ip, { count: 1, reset: agora + janelaMs }); return false; }
+  b.count += 1;
+  return b.count > max;
+}
+
+/**
+ * Avalia as candidatas com TEMPOS REAIS de trajeto sempre que possível.
+ *  1) Prévia por estimativa — serve SÓ para priorizar quais rotas recebem a
+ *     consulta viária (cota limitada); nenhum resultado dela é confirmado.
+ *  2) As mais promissoras ganham a matriz real (pontos da rota + casa da
+ *     família + escola) e são REAVALIADAS pelo mesmo motor.
+ *  3) Rota sem matriz real (sem chave, falha, limite) mantém o resultado da
+ *     prévia, que o núcleo já rebaixa para "sob confirmação".
+ */
+async function avaliarComTemposReais(entradas: EntradaBuscaReal[], pedido: PedidoFamilia): Promise<{ resultados: ResultadoRotaReal[]; totalRotasAvaliadas: number }> {
+  const candidatas = candidatasParaBusca(entradas, pedido);
+  if (candidatas.length === 0) return { resultados: [], totalRotasAvaliadas: 0 };
+  const previa = buscarEmRotasReais(candidatas, pedido, criarMatrizDemo()).resultados;
+
+  const key = process.env.GEOAPIFY_API_KEY;
+  const maxViarias = Math.max(0, Math.min(40, Number(process.env.BUSCAR_ROTAS_MAX_VIARIAS) || 8));
+  const porId = new Map(candidatas.map((e) => [e.rota.id, e]));
+  const matrizReal = new MatrizPorCoordenadas();
+  const comReal = new Set<string>();
+  if (key && pedido.origem) {
+    const origem = pedido.origem;
+    await Promise.all(previa.slice(0, maxViarias).map(async (r) => {
+      const e = porId.get(r.rotaId);
+      if (!e) return;
+      const pontos = pontosDistintos([
+        ...e.rota.paradas.filter((p) => p.lat != null && p.lng != null).map((p) => ({ lat: p.lat as number, lng: p.lng as number })),
+        origem,
+        ...(pedido.escolaPonto ? [pedido.escolaPonto] : []),
+      ]);
+      const tabelas = await consultarTabelasViarias(pontos, key);
+      if (!tabelas) return;
+      matrizReal.adicionar(pontos, tabelas.tempos, tabelas.distancias);
+      comReal.add(e.rota.id);
+    }));
+  }
+
+  const reais = comReal.size
+    ? buscarEmRotasReais(candidatas.filter((e) => comReal.has(e.rota.id)), pedido, matrizReal).resultados
+    : [];
+  const estimados = previa.filter((r) => !comReal.has(r.rotaId));
+  return { resultados: [...reais, ...estimados].sort(compararResultados), totalRotasAvaliadas: candidatas.length };
+}
+
 export default async function handler(req: IncomingMessage, res: ServerResponse) {
   if (req.method !== 'POST') return reply(res, 405, { erro: 'Use POST.' });
+  const ip = String(req.headers['x-forwarded-for'] ?? '').split(',')[0].trim() || 'desconhecido';
+  if (limitado(ip)) return reply(res, 429, { erro: 'Muitas buscas em pouco tempo. Aguarde um instante.' });
 
   const url = process.env.VITE_SUPABASE_URL;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -130,9 +198,9 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     let consulta = db
       .from('routes')
       .select(
-        'id,name,owner_id,vehicle_id,direction,turno,monitor,monitor_ocupa_lugar,reserved_seats,last_dropoff_min,status,is_demo,is_published,price_month,price_type,' +
+        'id,name,owner_id,vehicle_id,direction,turno,monitor,monitor_ocupa_lugar,reserved_seats,last_dropoff_min,early_leave_limit_min,status,is_demo,is_published,price_month,price_type,' +
           'route_stops(id,ordem,type,label,lat,lng,confirmed,destination_id,leg_time_min,habitual_arrival_min),' +
-          'route_passengers(id,identificacao,board_stop_id,alight_stop_id,destination_id,horario_habitual_min)',
+          'route_passengers(id,identificacao,board_stop_id,alight_stop_id,destination_id,horario_habitual_min,ajuste_antes_min,ajuste_depois_min,atendimento_min)',
       )
       .eq('status', 'concluida')
       .eq('direction', pedido.sentido);
@@ -156,7 +224,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       veiculo: mapVeiculo(r.vehicle_id ? vmap.get(r.vehicle_id) : undefined),
     }));
 
-    const { resultados, totalRotasAvaliadas } = buscarEmRotasReais(entradas, pedido);
+    const { resultados, totalRotasAvaliadas } = await avaliarComTemposReais(entradas, pedido);
 
     // Resposta SEM PII: dados da PRÓPRIA rota (nome + van), nenhum dado de aluno.
     const publico = resultados.map((res0) => {
@@ -178,6 +246,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
         horarioEscolaMin: res0.horarioEscolaMin,
         minutosABordo: res0.minutosABordo,
         fonteHorario: res0.fonteHorario,
+        temposEstimados: res0.temposEstimados,
         motivo: res0.motivo,
       };
     });

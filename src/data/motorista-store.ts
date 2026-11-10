@@ -2,9 +2,9 @@ import type { Rota, Veiculo, OrigemAtendimento } from '@/types/motorista';
 import { supabase, USE_SUPABASE, DEMO_MOTORISTA } from '@/lib/supabase';
 
 /**
- * Usa o banco real só quando o Supabase está configurado E o login demonstrativo
- * do motorista está DESLIGADO. No modo demo, tudo vai para o localStorage, então
- * o painel grava/lê sem depender de sessão (nunca trava).
+ * Padrão: banco real (Supabase) sempre que ele estiver configurado. O
+ * localStorage só é usado sem Supabase ou quando o modo demonstração do
+ * motorista foi ligado EXPLICITAMENTE (VITE_DEMO_MOTORISTA="true").
  */
 const USAR_BANCO_MOTORISTA = USE_SUPABASE && !DEMO_MOTORISTA;
 
@@ -19,10 +19,19 @@ const USAR_BANCO_MOTORISTA = USE_SUPABASE && !DEMO_MOTORISTA;
  * (ver observação em salvarRota).
  */
 
-export const novoId = (): string =>
-  typeof crypto !== 'undefined' && 'randomUUID' in crypto
-    ? crypto.randomUUID()
-    : 'id-' + Math.random().toString(36).slice(2) + Date.now().toString(36);
+/** Sempre um UUID v4: o banco só aceita UUID como id de rota, parada e aluno.
+ *  (`crypto.randomUUID` não existe em contexto não seguro/navegador antigo.) */
+export const novoId = (): string => {
+  const c = (globalThis as { crypto?: Partial<Crypto> }).crypto;
+  if (c?.randomUUID) return c.randomUUID();
+  const b = new Uint8Array(16);
+  if (c?.getRandomValues) c.getRandomValues(b);
+  else for (let i = 0; i < 16; i++) b[i] = Math.floor(Math.random() * 256);
+  b[6] = (b[6] & 0x0f) | 0x40;
+  b[8] = (b[8] & 0x3f) | 0x80;
+  const h = [...b].map((x) => x.toString(16).padStart(2, '0')).join('');
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+};
 
 /* --------------------------- localStorage (demo) --------------------------- */
 const K_VEIC = 'vambora.demo.veiculos';
@@ -45,54 +54,117 @@ function lsSet<T>(k: string, v: T): void {
 }
 
 /* ------------------------------- VEÍCULOS -------------------------------- */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const COLUNAS_VEICULO = 'id,model,year,plate,seats_passenger,feature_ac,feature_accessible,feature_seatbelt,photo_urls';
+
+interface LinhaVeiculo {
+  id: string; model: string | null; year: number | null; plate: string | null; seats_passenger: number | null;
+  feature_ac: boolean | null; feature_accessible: boolean | null; feature_seatbelt: boolean | null; photo_urls: string[] | null;
+}
+
+/** Linha do banco -> Veiculo do app. */
+export function mapVeiculoDoBanco(r: LinhaVeiculo): Veiculo {
+  return {
+    id: r.id,
+    modelo: r.model ?? '',
+    ano: r.year ?? undefined,
+    placa: r.plate ?? undefined,
+    lugaresPassageiro: r.seats_passenger ?? 0,
+    arCondicionado: !!r.feature_ac,
+    acessivel: !!r.feature_accessible,
+    cintos: !!r.feature_seatbelt,
+    fotos: r.photo_urls ?? [],
+  };
+}
+
+/** Veiculo do app -> colunas do banco (sem `id`; campos vazios viram NULL). */
+export function veiculoParaBanco(v: Veiculo, ownerId: string) {
+  const ano = typeof v.ano === 'number' && Number.isInteger(v.ano) && v.ano > 0 ? v.ano : null;
+  return {
+    owner_id: ownerId,
+    model: v.modelo.trim(),
+    year: ano,
+    plate: v.placa?.trim() ? v.placa.trim().toUpperCase() : null,
+    seats_passenger: v.lugaresPassageiro,
+    feature_ac: !!v.arCondicionado,
+    feature_accessible: !!v.acessivel,
+    feature_seatbelt: !!v.cintos,
+    photo_urls: v.fotos ?? [],
+  };
+}
+
+/** Confere os campos antes de gravar. Devolve a mensagem do 1º problema, ou null. */
+export function validarVeiculo(v: Veiculo): string | null {
+  if (!v.modelo?.trim()) return 'Informe o modelo da van.';
+  if (!Number.isInteger(v.lugaresPassageiro) || v.lugaresPassageiro < 1) return 'Informe quantos lugares para alunos a van tem (pelo menos 1).';
+  if (v.lugaresPassageiro > 60) return 'Número de lugares acima do possível para uma van escolar.';
+  if (v.ano != null && v.ano !== 0 && (!Number.isInteger(v.ano) || v.ano < 1980 || v.ano > new Date().getFullYear() + 1)) return 'Confira o ano da van.';
+  return null;
+}
+
+/** Erro do banco -> mensagem compreensível, SEM esconder o motivo real. */
+function erroDoBanco(e: { message?: string; code?: string }, oque: 'van' | 'rota' = 'van'): Error {
+  const real = e.message || 'erro desconhecido';
+  const amigavel =
+    e.code === '42501' ? `Sem permissão para gravar esta ${oque}. Saia e entre de novo na sua conta.`
+    : /autenticado/i.test(real) ? 'Sua sessão expirou. Entre de novo na sua conta.'
+    : e.code === '23503' && /destination/i.test(real) ? 'Uma das escolas escolhidas não existe mais no cadastro. Remova a parada da escola e escolha de novo.'
+    : e.code === '23503' && /vehicle/i.test(real) ? 'A van desta rota não existe mais. Escolha uma van cadastrada.'
+    : e.code === '23503' ? 'Seu cadastro de motorista ainda não está completo no servidor. Saia e entre de novo.'
+    : e.code === '23514' ? `Algum dado da ${oque} é inválido.`
+    : e.code === '22P02' ? `Algum identificador da ${oque} é inválido.`
+    : /fetch|network/i.test(real) ? 'Sem conexão com o servidor. Verifique a internet e tente de novo.'
+    : null;
+  return new Error(amigavel ? `${amigavel} (${real})` : real);
+}
+
+/** Id do usuário logado (sessão local; a RLS valida no servidor). */
+async function usuarioLogadoId(): Promise<string | null> {
+  if (!supabase) return null;
+  const { data } = await supabase.auth.getSession();
+  return data.session?.user?.id ?? null;
+}
+
 export async function listarVeiculos(): Promise<Veiculo[]> {
   if (USAR_BANCO_MOTORISTA && supabase) {
+    const ownerId = await usuarioLogadoId();
+    if (!ownerId) return []; // sem sessão não há "minhas vans"
     const { data, error } = await supabase
       .from('vehicles')
-      .select('id,model,year,plate,seats_passenger,feature_ac,feature_accessible,feature_seatbelt,photo_urls')
-      // Esconde veículos de demonstração do painel do motorista real (RLS já limita ao dono).
+      .select(COLUNAS_VEICULO)
+      // SÓ as vans do próprio motorista: a RLS também libera tudo para admin e
+      // as vans de demonstração para leitura — sem este filtro elas apareceriam
+      // (e poderiam ser editadas) como se fossem do usuário.
+      .eq('owner_id', ownerId)
       .eq('is_demo', false)
       .order('created_at');
-    if (error) throw new Error(error.message);
-    return (data ?? []).map((r) => ({
-      id: r.id as string,
-      modelo: (r.model as string) ?? '',
-      ano: (r.year as number) ?? undefined,
-      placa: (r.plate as string) ?? undefined,
-      lugaresPassageiro: (r.seats_passenger as number) ?? 0,
-      arCondicionado: !!r.feature_ac,
-      acessivel: !!r.feature_accessible,
-      cintos: !!r.feature_seatbelt,
-      fotos: (r.photo_urls as string[]) ?? [],
-    }));
+    if (error) throw erroDoBanco(error);
+    return ((data ?? []) as unknown as LinhaVeiculo[]).map(mapVeiculoDoBanco);
   }
   return lsGet<Veiculo[]>(K_VEIC, []);
 }
 
 export async function salvarVeiculo(v: Veiculo): Promise<Veiculo> {
+  const invalido = validarVeiculo(v);
+  if (invalido) throw new Error(invalido);
   if (USAR_BANCO_MOTORISTA && supabase) {
     // owner_id é obrigatório (NOT NULL) e usado pela RLS: preenche com o usuário logado.
-    const { data: u } = await supabase.auth.getUser();
-    const ownerId = u.user?.id;
+    const ownerId = await usuarioLogadoId();
     if (!ownerId) throw new Error('Faça login para salvar a van.');
-    // IDs de cenários demonstrativos não são UUIDs do banco.
-    // Nesse caso, criamos um registro novo e deixamos o Postgres gerar o UUID.
-    const uuidValido = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v.id);
-    const payload = {
-      ...(uuidValido ? { id: v.id } : {}),
-      owner_id: ownerId,
-      model: v.modelo,
-      year: v.ano ?? null,
-      plate: v.placa ?? null,
-      seats_passenger: v.lugaresPassageiro,
-      feature_ac: v.arCondicionado,
-      feature_accessible: v.acessivel,
-      feature_seatbelt: v.cintos,
-      photo_urls: v.fotos,
-    };
-    const { data, error } = await supabase.from('vehicles').upsert(payload).select('id').single();
-    if (error) throw new Error(error.message);
-    return { ...v, id: (data?.id as string) ?? v.id };
+    const payload = veiculoParaBanco(v, ownerId);
+    // EDIÇÃO: atualiza a van existente DESTE motorista (nunca cria outra nem
+    // assume a van de outra pessoa).
+    if (UUID_RE.test(v.id)) {
+      const { data, error } = await supabase
+        .from('vehicles').update(payload).eq('id', v.id).eq('owner_id', ownerId).select(COLUNAS_VEICULO).maybeSingle();
+      if (error) throw erroDoBanco(error);
+      if (data) return mapVeiculoDoBanco(data as unknown as LinhaVeiculo);
+    }
+    // NOVA (ou id local/demonstrativo que não existe no banco): o Postgres gera o UUID.
+    const { data, error } = await supabase.from('vehicles').insert(payload).select(COLUNAS_VEICULO).single();
+    if (error) throw erroDoBanco(error);
+    if (!data) throw new Error('O servidor não confirmou a gravação da van. Tente de novo.');
+    return mapVeiculoDoBanco(data as unknown as LinhaVeiculo);
   }
   const lista = lsGet<Veiculo[]>(K_VEIC, []);
   const id = v.id || novoId();
@@ -107,7 +179,10 @@ export async function salvarVeiculo(v: Veiculo): Promise<Veiculo> {
 /* -------------------------------- ROTAS ---------------------------------- */
 export async function listarRotas(): Promise<Rota[]> {
   if (USAR_BANCO_MOTORISTA && supabase) {
-    // Lê rotas + paradas + passageiros do dono (RLS cuida do escopo).
+    // Lê rotas + paradas + passageiros SÓ do motorista logado (a RLS também
+    // libera rotas de demonstração e, para admin, as de todos).
+    const ownerId = await usuarioLogadoId();
+    if (!ownerId) return [];
     const { data, error } = await supabase
       .from('routes')
       .select(
@@ -116,10 +191,10 @@ export async function listarRotas(): Promise<Rota[]> {
           'route_passengers(id,identificacao,board_stop_id,alight_stop_id,destination_id,' +
           'horario_habitual_min,ajuste_antes_min,ajuste_depois_min,atendimento_min,atendimento_origem)',
       )
-      // Esconde rotas de demonstração do painel do motorista real (RLS já limita ao dono).
+      .eq('owner_id', ownerId)
       .eq('is_demo', false)
       .order('updated_at', { ascending: false });
-    if (error) throw new Error(error.message);
+    if (error) throw erroDoBanco(error, 'rota');
     return (data ?? []).map(mapRotaDoBanco);
   }
   return lsGet<Rota[]>(K_ROTAS, []);
@@ -130,18 +205,86 @@ export async function obterRota(id: string): Promise<Rota | null> {
   return todas.find((r) => r.id === id) ?? null;
 }
 
+const minutoDoDia = (v: number | null | undefined): number | null =>
+  typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1439 ? Math.round(v) : null;
+
+/**
+ * Deixa a rota no formato que o banco aceita, SEM perder paradas nem alunos:
+ *  - ids de parada/aluno que não são UUID (rotas antigas do navegador ou do
+ *    cenário de exemplo) ganham um UUID, e os vínculos embarque/desembarque
+ *    são reapontados para o novo id;
+ *  - paradas são renumeradas 0..n-1 na ordem atual;
+ *  - coordenadas e horários inválidos viram "não informado".
+ * A RPC apaga e recria paradas e alunos a cada salvamento — por isso a rota
+ * enviada precisa estar sempre COMPLETA e coerente.
+ */
+export function normalizarRotaParaSalvar(rota: Rota): Rota {
+  const idParada = new Map<string, string>();
+  const paradas = [...rota.paradas].sort((a, b) => a.ordem - b.ordem).map((p, i) => {
+    const id = UUID_RE.test(p.id) && ![...idParada.values()].includes(p.id) ? p.id : novoId();
+    idParada.set(p.id, id);
+    const temPonto = typeof p.lat === 'number' && typeof p.lng === 'number' && Number.isFinite(p.lat) && Number.isFinite(p.lng);
+    return {
+      ...p, id, ordem: i, rotulo: (p.rotulo ?? '').trim(),
+      lat: temPonto ? p.lat : undefined, lng: temPonto ? p.lng : undefined,
+      horarioChegadaMin: minutoDoDia(p.horarioChegadaMin),
+      tempoAteProximaMin: typeof p.tempoAteProximaMin === 'number' && p.tempoAteProximaMin >= 0 ? Math.round(p.tempoAteProximaMin) : null,
+    };
+  });
+  const vistos = new Set<string>();
+  const passageiros = rota.passageiros.map((x) => {
+    const id = UUID_RE.test(x.id) && !vistos.has(x.id) ? x.id : novoId();
+    vistos.add(id);
+    return {
+      ...x, id, identificacao: (x.identificacao ?? '').trim(),
+      embarqueParadaId: x.embarqueParadaId ? idParada.get(x.embarqueParadaId) ?? null : null,
+      desembarqueParadaId: x.desembarqueParadaId ? idParada.get(x.desembarqueParadaId) ?? null : null,
+      horarioHabitualMin: minutoDoDia(x.horarioHabitualMin),
+    };
+  });
+  return {
+    ...rota, id: UUID_RE.test(rota.id) ? rota.id : '', paradas, passageiros,
+    ultimoDesembarqueMin: minutoDoDia(rota.ultimoDesembarqueMin),
+    limiteAntecipacaoMin: typeof rota.limiteAntecipacaoMin === 'number' && rota.limiteAntecipacaoMin >= 0 ? Math.round(rota.limiteAntecipacaoMin) : null,
+    lugaresReservados: Math.max(0, Math.round(rota.lugaresReservados || 0)),
+  };
+}
+
+/** Problema que impediria a gravação, em linguagem simples; null = pode salvar. */
+export function validarRotaParaSalvar(rota: Rota): string | null {
+  if (rota.sentido !== 'ida' && rota.sentido !== 'volta') return 'Escolha se a rota é de ida ou de volta.';
+  if (rota.veiculoId && !UUID_RE.test(rota.veiculoId)) return 'Escolha uma van cadastrada na sua conta (a van de exemplo não pode ser usada).';
+  if (rota.status === 'concluida' && !rota.veiculoId) return 'Escolha a van desta rota.';
+  const semEmbarque = rota.passageiros.find((x) => !x.embarqueParadaId);
+  if (semEmbarque) return `O aluno "${semEmbarque.identificacao || 'sem nome'}" está sem parada de embarque.`;
+  if (rota.passageiros.some((x) => !x.identificacao)) return 'Há um aluno sem identificação.';
+  return null;
+}
+
 export async function salvarRota(rota: Rota): Promise<Rota> {
-  const atualizada = { ...rota, atualizadoEm: new Date().toISOString() };
+  const atualizada = { ...normalizarRotaParaSalvar(rota), atualizadoEm: new Date().toISOString() };
   if (USAR_BANCO_MOTORISTA && supabase) {
-    // Salvamento transacional via RPC (criada na migração de rotas).
+    const ownerId = await usuarioLogadoId();
+    if (!ownerId) throw new Error('Faça login para salvar a rota.');
+    const invalida = validarRotaParaSalvar(atualizada);
+    if (invalida) throw new Error(invalida);
+    // Rota com id que ainda não existe no banco (criada antes no navegador): a
+    // RPC só ATUALIZA ids existentes — então entra como rota nova.
+    if (atualizada.id) {
+      const { data: existe, error: errE } = await supabase.from('routes').select('id').eq('id', atualizada.id).eq('owner_id', ownerId).maybeSingle();
+      if (errE) throw erroDoBanco(errE, 'rota');
+      if (!existe) atualizada.id = '';
+    }
+    // Salvamento transacional via RPC: rota + paradas + alunos, tudo ou nada.
     const { data, error } = await supabase.rpc('salvar_rota_completa', {
       p_rota: rotaParaBanco(atualizada),
     });
-    if (error) throw new Error(error.message);
-    return { ...atualizada, id: (data as string) ?? atualizada.id };
+    if (error) throw erroDoBanco(error, 'rota');
+    if (!data) throw new Error('O servidor não confirmou a gravação da rota. Tente de novo.');
+    return { ...atualizada, id: data as string };
   }
   const lista = lsGet<Rota[]>(K_ROTAS, []);
-  const id = atualizada.id || novoId();
+  const id = rota.id || novoId(); // modo local: mantém o id que a rota já tinha
   const nova = { ...atualizada, id };
   const i = lista.findIndex((x) => x.id === id);
   if (i >= 0) lista[i] = nova;
@@ -153,7 +296,7 @@ export async function salvarRota(rota: Rota): Promise<Rota> {
 export async function excluirRota(id: string): Promise<void> {
   if (USAR_BANCO_MOTORISTA && supabase) {
     const { error } = await supabase.from('routes').delete().eq('id', id);
-    if (error) throw new Error(error.message);
+    if (error) throw erroDoBanco(error, 'rota');
     return;
   }
   const lista = lsGet<Rota[]>(K_ROTAS, []).filter((r) => r.id !== id);
