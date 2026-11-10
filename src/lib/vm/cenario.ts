@@ -100,6 +100,38 @@ export function distanciaRotaKm(rota: Rota, fatorRuas = 1.32): number {
   return (m / 1000) * fatorRuas;
 }
 
+/** Tempo parado em cada casa quando o aluno não informou o seu (min). */
+export const PARADA_CASA_MIN = 2;
+/** Tempo parado em cada escola, para embarque/desembarque do grupo (min). */
+export const PARADA_ESCOLA_MIN = 3;
+/** Velocidade média de van escolar na cidade, usada só quando não há tempo viário do trecho. */
+const VELOCIDADE_URBANA_KMH = 22;
+
+/**
+ * Tempo estimado da rota (min) = DIRIGINDO + PARADO NAS PARADAS.
+ *  - dirigindo: tempo viário de cada trecho quando o mapa já calculou; senão,
+ *    a distância do trecho a velocidade urbana de van escolar;
+ *  - parado: em cada casa, o maior tempo de atendimento informado dos alunos
+ *    dali (ou o padrão); em cada escola, o tempo de embarque/desembarque.
+ */
+export function tempoRotaMin(rota: Rota): { total: number; dirigindo: number; parado: number } {
+  const paradas = [...rota.paradas].sort((a, b) => a.ordem - b.ordem);
+  let dirigindo = 0;
+  for (let i = 0; i + 1 < paradas.length; i++) {
+    const t = paradas[i].tempoAteProximaMin;
+    if (typeof t === 'number' && t >= 0) dirigindo += t;
+    else dirigindo += (distanciaRotaKm({ ...rota, paradas: [paradas[i], paradas[i + 1]] }) / VELOCIDADE_URBANA_KMH) * 60;
+  }
+  let parado = 0;
+  for (const p of paradas) {
+    const alunos = rota.passageiros.filter((x) => x.embarqueParadaId === p.id || x.desembarqueParadaId === p.id);
+    if (!alunos.length) continue;
+    parado += p.tipo === 'escola' ? PARADA_ESCOLA_MIN : Math.max(...alunos.map((x) => x.atendimentoMin ?? PARADA_CASA_MIN));
+  }
+  const d = Math.round(dirigindo), e = Math.round(parado);
+  return { total: d + e, dirigindo: d, parado: e };
+}
+
 export interface DadosMotorista {
   demo: boolean;
   veiculo: Veiculo | null;

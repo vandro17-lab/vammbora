@@ -49,3 +49,20 @@ describe('carregarDadosMotorista (painel do motorista)', () => {
     expect(comDados.veiculo).toBe(VAN);
   });
 });
+
+import { tempoRotaMin } from './cenario';
+describe('tempo estimado da rota = dirigindo + parado nas paradas', () => {
+  const p = (id: string, ordem: number, tipo: 'casa' | 'escola', tempo: number | null) => ({ id, ordem, tipo, rotulo: id, lat: -21.2, lng: -50.44 + ordem * 0.01, confirmado: true, tempoAteProximaMin: tempo });
+  const base = { id: 'r', nome: '', sentido: 'volta' as const, turno: null, dias: [], veiculoId: null, monitor: false, monitorOcupaLugar: false, lugaresReservados: 0, ultimoDesembarqueMin: null, limiteAntecipacaoMin: null, status: 'concluida' as const, atualizadoEm: '' };
+  it('soma o tempo viário dos trechos e o tempo de cada parada com aluno', () => {
+    const rota = { ...base, paradas: [p('escola', 0, 'escola', 5), p('c1', 1, 'casa', 2), p('c2', 2, 'casa', null)],
+      passageiros: [{ id: 'a', identificacao: 'A', embarqueParadaId: 'escola', desembarqueParadaId: 'c1' }, { id: 'b', identificacao: 'B', embarqueParadaId: 'escola', desembarqueParadaId: 'c2', atendimentoMin: 4 }] };
+    expect(tempoRotaMin(rota)).toEqual({ total: 16, dirigindo: 7, parado: 9 }); // 3 (escola) + 2 (padrão) + 4 (informado)
+  });
+  it('sem tempo viário, usa a distância a velocidade urbana (nunca 35 km/h sem paradas)', () => {
+    const rota = { ...base, paradas: [p('escola', 0, 'escola', null), p('c1', 1, 'casa', null)], passageiros: [{ id: 'a', identificacao: 'A', embarqueParadaId: 'escola', desembarqueParadaId: 'c1' }] };
+    const t = tempoRotaMin(rota);
+    expect(t.parado).toBe(5);
+    expect(t.dirigindo).toBeGreaterThanOrEqual(3); // ~1,37 km de ruas a 22 km/h
+  });
+});
