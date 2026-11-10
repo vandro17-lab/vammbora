@@ -2,9 +2,9 @@ import type { Rota, Veiculo, OrigemAtendimento } from '@/types/motorista';
 import { supabase, USE_SUPABASE, DEMO_MOTORISTA } from '@/lib/supabase';
 
 /**
- * Usa o banco real só quando o Supabase está configurado E o login demonstrativo
- * do motorista está DESLIGADO. No modo demo, tudo vai para o localStorage, então
- * o painel grava/lê sem depender de sessão (nunca trava).
+ * Padrão: banco real (Supabase) sempre que ele estiver configurado. O
+ * localStorage só é usado sem Supabase ou quando o modo demonstração do
+ * motorista foi ligado EXPLICITAMENTE (VITE_DEMO_MOTORISTA="true").
  */
 const USAR_BANCO_MOTORISTA = USE_SUPABASE && !DEMO_MOTORISTA;
 

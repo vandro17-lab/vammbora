@@ -41,18 +41,19 @@ const flag = import.meta.env.VITE_USE_SUPABASE;
 export const USE_SUPABASE = !!url && !!anonKey && flag !== 'false';
 
 /**
- * Login DEMONSTRATIVO do motorista (ligado por padrão).
+ * Login DEMONSTRATIVO do motorista — DESLIGADO por padrão.
  *
- * Quando ativo, a tela de login do motorista NÃO faz verificação real: entra
- * direto no painel, e o painel do motorista passa a usar o armazenamento LOCAL
- * do navegador (localStorage) em vez do Supabase — assim a demonstração nunca
- * trava por autenticação, cold start ou servidor indisponível.
+ * Padrão (fluxo real): o motorista autentica no Supabase e veículos/rotas são
+ * gravados no banco (RLS por dono).
  *
- * A vitrine da família (escolas, mapas) continua usando o Supabase normalmente;
- * este flag afeta SOMENTE o login e o painel do motorista. Para exigir login
- * real do motorista, defina VITE_DEMO_MOTORISTA="false".
+ * Só quando VITE_DEMO_MOTORISTA="true" é definido explicitamente no build: a
+ * tela de login entra direto no painel, sem verificação, e o painel usa o
+ * armazenamento LOCAL do navegador (localStorage) em vez do Supabase.
+ *
+ * Sem Supabase configurado (USE_SUPABASE=false) o painel continua funcionando
+ * localmente, como antes. A vitrine da família não é afetada por este flag.
  */
-export const DEMO_MOTORISTA = import.meta.env.VITE_DEMO_MOTORISTA !== 'false';
+export const DEMO_MOTORISTA = import.meta.env.VITE_DEMO_MOTORISTA === 'true';
 
 export const supabase: SupabaseClient | null = USE_SUPABASE
   ? createClient(url as string, anonKey as string, {
