@@ -55,6 +55,17 @@ export const USE_SUPABASE = !!url && !!anonKey && flag !== 'false';
  */
 export const DEMO_MOTORISTA = import.meta.env.VITE_DEMO_MOTORISTA === 'true';
 
+/**
+ * Busca DEMONSTRATIVA da família — DESLIGADA por padrão.
+ *
+ * Padrão (fluxo real): a tela de resultados consulta `/api/buscar-rotas`, que
+ * avalia as rotas REAIS cadastradas no Supabase com o motor de encaixe.
+ *
+ * Só com VITE_DEMO_BUSCA="true" explícito (ou sem Supabase configurado) a tela
+ * mostra as ofertas de exemplo (motoristas e vans fictícios).
+ */
+export const DEMO_BUSCA = import.meta.env.VITE_DEMO_BUSCA === 'true';
+
 export const supabase: SupabaseClient | null = USE_SUPABASE
   ? createClient(url as string, anonKey as string, {
       auth: { persistSession: true, autoRefreshToken: true },

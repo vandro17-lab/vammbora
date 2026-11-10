@@ -1,12 +1,20 @@
 import { describe, it, expect } from 'vitest';
+import * as nucleo from './busca-rotas-reais';
 import {
-  avaliarRotaReal,
-  buscarEmRotasReais,
   rotaElegivelParaBusca,
   rotaAtendeDestino,
   type PedidoFamilia,
+  type EntradaBuscaReal,
 } from './busca-rotas-reais';
+import { criarMatrizDemo, type MatrizViaria } from '@/lib/encaixe';
 import type { Rota, Veiculo, ParadaRota, PassageiroRota } from '@/types/motorista';
+
+/** Matriz de TESTE (origem 'fixture-testada'): mesmos números determinísticos
+ *  da estimativa por coordenadas, mas declarada como fixture — o núcleo não tem
+ *  matriz padrão e rebaixa a origem 'demonstracao' para "sob confirmação". */
+const FIXTURE: MatrizViaria = { ...criarMatrizDemo(), origem: 'fixture-testada' };
+const avaliarRotaReal = (r: Rota, v: Veiculo | null, p: PedidoFamilia, m: MatrizViaria = FIXTURE) => nucleo.avaliarRotaReal(r, v, p, m);
+const buscarEmRotasReais = (e: EntradaBuscaReal[], p: PedidoFamilia, m: MatrizViaria = FIXTURE) => nucleo.buscarEmRotasReais(e, p, m);
 
 /* Coordenadas reais aproximadas de Araçatuba (dados de TESTE, sem PII real). */
 const C = {
@@ -257,5 +265,30 @@ describe('âncora de horário é a da escola ESCOLHIDA (menos erro)', () => {
     // Chega em escX no máximo às 07:00 (horário declarado dessa escola), nunca às 08:00.
     expect(res.fonteHorario).toBe('rota');
     if (res.horarioEscolaMin != null) expect(res.horarioEscolaMin).toBeLessThanOrEqual(7 * 60);
+  });
+});
+
+describe('tempos fictícios nunca confirmam encaixe', () => {
+  it('matriz de demonstração: mesmo encaixe vira "sob confirmação" e sinaliza estimativa', () => {
+    const real = avaliarRotaReal(rotaIda(), veiculo(4), pedidoIda());
+    const estimado = nucleo.avaliarRotaReal(rotaIda(), veiculo(4), pedidoIda(), criarMatrizDemo());
+    expect(real.status).toBe('compativel');
+    expect(real.temposEstimados).toBe(false);
+    expect(estimado.status).toBe('sob_confirmacao');
+    expect(estimado.temposEstimados).toBe(true);
+    expect(estimado.motivo).toMatch(/estimad/i);
+  });
+
+  it('busca com matriz de demonstração não devolve nenhum "compatível"', () => {
+    const { resultados } = nucleo.buscarEmRotasReais([{ rota: rotaIda(), veiculo: veiculo(4) }], pedidoIda(), criarMatrizDemo());
+    expect(resultados.length).toBeGreaterThan(0);
+    expect(resultados.some((r) => r.status === 'compativel')).toBe(false);
+  });
+
+  it('ida: rota de outro turno não é candidata; turno não informado continua sendo avaliado', () => {
+    const tarde = { rota: rotaIda({ turno: 'tarde' }), veiculo: veiculo(4) };
+    expect(nucleo.candidatasParaBusca([tarde], pedidoIda({ turno: 'manha' }))).toHaveLength(0);
+    expect(nucleo.candidatasParaBusca([tarde], pedidoIda({ turno: null }))).toHaveLength(1);
+    expect(nucleo.candidatasParaBusca([{ rota: rotaIda({ turno: null }), veiculo: veiculo(4) }], pedidoIda({ turno: 'manha' }))).toHaveLength(1);
   });
 });

@@ -5,7 +5,7 @@ import {
   type AlunoNovo,
   type CodigoMotivo,
 } from '@/lib/rota-para-encaixe';
-import { criarMatrizDemo, haversineMetros, type MatrizViaria } from '@/lib/encaixe';
+import { haversineMetros, type MatrizViaria } from '@/lib/encaixe';
 import { vagasParaNovos } from '@/lib/ocupacao-rota';
 
 /** Distância máxima (m) de uma parada da rota à escola pedida para a rota ser
@@ -81,6 +81,9 @@ export interface ResultadoRotaReal {
   classe?: 'imediato' | 'pre_autorizado' | 'aprovacao_motorista';
   /** Minutos que a van precisaria sair antes do habitual. */
   antecipacaoMin?: number;
+  /** true = tempos de percurso ESTIMADOS por distância (sem consulta viária).
+   *  Nesse caso o resultado NUNCA é "compatível": no máximo "sob confirmação". */
+  temposEstimados: boolean;
 }
 
 /** Elegibilidade NO NÍVEL DA ROTA: real (não-demo), concluída e com casa +
@@ -166,22 +169,29 @@ function statusDeCodigos(codigos: CodigoMotivo[]): StatusBuscaReal {
 const MOTIVO_OK = 'Encaixa nesta rota. Horário estimado pela rota — sujeito à confirmação do motorista.';
 const MOTIVO_OK_FRACO = 'Parece compatível, mas o horário desta rota ainda não foi informado — fica sob confirmação.';
 const MOTIVO_DEPENDE_MOTORISTA = 'Cabe na rota, mas o motorista precisaria ajustar a saída ou a ordem das paradas — fica sob confirmação dele.';
+const MOTIVO_TEMPO_ESTIMADO = 'Parece compatível, mas os tempos de trajeto foram estimados pela distância (sem consulta às ruas) — fica sob confirmação do motorista.';
 const MOTIVO_AVULSO = 'Encaixe calculado; como é avulso, confirme a data direto com o motorista.';
 const MOTIVO_SEM_ORIGEM = 'Confirme um endereço de origem válido no mapa para calcularmos a compatibilidade.';
 const MOTIVO_SEM_DESTINO = 'Escolha a escola de destino para avaliarmos esta rota.';
 const MOTIVO_SEM_HORARIO = 'Esta rota ainda não tem horário suficiente para estimar — horário sob confirmação.';
 
+/** Matriz sem dado viário real (tempos estimados pelas coordenadas)? */
+export const matrizEhEstimativa = (matriz: MatrizViaria): boolean => matriz.origem === 'demonstracao';
+
 /**
- * Avalia UMA rota real contra o pedido da família. `matriz` deve vir de um
- * provedor viário real no servidor; nos testes/demonstração usa a matriz
- * determinística por coordenadas (origem 'demonstracao').
+ * Avalia UMA rota real contra o pedido da família. `matriz` é OBRIGATÓRIA e
+ * deve vir de um provedor viário real (servidor). Não há matriz padrão: quem
+ * passar a matriz de demonstração (`criarMatrizDemo`, origem 'demonstracao')
+ * recebe, no máximo, "sob confirmação" — tempos fictícios NUNCA confirmam um
+ * encaixe.
  */
 export function avaliarRotaReal(
   rota: Rota,
   veiculo: Veiculo | null,
   pedido: PedidoFamilia,
-  matriz: MatrizViaria = criarMatrizDemo(),
+  matriz: MatrizViaria,
 ): ResultadoRotaReal {
+  const temposEstimados = matrizEhEstimativa(matriz);
   const vagas = vagasParaNovos(rota, veiculo);
   const atendeEscola = rotaAtendeDestino(rota, pedido.destinoId);
   const vazio = (status: StatusBuscaReal, motivo: string, codigos: CodigoMotivo[] = []): ResultadoRotaReal => ({
@@ -197,6 +207,7 @@ export function avaliarRotaReal(
     fonteHorario: 'nenhuma',
     motivo,
     codigos,
+    temposEstimados,
   });
 
   // O sentido pedido precisa bater com o da rota (ida e volta são rotas independentes).
@@ -252,8 +263,10 @@ export function avaliarRotaReal(
   // Encaixe que exige sair mais cedo do que o motorista autorizou (ou mudar a
   // ordem das paradas) é possível, mas NÃO é vaga garantida: depende dele.
   const dependeMotorista = sim.classe === 'aprovacao_motorista';
-  const status: StatusBuscaReal = avulso || horarioFraco || dependeMotorista ? 'sob_confirmacao' : 'compativel';
-  const motivo = avulso ? MOTIVO_AVULSO : horarioFraco ? MOTIVO_OK_FRACO : dependeMotorista ? MOTIVO_DEPENDE_MOTORISTA : MOTIVO_OK;
+  // Tempos estimados (sem consulta viária) nunca confirmam o encaixe.
+  const status: StatusBuscaReal = avulso || horarioFraco || dependeMotorista || temposEstimados ? 'sob_confirmacao' : 'compativel';
+  const motivo = avulso ? MOTIVO_AVULSO : horarioFraco ? MOTIVO_OK_FRACO : dependeMotorista ? MOTIVO_DEPENDE_MOTORISTA
+    : temposEstimados ? MOTIVO_TEMPO_ESTIMADO : MOTIVO_OK;
 
   return {
     rotaId: rota.id,
@@ -270,6 +283,7 @@ export function avaliarRotaReal(
     codigos: [],
     classe: sim.classe,
     antecipacaoMin: sim.antecipacaoMin ?? 0,
+    temposEstimados,
   };
 }
 
@@ -288,48 +302,67 @@ export interface ResultadoBuscaReal {
   totalRotasAvaliadas: number;
 }
 
+/** Turnos incompatíveis na IDA: ambos informados, diferentes e nenhum integral.
+ *  (Na volta o turno cadastrado é ambíguo — a volta da manhã acontece ao
+ *  meio-dia —, então lá quem decide é o horário da escola, não o rótulo.) */
+function turnoIncompativel(rota: Rota, pedido: PedidoFamilia): boolean {
+  if (pedido.sentido !== 'ida' || !pedido.turno || !rota.turno) return false;
+  if (pedido.turno === 'integral' || rota.turno === 'integral') return false;
+  return pedido.turno !== rota.turno;
+}
+
+/**
+ * Recorte das CANDIDATAS, nesta ordem: mesmo sentido; turno compatível; COM
+ * VAGA (capacidade − pico de ocupação ≥ 1); que já ATENDEM a escola (Tier A)
+ * OU passam PERTO dela (Tier B). Não prova encaixe — só evita avaliar à toa.
+ */
+export function candidatasParaBusca(entradas: EntradaBuscaReal[], pedido: PedidoFamilia): EntradaBuscaReal[] {
+  return entradas.filter((e) => {
+    if (e.rota.sentido !== pedido.sentido) return false;
+    if (turnoIncompativel(e.rota, pedido)) return false;
+    if (vagasParaNovos(e.rota, e.veiculo) < 1) return false; // 1º filtro: vaga
+    return rotaAtendeDestino(e.rota, pedido.destinoId) || rotaPassaPertoDaEscola(e.rota, pedido.escolaPonto);
+  });
+}
+
+/**
+ * §6.3 — ordenação pela MELHOR EXPERIÊNCIA DO NOVO ALUNO, nesta ordem:
+ * 1) status (compatível antes de "sob confirmação");
+ * 2) MENOR TEMPO A BORDO do novo aluno (experiência de deslocamento do
+ *    aluno) — NÃO confundir com o desvio do motorista;
+ * 3) MENOR DESVIO/impacto necessário para o encaixe (desempate);
+ * 4) rota que já ATENDE a escola (Tier A) antes de proximidade (Tier B);
+ * 5) coleta mais cedo em casa.
+ */
+export function compararResultados(a: ResultadoRotaReal, b: ResultadoRotaReal): number {
+  if (pesoStatus(a.status) !== pesoStatus(b.status)) return pesoStatus(a.status) - pesoStatus(b.status);
+  const ba = a.minutosABordo ?? Number.POSITIVE_INFINITY;
+  const bb = b.minutosABordo ?? Number.POSITIVE_INFINITY;
+  if (ba !== bb) return ba - bb; // 2) menor permanência do aluno na van
+  const da = a.desvioMin ?? Number.POSITIVE_INFINITY;
+  const db = b.desvioMin ?? Number.POSITIVE_INFINITY;
+  if (da !== db) return da - db; // 3) menor desvio/impacto (desempate)
+  if (a.atendeEscola !== b.atendeEscola) return a.atendeEscola ? -1 : 1; // 4) Tier A antes de Tier B
+  const pa = a.passagemCasaMin ?? Number.POSITIVE_INFINITY;
+  const pb = b.passagemCasaMin ?? Number.POSITIVE_INFINITY;
+  return pa - pb; // 5) coleta mais cedo
+}
+
 /**
  * Avalia o pedido da família contra uma lista de rotas reais JÁ ELEGÍVEIS.
- * Recortes, nesta ordem:
- *   1) mesmo sentido;
- *   2) COM VAGA (capacidade − pico de ocupação ≥ 1) — motoristas sem vaga não
- *      entram;
- *   3) que já ATENDEM a escola (Tier A) OU passam PERTO dela (Tier B).
- * Para cada candidata o motor PROVA o encaixe (nunca "compatível" só por vaga ou
- * proximidade). Ordena: compatíveis antes de "sob confirmação"; Tier A antes de
- * Tier B; menor alteração de rota; coleta mais cedo. Saída sem PII.
+ * Para cada candidata (ver `candidatasParaBusca`) o motor PROVA o encaixe
+ * (nunca "compatível" só por vaga ou proximidade) usando a `matriz` informada
+ * — obrigatória; com matriz de estimativa o teto é "sob confirmação".
+ * Saída ordenada (ver `compararResultados`) e sem PII.
  */
 export function buscarEmRotasReais(
   entradas: EntradaBuscaReal[],
   pedido: PedidoFamilia,
-  matriz: MatrizViaria = criarMatrizDemo(),
+  matriz: MatrizViaria,
 ): ResultadoBuscaReal {
-  const candidatas = entradas.filter((e) => {
-    if (e.rota.sentido !== pedido.sentido) return false;
-    if (vagasParaNovos(e.rota, e.veiculo) < 1) return false; // 1º filtro: vaga
-    return rotaAtendeDestino(e.rota, pedido.destinoId) || rotaPassaPertoDaEscola(e.rota, pedido.escolaPonto);
-  });
+  const candidatas = candidatasParaBusca(entradas, pedido);
   const resultados = candidatas
     .map((e) => avaliarRotaReal(e.rota, e.veiculo, pedido, matriz))
-    .sort((a, b) => {
-      // §6.3 — ordenação pela MELHOR EXPERIÊNCIA DO NOVO ALUNO, nesta ordem:
-      // 1) status (compatível antes de "sob confirmação");
-      // 2) MENOR TEMPO A BORDO do novo aluno (experiência de deslocamento do
-      //    aluno) — NÃO confundir com o desvio do motorista;
-      // 3) MENOR DESVIO/impacto necessário para o encaixe (desempate);
-      // 4) rota que já ATENDE a escola (Tier A) antes de proximidade (Tier B);
-      // 5) coleta mais cedo em casa.
-      if (pesoStatus(a.status) !== pesoStatus(b.status)) return pesoStatus(a.status) - pesoStatus(b.status);
-      const ba = a.minutosABordo ?? Number.POSITIVE_INFINITY;
-      const bb = b.minutosABordo ?? Number.POSITIVE_INFINITY;
-      if (ba !== bb) return ba - bb; // 2) menor permanência do aluno na van
-      const da = a.desvioMin ?? Number.POSITIVE_INFINITY;
-      const db = b.desvioMin ?? Number.POSITIVE_INFINITY;
-      if (da !== db) return da - db; // 3) menor desvio/impacto (desempate)
-      if (a.atendeEscola !== b.atendeEscola) return a.atendeEscola ? -1 : 1; // 4) Tier A antes de Tier B
-      const pa = a.passagemCasaMin ?? Number.POSITIVE_INFINITY;
-      const pb = b.passagemCasaMin ?? Number.POSITIVE_INFINITY;
-      return pa - pb; // 5) coleta mais cedo
-    });
+    .sort(compararResultados);
   return { resultados, totalRotasAvaliadas: candidatas.length };
 }

@@ -3,9 +3,18 @@ import { describe, it, expect } from 'vitest';
 import { gerarBaseDemo, haversineMetros } from '../../scripts/demo-aracatuba/gerar.mjs';
 // @ts-expect-error — dados .mjs sem tipos.
 import { DESTINOS, PONTOS } from '../../scripts/demo-aracatuba/dados.mjs';
-import { buscarEmRotasReais, avaliarRotaReal, type EntradaBuscaReal, type PedidoFamilia } from '@/lib/busca-rotas-reais';
+import * as nucleo from '@/lib/busca-rotas-reais';
+import { type EntradaBuscaReal, type PedidoFamilia } from '@/lib/busca-rotas-reais';
+import { criarMatrizDemo, type MatrizViaria } from '@/lib/encaixe';
 import { picoOcupacao, capacidadeAlunos } from '@/lib/ocupacao-rota';
 import type { Rota, Veiculo } from '@/types/motorista';
+
+/** Matriz de TESTE (origem 'fixture-testada'): mesmos números determinísticos
+ *  da estimativa por coordenadas, mas declarada como fixture — o núcleo não tem
+ *  matriz padrão e rebaixa a origem 'demonstracao' para "sob confirmação". */
+const FIXTURE: MatrizViaria = { ...criarMatrizDemo(), origem: 'fixture-testada' };
+const avaliarRotaReal = (r: Rota, v: Veiculo | null, p: PedidoFamilia, m: MatrizViaria = FIXTURE) => nucleo.avaliarRotaReal(r, v, p, m);
+const buscarEmRotasReais = (e: EntradaBuscaReal[], p: PedidoFamilia, m: MatrizViaria = FIXTURE) => nucleo.buscarEmRotasReais(e, p, m);
 
 /**
  * Testes de INTEGRAÇÃO da base demonstrativa (pacote VB150) contra o MESMO motor
