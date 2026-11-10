@@ -52,6 +52,7 @@ const mostravel = (s: StatusBuscaReal) => s === 'compativel' || s === 'sob_confi
 export async function buscarRotasReais(
   criterios: CriteriosBusca,
   escolaPonto?: { lat: number; lng: number } | null,
+  signal?: AbortSignal,
 ): Promise<{ estado: EstadoBuscaReal; resultados: CartaoRotaRealDados[] }> {
   if (!Number.isFinite(criterios.origemLat) || !Number.isFinite(criterios.origemLng) || !criterios.destinoId) {
     return { estado: 'ok', resultados: [] };
@@ -61,6 +62,7 @@ export async function buscarRotasReais(
     try {
       const r = await fetch('/api/buscar-rotas', {
         method: 'POST',
+        signal,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           origem: { lat: criterios.origemLat, lng: criterios.origemLng },

@@ -1,43 +1,70 @@
+import { useEffect, useRef, useSyncExternalStore } from 'react';
+import { useLocation } from 'react-router-dom';
 import { createPortal } from 'react-dom';
-import { motion } from 'framer-motion';
-import { OpeningVan } from '@/components/brand/StartupExperience';
-import '@/components/brand/startup.css';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
+import { buscaOverlay } from '@/lib/busca-overlay';
+import { URL_BUSCA } from '@/lib/animacoes';
 
-interface Props { cidade: string }
+/**
+ * Tela de BUSCA INTELIGENTE: reproduz a animação original
+ * (/animacoes/vanbora-animacao.html, versão A, na velocidade e no loop dela)
+ * enquanto a consulta real acontece. Montada uma única vez no App; quem abre e
+ * fecha é o estado `buscaOverlay`.
+ *
+ * Com "reduzir movimento" ativo no dispositivo, a animação não é carregada:
+ * fica só o aviso estático.
+ */
+export function SearchLoadingScreen() {
+  const { aberta } = useSyncExternalStore(buscaOverlay.assinar, buscaOverlay.obter, buscaOverlay.obter);
+  const reduzir = useReducedMotion();
+  const { pathname } = useLocation();
 
-/** A busca usa a mesma abertura da entrada, mantendo a tela protegida durante o processamento. */
-export function SearchLoadingScreen({ cidade }: Props) {
+  // Saiu da página de resultados com a tela aberta (ex.: botão Voltar): a busca
+  // deixa de interessar — cancela e fecha, para a tela nunca ficar presa.
+  const esteveNosResultados = useRef(false);
+  useEffect(() => {
+    if (!aberta) { esteveNosResultados.current = false; return; }
+    if (pathname === '/resultados') esteveNosResultados.current = true;
+    else if (esteveNosResultados.current) buscaOverlay.cancelar();
+  }, [aberta, pathname]);
+
+  useEffect(() => {
+    if (!aberta) return;
+    const anterior = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = anterior; };
+  }, [aberta]);
+
   return createPortal(
-    <motion.div
-      className="startup"
-      role="status"
-      aria-live="polite"
-      aria-label="Buscando vans para seu destino"
-      initial={{ opacity: 1 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={{ duration: .35 }}
-    >
-      <div className="startup-glow" aria-hidden="true" />
-      <div className="startup-grid" aria-hidden="true" />
-      <div className="startup-center">
-        <div className="startup-scene" aria-hidden="true">
-          <svg className="startup-road" viewBox="0 0 400 160" fill="none">
-            <path d="M-20 125H90C130 125 130 45 180 45H420" stroke="url(#search-road)" strokeWidth="1.5" />
-            <defs><linearGradient id="search-road"><stop stopColor="#facc15" stopOpacity="0" /><stop offset=".5" stopColor="#facc15" stopOpacity=".65" /><stop offset="1" stopColor="#facc15" stopOpacity="0" /></linearGradient></defs>
-          </svg>
-          <div className="startup-van"><OpeningVan /></div>
-          <div className="startup-word">Van<span>Bora</span><span className="startup-period">.</span></div>
-        </div>
-        <h1 className="sr-only">VanBora</h1>
-        <p className="startup-tagline"><span>Conectando pessoas.</span><span>Encurtando destinos.</span></p>
-        <div className="startup-loading" role="status" aria-live="polite">
-          <span className="startup-loading-line" aria-hidden="true" />
-          <span className="startup-status">Consultando trajetos em {cidade}</span>
-        </div>
-      </div>
-      <div className="startup-bottom"><span>ARAÇATUBA E REGIÃO</span></div>
-    </motion.div>,
+    <AnimatePresence>
+      {aberta && (
+        <motion.div
+          key="busca-inteligente"
+          data-testid="busca-overlay"
+          className="fixed inset-0 z-[100] overflow-hidden bg-black text-white"
+          role="dialog" aria-modal="true" aria-label="Buscando vans para o seu trajeto"
+          initial={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: reduzir ? 0 : 0.3 }}
+        >
+          {!reduzir && (
+            <iframe
+              src={URL_BUSCA} title="" aria-hidden="true" tabIndex={-1}
+              className="pointer-events-none absolute inset-0 h-full w-full border-0"
+            />
+          )}
+          <div className="absolute inset-x-0 bottom-0 flex flex-col items-center gap-4 bg-gradient-to-t from-black via-black/80 to-transparent px-6 pb-[max(1.75rem,env(safe-area-inset-bottom))] pt-16 text-center">
+            <p role="status" aria-live="polite" className="text-sm font-medium tracking-wide text-white/90">
+              Buscando vans compatíveis com o seu trajeto…
+            </p>
+            <button
+              type="button" onClick={() => buscaOverlay.cancelar()}
+              className="rounded-full px-5 py-2.5 text-sm font-semibold text-white/85 ring-1 ring-white/35 transition hover:bg-white/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+            >
+              Cancelar busca
+            </button>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>,
     document.body,
   );
 }

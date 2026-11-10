@@ -1,12 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { AnimatePresence } from 'framer-motion';
 import { ArrowLeft } from 'lucide-react';
 import { paramsParaCriterios } from '@/lib/searchParams';
 import { useVitrine } from '@/data/VitrineProvider';
 import { buscarOfertasDemo, horarioPadrao, type OfertaDemo } from '@/features/family-search-demo/engine';
 import { FamilyDemoResults } from '@/features/family-search-demo/FamilyDemoResults';
-import { SearchLoadingScreen } from '@/components/search/SearchLoadingScreen';
+import { buscaOverlay } from '@/lib/busca-overlay';
+import { BUSCA_LIMITE_MS, esperaRestanteDaBusca } from '@/lib/animacoes';
 import { DEMO_BUSCA } from '@/lib/supabase';
 import { buscarRotasReais, type CartaoRotaRealDados } from '@/lib/busca-rotas-reais-cliente';
 import { CartaoRotaReal } from '@/components/results/CartaoRotaReal';
@@ -16,7 +16,7 @@ export function SearchResultsPage(){
  const [sp]=useSearchParams();
  const parametros=sp.toString();
  const criterios=useMemo(()=>paramsParaCriterios(new URLSearchParams(parametros)),[parametros]);
- const {destinosPorId,modoDemo}=useVitrine();
+ const {destinosPorId,modoDemo,carregando:vitrineCarregando}=useVitrine();
  // Fluxo real (padrão): rotas cadastradas, via /api/buscar-rotas. As ofertas de
  // exemplo só aparecem no modo demonstração EXPLÍCITO (ou sem Supabase).
  const buscaDemo=DEMO_BUSCA||modoDemo;
@@ -25,42 +25,57 @@ export function SearchResultsPage(){
  const horario=sp.get('horario')||horarioPadrao(criterios.turno,criterios.modalidade);
  const [ofertas,setOfertas]=useState<OfertaDemo[]>([]);
  const [carregando,setCarregando]=useState(true);
- const [mostrarOverlay,setMostrarOverlay]=useState(() => sessionStorage.getItem('vambora.busca.transicao') === '1');
+ // Tela de busca (animação): aberta pelo formulário no clique em "Buscar vans".
+ const overlay=useSyncExternalStore(buscaOverlay.assinar,buscaOverlay.obter,buscaOverlay.obter);
+ const [cancelada,setCancelada]=useState(false);
+ const [tentativa,setTentativa]=useState(0);
  const [imagensProntas,setImagensProntas]=useState(false);
  const [erro,setErro]=useState('');
  useEffect(()=>{
+  // Uma consulta por vez: trocar os critérios (ou sair da página) aborta a
+  // anterior, e respostas de consultas abortadas são descartadas.
   const ctrl=new AbortController();
-  setCarregando(true);setErro('');setOfertas([]);setReais([]);setImagensProntas(false);
+  setCarregando(true);setErro('');setOfertas([]);setReais([]);setImagensProntas(false);setCancelada(false);
+  const limite=window.setTimeout(()=>{
+   ctrl.abort();
+   setErro('A busca demorou mais do que o esperado. Verifique a conexão e tente novamente.');
+   setCarregando(false);
+  },BUSCA_LIMITE_MS);
+  const encerrar=()=>{clearTimeout(limite);ctrl.abort();};
+  buscaOverlay.definirCancelamento(()=>{clearTimeout(limite);ctrl.abort();setCancelada(true);setCarregando(false);});
   if(!criterios.origemLat||!criterios.origemLng){
    setErro('Selecione um endereço reconhecido pelo mapa para calcular as opções.');
-   setCarregando(false);
-   return()=>ctrl.abort();
+   clearTimeout(limite);setCarregando(false);
+   return encerrar;
   }
+  // Catálogo de escolas ainda chegando: continua carregando (não é erro).
+  if(!destino&&vitrineCarregando)return encerrar;
   if(!destino||destino.lat==null||destino.lng==null){
    setErro('Escolha uma escola com localização disponível para calcular o trajeto.');
-   setCarregando(false);
-   return()=>ctrl.abort();
+   clearTimeout(limite);setCarregando(false);
+   return encerrar;
   }
   if(!buscaDemo){
    // BUSCA REAL: o servidor avalia as rotas do Supabase com o motor de encaixe
    // e devolve só o veredito (sem dados de outros passageiros).
-   buscarRotasReais(criterios,{lat:destino.lat,lng:destino.lng})
+   buscarRotasReais(criterios,{lat:destino.lat,lng:destino.lng},ctrl.signal)
     .then(r=>{
      if(ctrl.signal.aborted)return;
+     clearTimeout(limite);
      if(r.estado==='ok')setReais(r.resultados);
      else setErro(r.estado==='nao_configurado'
       ?'A busca por rotas ainda não está disponível neste ambiente. Tente novamente mais tarde.'
       :'Não foi possível consultar as rotas agora. Verifique a conexão e tente novamente.');
     })
     .finally(()=>{if(!ctrl.signal.aborted)setCarregando(false);});
-   return()=>ctrl.abort();
+   return encerrar;
   }
   buscarOfertasDemo({criterios,destino,horario},ctrl.signal)
    .then(lista=>{if(!ctrl.signal.aborted){setOfertas(lista);if(!lista.length)setErro('Não foi possível confirmar rotas viárias compatíveis. Verifique o endereço ou tente novamente mais tarde.');}})
    .catch(()=>{if(!ctrl.signal.aborted)setErro('Falha ao consultar o serviço de trajetos. Tente novamente.');})
-   .finally(()=>{if(!ctrl.signal.aborted)setCarregando(false);});
-  return()=>ctrl.abort();
- },[criterios,destino,horario,buscaDemo]);
+   .finally(()=>{if(!ctrl.signal.aborted){clearTimeout(limite);setCarregando(false);}});
+  return encerrar;
+ },[criterios,destino,horario,buscaDemo,tentativa,vitrineCarregando]);
  useEffect(() => {
   if (carregando) return;
   let cancelado = false;
@@ -73,31 +88,26 @@ export function SearchResultsPage(){
   }))).then(() => { if (!cancelado) setImagensProntas(true); });
   return () => { cancelado = true; };
  }, [carregando, ofertas]);
+ // Fecha a animação quando a consulta terminou (resultado, vazio ou erro) E o
+ // mínimo de exibição já passou; se a consulta demorar mais, espera por ela.
  useEffect(() => {
-  if (!mostrarOverlay) return;
-  const previous = document.body.style.overflow;
-  document.body.style.overflow = 'hidden';
-  window.scrollTo({top:0,left:0,behavior:'instant'});
-  return () => { document.body.style.overflow = previous; };
- }, [mostrarOverlay]);
- useEffect(() => {
-  if (carregando || !imagensProntas || !mostrarOverlay) return;
-  const iniciadaEm = Number(sessionStorage.getItem('vambora.busca.iniciadaEm')) || Date.now();
-  const espera = Math.max(0, 3000 - (Date.now() - iniciadaEm));
+  if (!overlay.aberta || carregando || !imagensProntas) return;
   const id = window.setTimeout(() => {
    window.scrollTo({top:0,left:0,behavior:'instant'});
-   sessionStorage.removeItem('vambora.busca.transicao');
-   sessionStorage.removeItem('vambora.busca.iniciadaEm');
-   setMostrarOverlay(false);
-  }, espera);
+   buscaOverlay.fechar();
+  }, esperaRestanteDaBusca(overlay.iniciadaEm, Date.now()));
   return () => clearTimeout(id);
- }, [carregando, imagensProntas, mostrarOverlay]);
+ }, [overlay.aberta, overlay.iniciadaEm, carregando, imagensProntas]);
  return <main className="container-page py-8">
-  <AnimatePresence>{mostrarOverlay&&<SearchLoadingScreen key="busca-loading" cidade="Araçatuba" />}</AnimatePresence>
   <Link to="/" className="inline-flex items-center gap-2 text-sm font-semibold text-navy-700 hover:text-navy-900"><ArrowLeft size={17}/> Nova busca</Link>
   <h1 className="mt-3 font-display text-3xl font-bold tracking-tight text-navy-900">Vans para {destino?.nome||'sua escola'}</h1>
   <p className="mt-2 text-sm text-navy-500">Localização e trajetos consultados em mapas reais.</p>
-  {buscaDemo
+  {cancelada
+   ? <section className="mt-6">
+      <p role="status" className="rounded-xl bg-navy-50 p-4 text-sm text-navy-700">Busca cancelada. Nenhum resultado foi carregado.</p>
+      <button type="button" className="btn btn-primary mt-4" onClick={()=>setTentativa(n=>n+1)}>Buscar novamente</button>
+     </section>
+   : buscaDemo
    ? <FamilyDemoResults ofertas={ofertas} carregando={carregando} erro={erro} horario={horario} endereco={criterios.endereco} onEditar={()=>window.location.assign('/')}/>
    : <section className="mt-6" aria-busy={carregando}>
       {carregando&&<p className="text-sm text-navy-500">Avaliando as rotas cadastradas…</p>}

@@ -10,7 +10,7 @@ import { criteriosParaParams } from '@/lib/searchParams';
 import { AutocompleteEndereco } from '@/components/search/AutocompleteEndereco';
 import { locaisDeDestinos, geocodificarPreciso } from '@/lib/geocode';
 import { Loader2 } from 'lucide-react';
-import { SearchLoadingScreen } from '@/components/search/SearchLoadingScreen';
+import { buscaOverlay } from '@/lib/busca-overlay';
 
 const TITULOS = ['De onde vamos sair?', 'Qual é o destino?', 'Como é sua rotina?'];
 const DESCRICOES = ['Comece pelo bairro de embarque.', 'Escolha a escola ou a faculdade.', 'Falta pouco para encontrar suas opções.'];
@@ -33,7 +33,6 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
   const [modalidade, setModalidade] = useState<ModalidadeTrajeto>('ida');
   const [localizando, setLocalizando] = useState(false);
   const [horario, setHorario] = useState('07:00');
-  const [mostrarBusca, setMostrarBusca] = useState(false);
   const titulo = useRef<HTMLHeadingElement>(null);
   // Ao trocar de passo, focamos o título (acessibilidade). `preventScroll` tenta
   // evitar que a página role ao focar — mas iOS antigo o ignora e a tela "foge
@@ -53,9 +52,13 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
     if (passo < 2) { ir(passo + 1); return; }
     if (localizando) return;
 
-    sessionStorage.setItem('vambora.busca.transicao', '1');
-    sessionStorage.setItem('vambora.busca.iniciadaEm', String(Date.now()));
-    setMostrarBusca(true);
+    // A animação de busca aparece JÁ no clique e segue na página de resultados
+    // (é a mesma tela; não reinicia). Cancelar aqui interrompe a localização do
+    // endereço e mantém a pessoa no formulário.
+    let cancelada = false;
+    const ctrl = new AbortController();
+    buscaOverlay.abrir();
+    buscaOverlay.definirCancelamento(() => { cancelada = true; ctrl.abort(); });
     const texto = endereco.trim();
     // Garante uma COORDENADA de origem antes de buscar. Sem ela, o motor de
     // rotas reais não classifica compatibilidade (era por isso que "nunca
@@ -66,7 +69,6 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
     const temNumero = /\d/.test(texto);
     if (texto.length >= 3 && (!coord || temNumero)) {
       setLocalizando(true);
-      const ctrl = new AbortController();
       const limite = window.setTimeout(() => ctrl.abort(), 7000);
       try {
         const ponto = await geocodificarPreciso(texto, '', ctrl.signal);
@@ -76,6 +78,7 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
       } catch { /* serviço de mapas indisponível: segue sem coordenada precisa */ }
       finally { clearTimeout(limite); setLocalizando(false); }
     }
+    if (cancelada) return;
 
     const paramsBase = criteriosParaParams({ cidadeId: CIDADE_PADRAO.id, endereco: texto, destinoId: destinoId || null, turno: turno || null, contratacao, dataAvulso: contratacao === 'avulso' ? dataAvulso : undefined, modalidade, origemLat: coord?.lat, origemLng: coord?.lng });
     const params = new URLSearchParams(paramsBase);
@@ -122,7 +125,6 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
         <button type="submit" className="btn btn-lg btn-primary flex-1" disabled={localizando} aria-busy={localizando}>{passo === 2 ? (localizando ? <><Loader2 className="h-4 w-4 animate-spin" /> Localizando endereço…</> : <><Search className="h-4 w-4" /> Encontrar vans</>) : <>Continuar <ArrowRight className="h-4 w-4" /></>}</button>
       </div>
       <p className="mt-4 text-center text-xs text-navy-500">Sem criar conta. No seu tempo.</p>
-      {mostrarBusca && <SearchLoadingScreen cidade={CIDADE_PADRAO.nome} />}
     </form>
   );
 }

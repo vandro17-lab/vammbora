@@ -1,4 +1,5 @@
 import { StartupExperience } from '@/components/brand/StartupExperience';
+import { SearchLoadingScreen } from '@/components/search/SearchLoadingScreen';
 import { BrowserRouter, Routes, Route, Outlet } from 'react-router-dom';
 import { ExigirMotorista } from '@/pages/motorista/MotoristaShell';
 import { DashboardPage } from '@/pages/vambora-motoristas/DashboardPage';
@@ -92,6 +93,7 @@ export default function App() {
             {rotasRedirecionamentoMotorista()}
           </Routes>
           </StartupExperience>
+          <SearchLoadingScreen />
         </VitrineProvider>
         </EdicaoAparenciaProvider>
         </UiConfigProvider>
