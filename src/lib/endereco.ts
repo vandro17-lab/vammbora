@@ -76,10 +76,11 @@ const finito = (p: Coord | null | undefined): p is Coord => !!p && Number.isFini
  * Decide o ponto de um endereço a partir do que existe, do MAIS confiável para
  * o menos:
  *   1) geocodificação que confirmou o número  → 'exato';
- *   2) sugestão escolhida pela pessoa          → 'exato' se já era do número
- *      pedido; senão 'rua' (o ponto é da via, não do imóvel);
- *   3) geocodificação só da rua                → 'rua';
- *   4) nada confiável                          → sem ponto.
+ *   2) sugestão escolhida que já era do número → 'exato';
+ *   3) posição calculada pelos números vizinhos → 'estimado';
+ *   4) sugestão escolhida (só a rua)           → 'rua' (ponto da via);
+ *   5) geocodificação só da rua                → 'rua';
+ *   6) nada confiável                          → sem ponto.
  * Um resultado apenas "aproximado" (bairro/cidade) NUNCA substitui a sugestão
  * escolhida nem vira ponto por conta própria.
  */
@@ -87,8 +88,14 @@ export function escolherPonto(preciso: PontoPreciso | null, sugestao: PontoSuges
   if (finito(preciso) && preciso.precisao === 'exato') {
     return { coord: { lat: preciso.lat, lng: preciso.lng }, precisao: 'exato', rotulo: preciso.rotulo || null };
   }
+  if (finito(sugestao) && sugestao.temNumero) {
+    return { coord: { lat: sugestao.lat, lng: sugestao.lng }, precisao: 'exato', rotulo: null };
+  }
+  if (finito(preciso) && preciso.precisao === 'estimado') {
+    return { coord: { lat: preciso.lat, lng: preciso.lng }, precisao: 'estimado', rotulo: preciso.rotulo || null };
+  }
   if (finito(sugestao)) {
-    return { coord: { lat: sugestao.lat, lng: sugestao.lng }, precisao: sugestao.temNumero ? 'exato' : 'rua', rotulo: null };
+    return { coord: { lat: sugestao.lat, lng: sugestao.lng }, precisao: 'rua', rotulo: null };
   }
   if (finito(preciso) && preciso.precisao === 'rua') {
     return { coord: { lat: preciso.lat, lng: preciso.lng }, precisao: 'rua', rotulo: preciso.rotulo || null };
@@ -104,6 +111,8 @@ export interface EnderecoCampo {
   precisao?: Precisao;
   /** Ainda consultando o mapa para o texto atual. */
   validando: boolean;
+  /** Rua já marcada no mapa; ainda procurando a posição do número. */
+  refinando?: boolean;
 }
 
 export const ENDERECO_VAZIO: EnderecoCampo = { texto: '', coord: null, precisao: undefined, validando: false };
@@ -117,10 +126,12 @@ export function avisoEndereco(e: EnderecoCampo): { tom: TomAviso; texto: string 
   if (e.validando) return { tom: 'neutro', texto: 'Localizando o endereço no mapa…' };
   const { num } = numeroDoEndereco(texto);
   if (!e.coord) {
-    return { tom: 'alerta', texto: 'Não localizamos esse endereço. Confira a rua, escolha uma sugestão ou marque o ponto no mapa.' };
+    return { tom: 'alerta', texto: 'Não localizamos esse endereço. Confira a rua, escolha uma sugestão ou toque no mapa para marcar o ponto.' };
   }
   if (e.precisao === 'ajustado') return { tom: 'ok', texto: 'Ponto marcado por você no mapa ✓' };
   if (e.precisao === 'exato') return { tom: 'ok', texto: num ? `Número ${num} localizado ✓ — confira no mapa se precisar.` : 'Endereço localizado ✓' };
-  if (num) return { tom: 'alerta', texto: `Localizamos a rua, mas o mapa não tem o número ${num}. O ponto está na rua — ajuste no mapa para a porta certa.` };
-  return { tom: 'neutro', texto: 'Localizamos a rua. Informe o número ou ajuste o ponto no mapa.' };
+  if (e.precisao === 'estimado') return { tom: 'neutro', texto: `O mapa não tem o número ${num} cadastrado: marcamos a posição estimada pelos números vizinhos. Confira e, se precisar, arraste o alfinete até a porta.` };
+  if (num && e.refinando) return { tom: 'neutro', texto: `Rua marcada no mapa. Procurando a posição do número ${num}…` };
+  if (num) return { tom: 'alerta', texto: `Localizamos a rua, mas o mapa não tem o número ${num}. O ponto está na rua — ajuste no mapa: arraste o alfinete até a porta certa.` };
+  return { tom: 'neutro', texto: 'Rua marcada no mapa. Informe o número ou arraste o alfinete até o ponto certo.' };
 }

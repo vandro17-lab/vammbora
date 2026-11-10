@@ -462,9 +462,9 @@ function FormEndereco({ titulo, dica, botao, locais, onConfirmar, onCancelar, co
         <label className="field-label">Endereço (rua e número)</label>
         <CampoEndereco
           valor={endereco} onChange={setEndereco} locais={locais}
-          placeholder="Ex.: Rua José Geraldo, 580" mapa={compacto ? 'sob-demanda' : 'sempre'}
+          placeholder="Ex.: Rua José Geraldo, 580"
         />
-        <p className="mt-1 text-[11px] text-navy-400">Digite rua e número juntos. O mapa principal será atualizado.</p>
+        <p className="mt-1 text-[11px] text-navy-400">Digite rua e número juntos: o alfinete aparece no mapa e você pode arrastá-lo até a porta.</p>
       </div>
 
       <div className="mt-3 flex gap-2">

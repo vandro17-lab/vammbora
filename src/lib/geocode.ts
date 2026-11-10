@@ -1,11 +1,15 @@
 import type { Destino } from '@/types';
 import { nomeDestinoParaExibicao } from '@/lib/utils';
 import { numeroDoEndereco } from '@/lib/endereco';
+import { estimarPorVizinhos, type NumeroConhecido } from '@/lib/numero-estimado';
 
 export interface SugestaoEndereco { rotulo: string; lat: number; lng: number }
 
-/** Precisão de um ponto geográfico. 'ajustado' = movido à mão pelo motorista. */
-export type Precisao = 'exato' | 'rua' | 'aproximado' | 'ajustado';
+/**
+ * Precisão de um ponto geográfico. 'ajustado' = movido à mão; 'estimado' = o
+ * mapa não tem o número, a posição foi calculada pelos números vizinhos da rua.
+ */
+export type Precisao = 'exato' | 'estimado' | 'rua' | 'aproximado' | 'ajustado';
 export interface PontoPreciso { rotulo: string; lat: number; lng: number; precisao: Precisao }
 
 /**
@@ -67,6 +71,7 @@ let proxyIndisponivel = false;
 const MEMORIA_MAX = 120;
 const memoriaSugestoes = new Map<string, SugestaoEndereco[]>();
 const memoriaPontos = new Map<string, PontoPreciso | null>();
+const memoriaEstimativas = new Map<string, PontoPreciso | null>();
 function lembrar<V>(mapa: Map<string, V>, chave: string, valor: V): V {
   if (mapa.size >= MEMORIA_MAX) mapa.delete(mapa.keys().next().value as string);
   mapa.set(chave, valor);
@@ -74,7 +79,7 @@ function lembrar<V>(mapa: Map<string, V>, chave: string, valor: V): V {
 }
 /** Só para testes: esquece consultas e o estado do proxy. */
 export function reiniciarGeocodificacao(): void {
-  memoriaSugestoes.clear(); memoriaPontos.clear(); proxyIndisponivel = false;
+  memoriaSugestoes.clear(); memoriaPontos.clear(); memoriaEstimativas.clear(); proxyIndisponivel = false;
 }
 
 /**
@@ -266,6 +271,67 @@ async function geocodificarSemMemoria(
     return { rotulo, lat, lng, precisao: temNumero ? 'exato' : 'rua' };
   } catch {
     return fim();
+  }
+}
+
+/**
+ * NÚMERO QUE O MAPA NÃO TEM: estima a posição pelos números vizinhos.
+ *
+ * Busca no OpenStreetMap (Overpass, sem chave) os imóveis NUMERADOS da mesma
+ * rua, perto do ponto já encontrado, e calcula onde o número pedido fica entre
+ * eles (ver `estimarPorVizinhos`). Devolve 'exato' se o número aparecer entre
+ * os imóveis, 'estimado' se foi calculado, ou null se a rua não tem números
+ * suficientes no mapa (fica valendo o ponto da rua).
+ */
+export async function estimarNumeroNaRua(
+  texto: string, base: { lat: number; lng: number; rotulo?: string | null }, signal?: AbortSignal,
+): Promise<PontoPreciso | null> {
+  const { rua, num } = numeroDoEndereco(texto);
+  if (!num || !Number.isFinite(base.lat) || !Number.isFinite(base.lng)) return null;
+  const primeiroTrecho = (t: string) => t.split(/[,(–—]| - /)[0].trim();
+  // Nome da rua como o mapa a reconhece (com acentos) e como foi digitada.
+  const nomes = [...new Set([primeiroTrecho(base.rotulo ?? ''), primeiroTrecho(rua)].filter((n) => n.length >= 3))];
+  if (!nomes.length) return null;
+  const chave = `${nomes.map(normalizarTexto).join('|')}|${num}|${base.lat.toFixed(3)},${base.lng.toFixed(3)}`;
+  if (memoriaEstimativas.has(chave)) return memoriaEstimativas.get(chave) ?? null;
+
+  // Filtro folgado no servidor (vogais/acentos viram curinga); a conferência
+  // exata do nome é feita aqui, depois.
+  const padrao = nomes.map((n) => n.replace(/[^A-Za-z0-9 ]|[aeiouc]/gi, '.{1,2}')).join('|');
+  const consulta = `[out:json][timeout:8];nwr["addr:housenumber"]["addr:street"~"^(${padrao})$",i](around:5000,${base.lat},${base.lng});out center tags 300;`;
+  const ctrl = new AbortController();
+  const abortar = () => ctrl.abort();
+  signal?.addEventListener('abort', abortar);
+  const limite = setTimeout(abortar, 9000);
+  try {
+    const u = new URL('https://overpass-api.de/api/interpreter');
+    u.searchParams.set('data', consulta);
+    const r = await fetch(u, { signal: ctrl.signal });
+    if (!r.ok) return null; // serviço ocupado: não guarda, tenta de novo depois
+    const d = (await r.json()) as { elements?: Array<{ lat?: number; lon?: number; center?: { lat: number; lon: number }; tags?: Record<string, string> }> };
+    const aceitos = new Set(nomes.map(normalizarTexto));
+    const conhecidos: NumeroConhecido[] = [];
+    let nomeNoMapa = '';
+    for (const e of d.elements ?? []) {
+      const via = e.tags?.['addr:street'] ?? '';
+      if (!aceitos.has(normalizarTexto(via))) continue;
+      const n = Number.parseInt(e.tags?.['addr:housenumber'] ?? '', 10);
+      const lat = e.lat ?? e.center?.lat ?? NaN;
+      const lng = e.lon ?? e.center?.lon ?? NaN;
+      if (!Number.isFinite(n) || !Number.isFinite(lat) || !Number.isFinite(lng) || !dentroDeAracatuba(lat, lng)) continue;
+      conhecidos.push({ num: n, lat, lng });
+      nomeNoMapa ||= via;
+    }
+    const pos = estimarPorVizinhos(Number(num), conhecidos);
+    const ponto: PontoPreciso | null = pos
+      ? { rotulo: `${nomeNoMapa || nomes[0]}, ${num}`, lat: pos.lat, lng: pos.lng, precisao: pos.exato ? 'exato' : 'estimado' }
+      : null;
+    return lembrar(memoriaEstimativas, chave, ponto);
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(limite);
+    signal?.removeEventListener('abort', abortar);
   }
 }
 

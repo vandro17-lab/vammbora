@@ -9,7 +9,7 @@ import { TURNO_LABEL, cn } from '@/lib/utils';
 import { criteriosParaParams } from '@/lib/searchParams';
 import { CampoEndereco } from '@/components/search/CampoEndereco';
 import { ENDERECO_VAZIO, escolherPonto, type EnderecoCampo } from '@/lib/endereco';
-import { locaisDeDestinos, geocodificarPreciso } from '@/lib/geocode';
+import { locaisDeDestinos, geocodificarPreciso, estimarNumeroNaRua } from '@/lib/geocode';
 import { Loader2 } from 'lucide-react';
 import { buscaOverlay } from '@/lib/busca-overlay';
 
@@ -73,6 +73,11 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
       try {
         const ponto = await geocodificarPreciso(texto, '', ctrl.signal, { aceitarSemNumero: true });
         coord = escolherPonto(ponto, null).coord;
+        // Só a rua: tenta a posição do número pelos vizinhos (mesma regra do campo).
+        if (coord && ponto?.precisao === 'rua') {
+          const estimado = await estimarNumeroNaRua(texto, ponto, ctrl.signal).catch(() => null);
+          if (estimado) coord = { lat: estimado.lat, lng: estimado.lng };
+        }
       } catch { /* serviço de mapas indisponível: segue sem coordenada */ }
       finally { clearTimeout(limite); setLocalizando(false); }
     }
@@ -100,7 +105,7 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
         <p className="mt-2 text-sm leading-relaxed text-navy-500">{DESCRICOES[passo]}</p>
         {passo === 0 && <div className="mt-6 space-y-5">
           <div className="flex items-center gap-3 rounded-xl bg-navy-50 p-4"><MapPin className="h-5 w-5 text-mint-700" /><div><span className="block text-xs text-navy-500">Sua cidade</span><span className="text-sm font-semibold">Araçatuba, SP</span></div></div>
-          <div><label className="field-label" htmlFor="endereco">Endereço ou bairro de embarque</label><CampoEndereco id="endereco" valor={origem} onChange={setOrigem} locais={locaisBusca} placeholder="Ex.: Rua José Geraldo, 450 — Centro" /><p className="mt-2 text-xs text-navy-500">Pode incluir o número (ex.: “Rua José Geraldo, 450”). Escolha uma sugestão ou apenas digite — nós localizamos no mapa. O ponto exato você combina com o motorista.</p></div>
+          <div><label className="field-label" htmlFor="endereco">Endereço ou bairro de embarque</label><CampoEndereco id="endereco" valor={origem} onChange={setOrigem} locais={locaisBusca} placeholder="Ex.: Rua José Geraldo, 450 — Centro" /><p className="mt-2 text-xs text-navy-500">Pode incluir o número (ex.: “Rua José Geraldo, 450”). Escolha uma sugestão ou apenas digite: o alfinete aparece no mapa e você pode arrastá-lo. O ponto exato você combina com o motorista.</p></div>
         </div>}
         {passo === 1 && <div className="mt-6">
           <label className="field-label" htmlFor="destino">Escola, faculdade ou destino</label>

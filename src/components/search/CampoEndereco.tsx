@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { MapPinned } from 'lucide-react';
 import { AutocompleteEndereco } from '@/components/search/AutocompleteEndereco';
 import { SeletorPontoMapa } from '@/components/motorista/SeletorPontoMapa';
-import { geocodificarPreciso, reverseGeocodificar, type Precisao, type SugestaoEndereco } from '@/lib/geocode';
+import { estimarNumeroNaRua, geocodificarPreciso, reverseGeocodificar, type Precisao, type SugestaoEndereco } from '@/lib/geocode';
 import { avisoEndereco, escolherPonto, numeroDoEndereco, type Coord, type EnderecoCampo, type PontoSugestao } from '@/lib/endereco';
 import { cn } from '@/lib/utils';
 
@@ -13,16 +12,15 @@ const COR_AVISO = { neutro: 'bg-navy-50 text-navy-700', ok: 'bg-mint-50 text-min
  *
  * Junta, com as mesmas regras em todas as telas:
  *  - sugestões enquanto digita (rua e número no mesmo campo);
- *  - localização do endereço completo, tentando o número;
- *  - aviso honesto quando o mapa só tem a rua, com ajuste do ponto no mapa;
+ *  - localização do endereço completo, tentando o número; se o mapa não tem o
+ *    número, a rua é marcada já e a posição do número é estimada pelos vizinhos;
+ *  - O MAPA aparece sozinho com o alfinete assim que o endereço é localizado
+ *    (ou para marcar à mão, se não foi) — arrastar o alfinete ajusta o ponto;
  *  - o ponto só existe quando veio do provedor, de uma sugestão escolhida ou
  *    do mapa — e é descartado/refeito quando o texto muda.
- *
- * `mapa`: 'sempre' mostra o mapa de ajuste junto; 'sob-demanda' mostra um botão
- * que o abre (telas compactas).
  */
 export function CampoEndereco({
-  id, valor, onChange, locais = [], placeholder, mapa = 'sob-demanda',
+  id, valor, onChange, locais = [], placeholder,
 }: {
   id?: string;
   /** Estado atual (controlado por quem usa o campo). */
@@ -30,10 +28,10 @@ export function CampoEndereco({
   onChange: (e: EnderecoCampo) => void;
   locais?: SugestaoEndereco[];
   placeholder?: string;
-  mapa?: 'sempre' | 'sob-demanda';
 }) {
   const [enderecoNoMapa, setEnderecoNoMapa] = useState<string | null>(null);
-  const [mapaAberto, setMapaAberto] = useState(false);
+  // Depois de aparecer, o mapa fica (não some e volta a cada tecla).
+  const [mapaVisto, setMapaVisto] = useState(false);
   // Ponto que a pessoa já confirmou PARA O TEXTO ATUAL (sugestão escolhida ou
   // ponto recebido pronto): é a reserva se o número não for encontrado.
   const confirmado = useRef<({ texto: string } & PontoSugestao) | null>(
@@ -67,7 +65,18 @@ export function CampoEndereco({
       if (!vivo || ajustadoAMao.current) return; // resposta antiga ou ponto já marcado à mão
       const r = escolherPonto(achado, reservaAgora()); // a sugestão pode ter sido escolhida durante a consulta
       setEnderecoNoMapa(r.rotulo);
-      onChangeRef.current({ texto, coord: r.coord, precisao: r.precisao, validando: false });
+      // Só a rua, com número pedido: o alfinete vai JÁ para a rua e a posição
+      // do número é procurada em seguida, pelos números vizinhos.
+      const estimar = !!num && !!r.coord && r.precisao === 'rua';
+      onChangeRef.current({ texto, coord: r.coord, precisao: r.precisao, validando: false, refinando: estimar });
+      if (!estimar || !r.coord) return;
+      let estimado = null;
+      try { estimado = await estimarNumeroNaRua(endereco, { ...r.coord, rotulo: achado?.rotulo }, ctrl.signal); }
+      catch { /* sem estimativa: fica o ponto da rua */ }
+      if (!vivo || ajustadoAMao.current) return;
+      const fim = estimado ? escolherPonto(estimado, null) : r;
+      if (estimado) setEnderecoNoMapa(null);
+      onChangeRef.current({ texto, coord: fim.coord, precisao: fim.precisao, validando: false, refinando: false });
     }, 650);
     return () => { vivo = false; ctrl.abort(); clearTimeout(t); };
   }, [texto]);
@@ -99,8 +108,13 @@ export function CampoEndereco({
   }
 
   const aviso = avisoEndereco(valor);
-  const mostrarMapa = mapa === 'sempre' || mapaAberto;
   const precisao: Precisao | undefined = valor.precisao;
+  // O mapa entra sozinho: com o ponto localizado, ou vazio (para marcar à mão)
+  // quando a busca terminou sem achar o endereço.
+  const temTexto = texto.trim().length >= 3;
+  const cabeMapa = temTexto && (!!valor.coord || !valor.validando);
+  useEffect(() => { if (cabeMapa) setMapaVisto(true); else if (!temTexto) setMapaVisto(false); }, [cabeMapa, temTexto]);
+  const mostrarMapa = temTexto && (cabeMapa || mapaVisto);
 
   return (
     <div>
@@ -109,16 +123,9 @@ export function CampoEndereco({
         onChange={aoDigitarOuEscolher} onEscolher={aoEscolher}
       />
       {aviso && <p role="status" data-testid="aviso-endereco" data-tom={aviso.tom} className={cn('mt-2 rounded-xl p-2.5 text-sm', COR_AVISO[aviso.tom])}>{aviso.texto}</p>}
-      {mapa === 'sob-demanda' && !mapaAberto && texto.trim().length >= 3 && !valor.validando && precisao !== 'exato' && (
-        <button type="button" onClick={() => setMapaAberto(true)}
-          className="mt-2 inline-flex min-h-[44px] items-center gap-1.5 rounded-lg px-1 text-sm font-semibold text-mint-700 hover:text-mint-800">
-          <MapPinned className="h-4 w-4" /> {valor.coord ? 'Ajustar o ponto no mapa' : 'Marcar o ponto no mapa'}
-        </button>
-      )}
       {mostrarMapa && (
         <div className="mt-3">
-          <SeletorPontoMapa ponto={valor.coord} precisao={precisao} onMover={aoMarcar} />
-          {enderecoNoMapa && <p className="mt-1 text-xs text-navy-500">No mapa: {enderecoNoMapa}</p>}
+          <SeletorPontoMapa ponto={valor.coord} precisao={precisao} onMover={aoMarcar} legenda={enderecoNoMapa} buscando={valor.validando || !!valor.refinando} />
         </div>
       )}
     </div>
