@@ -241,41 +241,38 @@ function codigosDoProgressivo(motivos: string[], faltaDado: boolean, limite: boo
   return [...set];
 }
 
+export interface RotaAncorada {
+  rotaOp: RotaOperacional;
+  base: PlanoCalculado;
+  nomePorCompromisso: Record<string, string>;
+  /** Ponto da escola `escolaId` quando ela já está no itinerário. */
+  escolaExistente: PontoGeo | null;
+}
+
 /**
- * Simula o encaixe de um novo aluno usando o motor PROGRESSIVO (insere escola
- * nova, reorganiza casas intercaladas, antecipa a saída). Mesma saída
- * (`ResultadoSimulacao`) do adaptador simples, sem PII.
+ * Rota do cadastro -> rota do motor, pronta para simular: limites por escola,
+ * partida habitual ancorada de trás para frente COM margem de segurança e
+ * janelas de flexibilidade cadastradas. É a ÚNICA montagem usada pelo simulador
+ * do motorista, pela busca das famílias e pelo otimizador de rota.
+ * `escolaId` (opcional): escola cujo horário é dado por `params.horarioEscolaMin`.
  */
-export function simularEncaixeProgressivo(
-  rota: Rota, veiculo: Veiculo | null, aluno: AlunoNovo, matriz: MatrizViaria, params: ParametrosSimulacao,
-): ResultadoSimulacao {
+export function montarRotaAncorada(
+  rota: Rota, veiculo: Veiculo | null, matriz: MatrizViaria,
+  params: Partial<ParametrosSimulacao> = {}, escolaId?: string,
+): RotaAncorada | null {
   const sentido = rota.sentido;
   const tolerancia = Math.min(TOLERANCIA_MAX_MIN, Math.max(0, params.toleranciaMin ?? TOLERANCIA_MAX_MIN));
-  const vazio = (codigos: CodigoMotivo[], extra?: Partial<ResultadoSimulacao>): ResultadoSimulacao => ({
-    sentido, elegivel: false, opcao: null, motivos: motivosDe(codigos), codigos,
-    base: null, partidaMin: null, nomePorCompromisso: {}, escolaNoItinerario: true, ...extra,
-  });
-
-  if (rota.passageiros.some((p) => p.id === aluno.alunoId)) return vazio(['aluno_duplicado']);
-
-  const { faltamCoordenadas } = coletarPontos(rota, aluno);
-  if (faltamCoordenadas.length > 0 || !coord(aluno.casa.lat) || !coord(aluno.casa.lng)) return vazio(['localizacao']);
-
   const nomePorCompromisso: Record<string, string> = {};
   const rotaBase = montarOperacional(rota, veiculo, matriz, tolerancia, params.atendimentoMin ?? ATENDIMENTO_PADRAO_MIN, nomePorCompromisso);
-  if (!rotaBase) return vazio(['localizacao']);
-
-  // Escola do novo aluno: já no itinerário (Tier A) ou inserir nova (Tier B).
-  const existente = rotaBase.compromissos.find((c) => c.ponto.id === aluno.escolaId) ?? null;
-  const escolaPonto = existente?.ponto ?? aluno.escolaPonto ?? null;
-  if (!escolaPonto) return vazio(['escola_itinerario'], { escolaNoItinerario: false });
+  if (!rotaBase) return null;
+  const existente = escolaId ? rotaBase.compromissos.find((c) => c.ponto.id === escolaId) ?? null : null;
 
   // Ancoragem CONSISTENTE: a escola escolhida carrega o horário usado no cálculo
-  // (declarado ou, na falta, do turno). Sem isso, uma rota sem limites ancararia
+  // (declarado ou, na falta, do turno). Sem isso, uma rota sem limites ancoraria
   // à meia-noite e o deslocamento falso estouraria a tolerância dos atuais.
-  let compromissos = existente
+  let compromissos = existente && params.horarioEscolaMin != null
     ? rotaBase.compromissos.map((c) =>
-        c.ponto.id === aluno.escolaId && (c.tipo === 'escola' || c.tipo === 'desembarque')
+        c.ponto.id === escolaId && (c.tipo === 'escola' || c.tipo === 'desembarque')
           ? { ...c, limiteEscolaMin: params.horarioEscolaMin }
           : c)
     : rotaBase.compromissos;
@@ -306,6 +303,33 @@ export function simularEncaixeProgressivo(
     rotaOp = { ...rotaOp, compromissos };
     base = simularRota(rotaOp, matriz);
   }
+  return { rotaOp, base, nomePorCompromisso, escolaExistente: existente?.ponto ?? null };
+}
+
+/**
+ * Simula o encaixe de um novo aluno usando o motor PROGRESSIVO (insere escola
+ * nova, reorganiza casas intercaladas, antecipa a saída). Mesma saída
+ * (`ResultadoSimulacao`) do adaptador simples, sem PII.
+ */
+export function simularEncaixeProgressivo(
+  rota: Rota, veiculo: Veiculo | null, aluno: AlunoNovo, matriz: MatrizViaria, params: ParametrosSimulacao,
+): ResultadoSimulacao {
+  const sentido = rota.sentido;
+  const vazio = (codigos: CodigoMotivo[], extra?: Partial<ResultadoSimulacao>): ResultadoSimulacao => ({
+    sentido, elegivel: false, opcao: null, motivos: motivosDe(codigos), codigos,
+    base: null, partidaMin: null, nomePorCompromisso: {}, escolaNoItinerario: true, ...extra,
+  });
+
+  if (rota.passageiros.some((p) => p.id === aluno.alunoId)) return vazio(['aluno_duplicado']);
+
+  const { faltamCoordenadas } = coletarPontos(rota, aluno);
+  if (faltamCoordenadas.length > 0 || !coord(aluno.casa.lat) || !coord(aluno.casa.lng)) return vazio(['localizacao']);
+
+  const montada = montarRotaAncorada(rota, veiculo, matriz, params, aluno.escolaId);
+  if (!montada) return vazio(['localizacao']);
+  const { rotaOp, base, nomePorCompromisso, escolaExistente: existente } = montada;
+  const escolaPonto = existente ?? aluno.escolaPonto ?? null;
+  if (!escolaPonto) return vazio(['escola_itinerario'], { escolaNoItinerario: false });
 
   const pedido: PedidoEncaixe = {
     alunoId: aluno.alunoId, casa: aluno.casa, escola: escolaPonto,
@@ -314,8 +338,10 @@ export function simularEncaixeProgressivo(
   const res = encontrarEncaixesProgressivo(rotaOp, pedido, matriz, {
     anteciparPartida: true,
     ...(params.antecipacaoMaxMin != null ? { antecipacaoMaxMin: params.antecipacaoMaxMin } : {}),
-    // Só o que o motorista cadastrou conta como já autorizado; o resto depende dele.
-    antecipacaoAutorizadaMin: rota.limiteAntecipacaoMin ?? 0,
+    // Limite de antecipação cadastrado pelo motorista. Sem cadastro, só um ajuste
+    // pequeno (até a tolerância dos passageiros, máx. 10 min) é tratado como já
+    // aceito — suposição inicial explícita; acima disso depende do motorista.
+    antecipacaoAutorizadaMin: rota.limiteAntecipacaoMin ?? Math.min(TOLERANCIA_MAX_MIN, Math.max(0, params.toleranciaMin ?? TOLERANCIA_MAX_MIN)),
     inserirEscolaNova: !existente,
     limiteEscolaNovaMin: params.horarioEscolaMin,
     matrizConservadora: matrizConservadora(matriz, params.estimativas ?? ESTIMATIVAS_INICIAIS),

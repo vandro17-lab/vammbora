@@ -39,10 +39,10 @@ const coordOk = (n: unknown): n is number => typeof n === 'number' && Number.isF
 
 /* --------- Mapeadores de linha do banco -> domínio (mínimos, sem PII extra) --------- */
 interface LinhaStop { id: string; ordem: number; type: string; label: string | null; lat: number | null; lng: number | null; confirmed: boolean; destination_id: string | null; leg_time_min: number | null; habitual_arrival_min: number | null }
-interface LinhaPax { id: string; identificacao: string; board_stop_id: string | null; alight_stop_id: string | null; destination_id: string | null; horario_habitual_min: number | null }
+interface LinhaPax { id: string; identificacao: string; board_stop_id: string | null; alight_stop_id: string | null; destination_id: string | null; horario_habitual_min: number | null; ajuste_antes_min?: number | null; ajuste_depois_min?: number | null; atendimento_min?: number | null }
 interface LinhaRota {
   id: string; name: string | null; owner_id: string; vehicle_id: string | null; direction: string; turno: string | null;
-  monitor: boolean; monitor_ocupa_lugar: boolean; reserved_seats: number; last_dropoff_min: number | null;
+  monitor: boolean; monitor_ocupa_lugar: boolean; reserved_seats: number; last_dropoff_min: number | null; early_leave_limit_min?: number | null;
   status: string; is_demo: boolean; is_published: boolean; price_month: number | null; price_type: string | null;
   route_stops: LinhaStop[]; route_passengers: LinhaPax[];
 }
@@ -58,11 +58,12 @@ function mapRota(r: LinhaRota): Rota {
   const passageiros: PassageiroRota[] = (r.route_passengers ?? []).map((p) => ({
     id: p.id, identificacao: p.identificacao, embarqueParadaId: p.board_stop_id, desembarqueParadaId: p.alight_stop_id,
     destinoId: p.destination_id, horarioHabitualMin: p.horario_habitual_min ?? null,
+    ajusteAntesMin: p.ajuste_antes_min ?? null, ajusteDepoisMin: p.ajuste_depois_min ?? null, atendimentoMin: p.atendimento_min ?? null,
   }));
   return {
     id: r.id, nome: r.name ?? '', sentido: (r.direction as Rota['sentido']) ?? 'ida', turno: (r.turno as Rota['turno']) ?? null,
     dias: [], veiculoId: r.vehicle_id, monitor: r.monitor, monitorOcupaLugar: r.monitor_ocupa_lugar,
-    lugaresReservados: r.reserved_seats, ultimoDesembarqueMin: r.last_dropoff_min, limiteAntecipacaoMin: null,
+    lugaresReservados: r.reserved_seats, ultimoDesembarqueMin: r.last_dropoff_min, limiteAntecipacaoMin: r.early_leave_limit_min ?? null,
     status: (r.status as Rota['status']) ?? 'rascunho', isPublished: r.is_published, paradas, passageiros, atualizadoEm: '',
   };
 }
@@ -130,9 +131,9 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     let consulta = db
       .from('routes')
       .select(
-        'id,name,owner_id,vehicle_id,direction,turno,monitor,monitor_ocupa_lugar,reserved_seats,last_dropoff_min,status,is_demo,is_published,price_month,price_type,' +
+        'id,name,owner_id,vehicle_id,direction,turno,monitor,monitor_ocupa_lugar,reserved_seats,last_dropoff_min,early_leave_limit_min,status,is_demo,is_published,price_month,price_type,' +
           'route_stops(id,ordem,type,label,lat,lng,confirmed,destination_id,leg_time_min,habitual_arrival_min),' +
-          'route_passengers(id,identificacao,board_stop_id,alight_stop_id,destination_id,horario_habitual_min)',
+          'route_passengers(id,identificacao,board_stop_id,alight_stop_id,destination_id,horario_habitual_min,ajuste_antes_min,ajuste_depois_min,atendimento_min)',
       )
       .eq('status', 'concluida')
       .eq('direction', pedido.sentido);

@@ -346,7 +346,7 @@ function indiceEscolaEm(compromissos: Compromisso[], escolaId: string): number {
 }
 
 /** Precedência: cada aluno embarca ANTES de desembarcar na sequência dada. */
-function precedenciaValida(seq: Compromisso[]): boolean {
+export function precedenciaValida(seq: Compromisso[]): boolean {
   const emb = new Map<string, number>();
   const des = new Map<string, number>();
   seq.forEach((c, i) => {
@@ -390,7 +390,7 @@ function* permutacoes<T>(arr: T[], teto = 60000): Generator<T[]> {
 /** Compromissos EFETIVOS de uma candidata: quem já está na rota e não tem
  *  janela cadastrada fica protegido pela tolerância em torno do horário atual
  *  (embarque: a van espera se chegar cedo; desembarque cedo demais é recusado). */
-function protegerExistentes(rota: RotaOperacional, base: PlanoCalculado, paradas: Compromisso[], tolerancia: number): Compromisso[] {
+export function protegerExistentes(rota: RotaOperacional, base: PlanoCalculado, paradas: Compromisso[], tolerancia: number): Compromisso[] {
   const eventosBase = new Map(base.eventos.map((e) => [e.compromisso.id, e]));
   return paradas.map((c) => {
     const antes = eventosBase.get(c.id);

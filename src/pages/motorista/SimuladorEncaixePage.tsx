@@ -295,6 +295,7 @@ function ResultadoEncaixe({ resultado, nomeAluno, sentido }: { resultado: Result
               </li>
             ))}
           </ul>
+          <Explicacao linhas={resultado.explicacao} />
           <ConfirmacaoBloqueada elegivel={false} />
         </div>
       </section>
@@ -318,6 +319,15 @@ function ResultadoEncaixe({ resultado, nomeAluno, sentido }: { resultado: Result
       </div>
 
       <div className="space-y-5 p-5">
+        {resultado.classe && resultado.classe !== 'imediato' && (
+          <p className={resultado.classe === 'pre_autorizado' ? 'rounded-xl bg-mint-50 p-3 text-sm text-mint-900' : 'rounded-xl bg-amber-50 p-3 text-sm text-amber-900'}>
+            {resultado.classe === 'pre_autorizado'
+              ? `Exige sair ${resultado.antecipacaoMin} min mais cedo — dentro da antecipação que você já cadastrou para esta rota.`
+              : (resultado.antecipacaoMin ?? 0) > 0
+                ? `Só cabe se você sair ${resultado.antecipacaoMin} min mais cedo, além do limite de antecipação cadastrado. A decisão é sua.`
+                : 'Só cabe mudando a ordem das paradas atuais. A decisão é sua.'}
+          </p>
+        )}
         <div className="grid grid-cols-2 gap-3">
           <Metrica rotulo={sentido === 'ida' ? 'Busca em casa' : 'Busca na escola'} valor={horaBusca} icon={sentido === 'ida' ? Home : School} />
           <Metrica rotulo={sentido === 'ida' ? 'Chegada à escola' : 'Chegada em casa'} valor={horaEntrega} icon={sentido === 'ida' ? School : Home} />
@@ -366,6 +376,8 @@ function ResultadoEncaixe({ resultado, nomeAluno, sentido }: { resultado: Result
           <div><p className="text-navy-500">Distância do aluno na van</p><strong>{(o.distanciaABordoMetros / 1000).toFixed(1)} km</strong></div>
         </div>
 
+        <Explicacao linhas={resultado.explicacao} />
+
         <p className="text-xs text-navy-500">
           Cálculo feito sobre os trajetos reais das ruas (estimativa, não garantia de trânsito). Esta simulação não reserva vaga nem matricula o aluno.
         </p>
@@ -389,6 +401,18 @@ function ConfirmacaoBloqueada({ elegivel }: { elegivel: boolean }) {
           ? 'A confirmação definitiva ainda está desativada. Ela depende de uma gravação transacional no banco (migração já incluída no projeto) que precisa ser revisada e aplicada com segurança antes de liberar a reserva de vaga.'
           : 'Uma simulação inviável nunca pode ser confirmada.'}
       </p>
+    </div>
+  );
+}
+
+function Explicacao({ linhas }: { linhas?: string[] }) {
+  if (!linhas?.length) return null;
+  return (
+    <div className="mt-4 rounded-xl border border-navy-100 p-4">
+      <h3 className="text-sm font-bold text-navy-800">Por que este resultado</h3>
+      <ul className="mt-2 space-y-1 text-sm text-navy-600">
+        {linhas.map((l, i) => <li key={i}>• {l}</li>)}
+      </ul>
     </div>
   );
 }

@@ -77,6 +77,10 @@ export interface ResultadoRotaReal {
   /** Mensagem amigável (pt-BR), sem jargão técnico. */
   motivo: string;
   codigos: CodigoMotivo[];
+  /** Como o encaixe pode ser efetivado (quando calculado). */
+  classe?: 'imediato' | 'pre_autorizado' | 'aprovacao_motorista';
+  /** Minutos que a van precisaria sair antes do habitual. */
+  antecipacaoMin?: number;
 }
 
 /** Elegibilidade NO NÍVEL DA ROTA: real (não-demo), concluída e com casa +
@@ -161,6 +165,7 @@ function statusDeCodigos(codigos: CodigoMotivo[]): StatusBuscaReal {
 
 const MOTIVO_OK = 'Encaixa nesta rota. Horário estimado pela rota — sujeito à confirmação do motorista.';
 const MOTIVO_OK_FRACO = 'Parece compatível, mas o horário desta rota ainda não foi informado — fica sob confirmação.';
+const MOTIVO_DEPENDE_MOTORISTA = 'Cabe na rota, mas o motorista precisaria ajustar a saída ou a ordem das paradas — fica sob confirmação dele.';
 const MOTIVO_AVULSO = 'Encaixe calculado; como é avulso, confirme a data direto com o motorista.';
 const MOTIVO_SEM_ORIGEM = 'Confirme um endereço de origem válido no mapa para calcularmos a compatibilidade.';
 const MOTIVO_SEM_DESTINO = 'Escolha a escola de destino para avaliarmos esta rota.';
@@ -244,8 +249,11 @@ export function avaliarRotaReal(
   const avulso = pedido.contratacao === 'avulso';
   // Horário fraco quando veio do turno (Tier B ou escola sem horário declarado).
   const horarioFraco = fonte === 'turno';
-  const status: StatusBuscaReal = avulso || horarioFraco ? 'sob_confirmacao' : 'compativel';
-  const motivo = avulso ? MOTIVO_AVULSO : horarioFraco ? MOTIVO_OK_FRACO : MOTIVO_OK;
+  // Encaixe que exige sair mais cedo do que o motorista autorizou (ou mudar a
+  // ordem das paradas) é possível, mas NÃO é vaga garantida: depende dele.
+  const dependeMotorista = sim.classe === 'aprovacao_motorista';
+  const status: StatusBuscaReal = avulso || horarioFraco || dependeMotorista ? 'sob_confirmacao' : 'compativel';
+  const motivo = avulso ? MOTIVO_AVULSO : horarioFraco ? MOTIVO_OK_FRACO : dependeMotorista ? MOTIVO_DEPENDE_MOTORISTA : MOTIVO_OK;
 
   return {
     rotaId: rota.id,
@@ -260,6 +268,8 @@ export function avaliarRotaReal(
     fonteHorario: fonte,
     motivo,
     codigos: [],
+    classe: sim.classe,
+    antecipacaoMin: sim.antecipacaoMin ?? 0,
   };
 }
 

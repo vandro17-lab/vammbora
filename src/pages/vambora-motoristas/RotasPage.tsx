@@ -9,6 +9,7 @@ import { VMShell } from '@/components/vm/VMShell';
 import { VMSectionHeader } from '@/components/vm/VMHeader';
 import { Card, SubHeader, DemoChip, EstadoVazio } from '@/components/vm/ui';
 import { MapaInterativoRota } from '@/components/motorista/MapaInterativoRota';
+import { SugestaoRotaMelhor } from '@/components/motorista/SugestaoRotaMelhor';
 import { useDadosMotorista } from '@/lib/vm/useDadosMotorista';
 import { publicarRota } from '@/data/motorista-store';
 import { distanciaRotaKm } from '@/lib/vm/cenario';
@@ -247,6 +248,9 @@ export function RotaDetalhePage() {
           </div>
           <p className="mt-2 text-[11px] leading-snug text-navy-400">Fonte: OpenStreetMap / OSRM — tempos são estimativas. Endereços permanecem privados.</p>
         </Card>
+
+        {/* VanBora 2.0: sugestão de ordem melhor (somente leitura) */}
+        <SugestaoRotaMelhor rota={rota} veiculo={dados.veiculo} />
 
         {/* Indicadores */}
         <Card className="grid grid-cols-3 divide-x divide-navy-50 p-0">
