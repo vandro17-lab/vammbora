@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, Outlet } from 'react-router-dom';
 import { ExigirMotorista } from '@/pages/motorista/MotoristaShell';
 import { DashboardPage } from '@/pages/vambora-motoristas/DashboardPage';
 import { RotasPage, RotaDetalhePage } from '@/pages/vambora-motoristas/RotasPage';
+import { MontarVoltaPage } from '@/pages/vambora-motoristas/MontarVoltaPage';
 import { OportunidadesPage, SimularEncaixePage as VMSimularPage } from '@/pages/vambora-motoristas/OportunidadesPage';
 import { InteligenciaPage } from '@/pages/vambora-motoristas/InteligenciaPage';
 import { MinhaVanPage, CadastroVanPage } from '@/pages/vambora-motoristas/MinhaVanPage';
@@ -76,6 +77,7 @@ export default function App() {
               <Route path="rotas" element={<RotasPage />} />
               <Route path="rotas/nova" element={<CriarRotaPage />} />
               <Route path="rotas/:id" element={<RotaDetalhePage />} />
+              <Route path="rotas/:id/volta" element={<MontarVoltaPage />} />
               <Route path="oportunidades" element={<OportunidadesPage />} />
               <Route path="oportunidades/:id" element={<VMSimularPage />} />
               <Route path="inteligencia" element={<InteligenciaPage />} />

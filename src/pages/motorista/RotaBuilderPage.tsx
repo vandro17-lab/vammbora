@@ -114,7 +114,8 @@ function Builder() {
       const salva = await salvarRota({ ...rotaAtualizada, nome, status });
       setRota(salva);
       if (status === 'concluida') {
-        navigate('/painel/rotas');
+        // Ida concluída: o app já oferece montar a volta a partir dela.
+        navigate(salva.sentido === 'ida' && salva.passageiros.length > 0 ? `/app/rotas/${salva.id}/volta` : '/painel/rotas');
       } else {
         setAviso('Rascunho salvo. Você pode continuar depois.');
       }

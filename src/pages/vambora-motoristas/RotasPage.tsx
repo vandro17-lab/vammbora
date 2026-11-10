@@ -218,6 +218,19 @@ export function RotaDetalhePage() {
           )}
         </Card>
 
+        {/* Volta sugerida a partir desta ida */}
+        {!dados.demo && rota.sentido === 'ida' && rota.passageiros.length > 0 && (
+          <Card className="p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="font-display font-bold text-navy-900">Rota de volta</p>
+                <p className="mt-0.5 text-xs leading-snug text-navy-500">Montamos a volta a partir desta ida. Você só confere quem volta e ajusta a ordem arrastando.</p>
+              </div>
+              <Link to={`/app/rotas/${rota.id}/volta`} className="shrink-0 rounded-full bg-navy-900 px-4 py-2 text-sm font-bold text-white transition active:scale-95">Montar volta</Link>
+            </div>
+          </Card>
+        )}
+
         {/* Publicar na busca pública (ação explícita do motorista) */}
         <Card className="p-4">
           <div className="flex items-center justify-between gap-3">
