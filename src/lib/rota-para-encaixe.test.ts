@@ -108,17 +108,29 @@ describe('simularEncaixeRota — adaptador do simulador', () => {
   });
 
   it('6: capacidade excedida no trecho em comum -> motivo de capacidade', () => {
-    const r = simularEncaixeRota(rotaIda(), veiculo(2), aluno(), matriz(temposIda), { horarioEscolaMin: 420 });
+    // Partida fixa (sem antecipar): não cabe no trecho em comum.
+    const r = simularEncaixeRota(rotaIda(), veiculo(2), aluno(), matriz(temposIda), { horarioEscolaMin: 420, antecipacaoMaxMin: 0 });
     expect(r.elegivel).toBe(false);
     expect(r.codigos).toContain('capacidade');
+    // VanBora 2.0: saindo mais cedo (dentro dos 30 min que o motorista cadastrou) a van
+    // deixa o novo aluno na escola antes de buscar o Bruno — nenhum trecho passa de 2.
+    const v2 = simularEncaixeRota(rotaIda(), veiculo(2), aluno(), matriz(temposIda), { horarioEscolaMin: 420 });
+    expect(v2.elegivel).toBe(true);
+    expect(v2.classe).toBe('pre_autorizado');
+    expect(v2.opcao!.eventos.every((e) => e.ocupacaoApos <= 2)).toBe(true);
   });
 
   it('8: chegada após o limite -> motivo de atraso', () => {
     // Todos os trajetos da casa nova são muito longos: qualquer inserção atrasa a escola.
     const longe = { 's>a': 5, 'a>b': 5, 'b>e': 7, 'a>nova': 40, 'nova>b': 40, 's>nova': 40, 'nova>e': 40, 'b>nova': 40 };
-    const r = simularEncaixeRota(rotaIda(), veiculo(5), aluno(), matriz(longe), { horarioEscolaMin: 420 });
+    const r = simularEncaixeRota(rotaIda(), veiculo(5), aluno(), matriz(longe), { horarioEscolaMin: 420, antecipacaoMaxMin: 0 });
     expect(r.elegivel).toBe(false);
     expect(r.codigos).toContain('atraso');
+    // VanBora 2.0: viável só saindo bem mais cedo que o autorizado (30) -> depende do motorista.
+    const v2 = simularEncaixeRota(rotaIda(), veiculo(5), aluno(), matriz(longe), { horarioEscolaMin: 420 });
+    expect(v2.elegivel).toBe(true);
+    expect(v2.classe).toBe('aprovacao_motorista');
+    expect(v2.antecipacaoMin!).toBeGreaterThan(30);
   });
 
   it('10: encaixe válido mantém cada aluno existente dentro de 10 minutos', () => {
