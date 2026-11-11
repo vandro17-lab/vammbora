@@ -81,6 +81,9 @@ export function sugerirRotaMelhor(rota: RotaOperacional, matriz: MatrizViaria, o
   const avaliar = (ordem: Compromisso[][]): Avaliada | null => {
     const crua = ordem.flat();
     if (!precedenciaValida(crua)) return null;
+    // Ponto final obrigatório (mesma regra do encaixe): nenhuma ordem sugerida
+    // deixa outra parada depois dele.
+    if (rota.pontoFinalId && crua[crua.length - 1].ponto.id !== rota.pontoFinalId) return null;
     avaliadas++;
     const seq = tolerancia === null ? crua : protegerExistentes(rota, base, crua, tolerancia);
     // Rota mais curta pode sair MAIS TARDE e chegar à escola no mesmo horário.

@@ -12,6 +12,18 @@ export function horaParaMinutoDoDia(hora: string | null | undefined): number | n
   return h * 60 + m;
 }
 
+/**
+ * Horário da família PARA UM SENTIDO (HH:MM) — ida e volta nunca compartilham
+ * o mesmo campo: ida = prazo de chegada; volta = liberação na escola.
+ * "Ida e volta" sem horário de volta informado: a volta fica sem exigência
+ * (não reaproveita o horário de chegada da manhã).
+ */
+export function horarioDoSentido(c: Pick<CriteriosBusca, 'modalidade' | 'horario' | 'horarioVolta'>, sentido: 'ida' | 'volta'): string | undefined {
+  const ok = (h?: string) => (h && HORA_RE.test(h) ? h : undefined);
+  if (sentido === 'ida') return c.modalidade === 'volta' ? undefined : ok(c.horario);
+  return c.modalidade === 'volta' ? ok(c.horarioVolta) ?? ok(c.horario) : c.modalidade === 'ambos' ? ok(c.horarioVolta) : undefined;
+}
+
 /** Serializa os critérios na URL (busca compartilhável e recarregável). */
 export function criteriosParaParams(c: CriteriosBusca): string {
   const p = new URLSearchParams();
@@ -27,6 +39,7 @@ export function criteriosParaParams(c: CriteriosBusca): string {
     p.set('olng', String(c.origemLng));
   }
   if (c.horario && HORA_RE.test(c.horario)) p.set('horario', c.horario);
+  if (c.modalidade === 'ambos' && c.horarioVolta && HORA_RE.test(c.horarioVolta)) p.set('horarioVolta', c.horarioVolta);
   return p.toString();
 }
 
@@ -50,6 +63,7 @@ export function paramsParaCriterios(sp: URLSearchParams): CriteriosBusca {
     origemLat: numeroOuUndef(sp.get('olat')),
     origemLng: numeroOuUndef(sp.get('olng')),
     horario: HORA_RE.test(sp.get('horario') ?? '') ? (sp.get('horario') as string) : undefined,
+    horarioVolta: HORA_RE.test(sp.get('horarioVolta') ?? '') ? (sp.get('horarioVolta') as string) : undefined,
   };
 }
 

@@ -11,14 +11,21 @@
  *   - VITE_SUPABASE_URL           (já usada pelo app)
  *   - SUPABASE_SERVICE_ROLE_KEY   (SEGREDO — nunca vai ao frontend)
  *   - GEOAPIFY_API_KEY            (SEGREDO — tempos REAIS de trajeto pelas ruas)
- *   - BUSCAR_ROTAS_MAX_VIARIAS    (opcional — nº máx. de rotas com consulta viária por busca; padrão 8)
+ *   - BUSCAR_ROTAS_MAX_VIARIAS    (opcional — nº máx. de REQUISIÇÕES ao provedor viário por chamada; padrão 8)
  *
- * Elegibilidade: rota `concluida`, não-demo, do sentido (e turno) pedido.
+ * Elegibilidade: rota `concluida`, não-demo, do sentido (e turno) pedido, que
+ * já visita a escola ou que o motorista informou aceitar incluí-la.
  *
- * TEMPOS DE TRAJETO: um encaixe só é CONFIRMADO ("compatível") com tempos reais
- * do provedor viário. Sem chave, com falha do provedor ou além do limite de
- * consultas, a rota é avaliada por ESTIMATIVA e sai, no máximo, como "sob
- * confirmação" (`temposEstimados: true`) — nunca como encaixe confirmado.
+ * TEMPOS DE TRAJETO: encaixe e recusa só valem com tempos reais do provedor
+ * viário. Estimativa por distância serve apenas para ORDENAR a fila de
+ * consultas. Rota sem consulta (sem chave, falha do provedor, fora do lote
+ * desta chamada) volta como "avaliação incompleta" — nunca como encaixe e
+ * nunca como incompatível — e a resposta traz `continuacao` para o cliente
+ * pedir o próximo lote (as ainda não calculadas primeiro).
+ *
+ * HORÁRIO DA FAMÍLIA (`horarioMin`, do sentido pedido): ida = prazo de chegada
+ * à escola; volta = a partir de quando o aluno está liberado. É exigência só
+ * do novo aluno: não muda o horário da escola na rota nem os atuais.
  *
  * MODO DEMONSTRAÇÃO (§6.1): por padrão a busca IGNORA rotas de demonstração
  * (`is_demo = true`), preservando o comportamento de produção. O modo demo é
@@ -30,12 +37,9 @@
  */
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { createClient } from '@supabase/supabase-js';
-import {
-  buscarEmRotasReais, candidatasParaBusca, compararResultados, contarInconclusivas,
-  type PedidoFamilia, type EntradaBuscaReal, type ResultadoRotaReal,
-} from '../src/lib/busca-rotas-reais';
-import { criarMatrizDemo } from '../src/lib/encaixe';
-import { MatrizPorCoordenadas, consultarTabelasViarias, pontosDistintos } from '../src/lib/matriz-viaria-servidor';
+import type { PedidoFamilia, EntradaBuscaReal } from '../src/lib/busca-rotas-reais';
+import { avaliarComTemposReais, type Continuacao } from '../src/lib/busca-avaliacao-servidor';
+import { consultarBlocoViario } from '../src/lib/matriz-viaria-servidor';
 import type { Rota, Veiculo, ParadaRota, PassageiroRota } from '../src/types/motorista';
 
 function reply(res: ServerResponse, status: number, data: unknown) {
@@ -49,7 +53,7 @@ const sentidoValido = (s: unknown): s is 'ida' | 'volta' => s === 'ida' || s ===
 const coordOk = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n);
 
 /* --------- Mapeadores de linha do banco -> domínio (mínimos, sem PII extra) --------- */
-interface LinhaStop { id: string; ordem: number; type: string; label: string | null; lat: number | null; lng: number | null; confirmed: boolean; destination_id: string | null; leg_time_min: number | null; habitual_arrival_min: number | null; arrival_deadline_min?: number | null; release_time_min?: number | null; group_service_min?: number | string | null }
+interface LinhaStop { id: string; ordem: number; type: string; label: string | null; lat: number | null; lng: number | null; confirmed: boolean; destination_id: string | null; leg_time_min: number | null; habitual_arrival_min: number | null; arrival_deadline_min?: number | null; release_time_min?: number | null; group_service_min?: number | string | null; opening_time_min?: number | null }
 interface LinhaPax { id: string; identificacao: string; board_stop_id: string | null; alight_stop_id: string | null; destination_id: string | null; horario_habitual_min: number | null; ajuste_antes_min?: number | null; ajuste_depois_min?: number | null; atendimento_min?: number | string | null }
 /** numeric do Postgres pode chegar como texto; NULL continua NULL (não informado). */
 const numero = (v: number | string | null | undefined): number | null => (v == null || v === '' || !Number.isFinite(Number(v)) ? null : Number(v));
@@ -57,7 +61,9 @@ interface LinhaRota {
   id: string; name: string | null; owner_id: string; vehicle_id: string | null; direction: string; turno: string | null;
   monitor: boolean; monitor_ocupa_lugar: boolean; reserved_seats: number; last_dropoff_min: number | null; early_leave_limit_min?: number | null;
   status: string; is_demo: boolean; is_published: boolean; price_month: number | null; price_type: string | null;
+  habitual_departure_min?: number | null; availability_reviewed?: boolean | null;
   route_stops: LinhaStop[]; route_passengers: LinhaPax[];
+  route_school_availability?: { id: string; destination_id: string; days: string[] | null; gate_lat: number | null; gate_lng: number | null; arrival_deadline_min: number | null; release_time_min: number | null; group_service_min: number | string | null; opening_time_min?: number | null }[] | null;
 }
 
 function mapRota(r: LinhaRota): Rota {
@@ -68,6 +74,7 @@ function mapRota(r: LinhaRota): Rota {
       destinoId: s.destination_id, tempoAteProximaMin: s.leg_time_min, horarioChegadaMin: s.habitual_arrival_min ?? null,
       // Visita à escola (etapa 1): limite de chegada, liberação e tempo do grupo.
       limiteChegadaMin: s.arrival_deadline_min ?? null, liberacaoMin: s.release_time_min ?? null, atendimentoGrupoMin: numero(s.group_service_min),
+      aberturaMin: s.opening_time_min ?? null,
     }))
     .sort((a, b) => a.ordem - b.ordem);
   const passageiros: PassageiroRota[] = (r.route_passengers ?? []).map((p) => ({
@@ -79,6 +86,13 @@ function mapRota(r: LinhaRota): Rota {
     id: r.id, nome: r.name ?? '', sentido: (r.direction as Rota['sentido']) ?? 'ida', turno: (r.turno as Rota['turno']) ?? null,
     dias: [], veiculoId: r.vehicle_id, monitor: r.monitor, monitorOcupaLugar: r.monitor_ocupa_lugar,
     lugaresReservados: r.reserved_seats, ultimoDesembarqueMin: r.last_dropoff_min, limiteAntecipacaoMin: r.early_leave_limit_min ?? null,
+    // Etapa 1: saída habitual cadastrada e escolas que o motorista aceita incluir nesta rota.
+    saidaHabitualMin: r.habitual_departure_min ?? null, disponibilidadeRevisada: !!r.availability_reviewed,
+    escolasDisponiveis: (r.route_school_availability ?? []).map((e) => ({
+      id: e.id, destinoId: e.destination_id, dias: e.days ?? null, portaoLat: e.gate_lat ?? null, portaoLng: e.gate_lng ?? null,
+      limiteChegadaMin: e.arrival_deadline_min ?? null, liberacaoMin: e.release_time_min ?? null, atendimentoGrupoMin: numero(e.group_service_min),
+      aberturaMin: e.opening_time_min ?? null,
+    })),
     status: (r.status as Rota['status']) ?? 'rascunho', isPublished: r.is_published, paradas, passageiros, atualizadoEm: '',
   };
 }
@@ -100,51 +114,15 @@ function limitado(ip: string, max = 20, janelaMs = 60_000): boolean {
   return b.count > max;
 }
 
-/**
- * Avalia as candidatas com TEMPOS REAIS de trajeto sempre que possível.
- *  1) Prévia por estimativa — serve SÓ para priorizar quais rotas recebem a
- *     consulta viária (cota limitada); nenhum resultado dela é confirmado.
- *  2) As mais promissoras ganham a matriz real (pontos da rota + casa da
- *     família + escola) e são REAVALIADAS pelo mesmo motor.
- *  3) Rota sem matriz real (sem chave, falha, limite) mantém o resultado da
- *     prévia, que o núcleo já rebaixa para "sob confirmação".
- */
-async function avaliarComTemposReais(entradas: EntradaBuscaReal[], pedido: PedidoFamilia): Promise<{ resultados: ResultadoRotaReal[]; totalRotasAvaliadas: number; inconclusivas: number }> {
-  const candidatas = candidatasParaBusca(entradas, pedido);
-  if (candidatas.length === 0) return { resultados: [], totalRotasAvaliadas: 0, inconclusivas: 0 };
-  const previa = buscarEmRotasReais(candidatas, pedido, criarMatrizDemo()).resultados;
-
-  const key = process.env.GEOAPIFY_API_KEY;
-  const maxViarias = Math.max(0, Math.min(40, Number(process.env.BUSCAR_ROTAS_MAX_VIARIAS) || 8));
-  const porId = new Map(candidatas.map((e) => [e.rota.id, e]));
-  const matrizReal = new MatrizPorCoordenadas();
-  const comReal = new Set<string>();
-  if (key && pedido.origem) {
-    const origem = pedido.origem;
-    await Promise.all(previa.slice(0, maxViarias).map(async (r) => {
-      const e = porId.get(r.rotaId);
-      if (!e) return;
-      const pontos = pontosDistintos([
-        ...e.rota.paradas.filter((p) => p.lat != null && p.lng != null).map((p) => ({ lat: p.lat as number, lng: p.lng as number })),
-        origem,
-        ...(pedido.escolaPonto ? [pedido.escolaPonto] : []),
-      ]);
-      const tabelas = await consultarTabelasViarias(pontos, key);
-      if (!tabelas) return;
-      matrizReal.adicionar(pontos, tabelas.tempos, tabelas.distancias);
-      comReal.add(e.rota.id);
-    }));
-  }
-
-  const reais = comReal.size
-    ? buscarEmRotasReais(candidatas.filter((e) => comReal.has(e.rota.id)), pedido, matrizReal).resultados
-    : [];
-  // Sem matriz real (sem chave, falha do provedor ou fora do orçamento) a rota
-  // fica com a prévia: encaixe positivo vira "sob confirmação"; recusa vira
-  // INCONCLUSIVA (o núcleo já faz isso) — nunca uma impossibilidade.
-  const estimados = previa.filter((r) => !comReal.has(r.rotaId));
-  const resultados = [...reais, ...estimados].sort(compararResultados);
-  return { resultados, totalRotasAvaliadas: candidatas.length, inconclusivas: contarInconclusivas(resultados) };
+/** Continuação enviada pelo cliente (devolvida por uma resposta anterior). É só
+ *  uma posição na fila e ids de rota a repetir: não amplia o que é avaliado. */
+function lerContinuacao(v: unknown): Continuacao | null {
+  if (!v || typeof v !== 'object') return null;
+  const c = v as { inicio?: unknown; repetir?: unknown };
+  const inicio = typeof c.inicio === 'number' && Number.isInteger(c.inicio) && c.inicio >= 0 && c.inicio <= 100000 ? c.inicio : 0;
+  const repetir = Array.isArray(c.repetir) ? c.repetir.filter((x): x is string => typeof x === 'string' && x.length > 0 && x.length <= 64).slice(0, 40) : [];
+  const assinatura = typeof (c as { assinatura?: unknown }).assinatura === 'string' ? String((c as { assinatura?: unknown }).assinatura).slice(0, 40) : undefined;
+  return { inicio, repetir, ...(assinatura !== undefined ? { assinatura } : {}) };
 }
 
 export default async function handler(req: IncomingMessage, res: ServerResponse) {
@@ -164,13 +142,14 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     raw += (chunk as Buffer).toString();
     if (raw.length > 8000) return reply(res, 413, { erro: 'Solicitação muito grande.' });
   }
-  let body: { origem?: { lat?: number; lng?: number }; destinoId?: string; escolaPonto?: { lat?: number; lng?: number } | null; sentido?: string; turno?: string | null; contratacao?: string | null; horarioMin?: number | null };
+  let body: { origem?: { lat?: number; lng?: number }; destinoId?: string; escolaPonto?: { lat?: number; lng?: number } | null; sentido?: string; turno?: string | null; contratacao?: string | null; horarioMin?: number | null; continuacao?: unknown };
   try { body = JSON.parse(raw || '{}'); } catch { return reply(res, 400, { erro: 'JSON inválido.' }); }
 
   if (!body.origem || !coordOk(body.origem.lat) || !coordOk(body.origem.lng)) return reply(res, 400, { erro: 'Origem (lat/lng) é obrigatória.' });
   if (!body.destinoId || typeof body.destinoId !== 'string') return reply(res, 400, { erro: 'destinoId é obrigatório.' });
   if (!sentidoValido(body.sentido)) return reply(res, 400, { erro: 'sentido deve ser ida ou volta.' });
-  // Horário da família (minuto do dia): ida = precisa chegar até; volta = sai da escola a partir de.
+  // Horário da família PARA ESTE SENTIDO (minuto do dia): ida = precisa chegar
+  // até; volta = liberado a partir de. Ausente = sem exigência própria.
   const horarioFamiliaMin = typeof body.horarioMin === 'number' && Number.isInteger(body.horarioMin) && body.horarioMin >= 0 && body.horarioMin <= 1439 ? body.horarioMin : null;
 
   // §6.1: modo demonstração ligado SÓ por configuração do servidor (nunca pelo cliente).
@@ -207,13 +186,13 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     // §10: `limit` alto e explícito evita o truncamento silencioso do PostgREST
     // (default 1000 linhas) com ~300 rotas na demonstração.
     const sentidoPedido = pedido.sentido;
-    const consultar = (colunasDaParada: string) => {
+    const consultar = (colunasDaParada: string, extras = '') => {
       let consulta = db
         .from('routes')
         .select(
           'id,name,owner_id,vehicle_id,direction,turno,monitor,monitor_ocupa_lugar,reserved_seats,last_dropoff_min,early_leave_limit_min,status,is_demo,is_published,price_month,price_type,' +
             `route_stops(${colunasDaParada}),` +
-            'route_passengers(id,identificacao,board_stop_id,alight_stop_id,destination_id,horario_habitual_min,ajuste_antes_min,ajuste_depois_min,atendimento_min)',
+            'route_passengers(id,identificacao,board_stop_id,alight_stop_id,destination_id,horario_habitual_min,ajuste_antes_min,ajuste_depois_min,atendimento_min)' + extras,
         )
         .eq('status', 'concluida')
         .eq('direction', sentidoPedido);
@@ -224,12 +203,19 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     // Visita à escola (limite de chegada, liberação, tempo do grupo): mesmos
     // dados que o simulador do motorista usa. Banco ainda sem essas colunas
     // (migração da etapa 1 pendente): consulta no formato anterior.
-    let { data: rotas, error: errR } = await consultar(`${PARADA_BASE},arrival_deadline_min,release_time_min,group_service_min`);
-    if (errR && (errR as { code?: string }).code === '42703') ({ data: rotas, error: errR } = await consultar(PARADA_BASE));
+    const colunaAusente = (e: unknown) => !!e && ['42703', '42P01', 'PGRST200', 'PGRST204'].includes(String((e as { code?: string }).code));
+    const VISITA = 'arrival_deadline_min,release_time_min,group_service_min';
+    const etapa1 = (extra: string) => consultar(`${PARADA_BASE},${VISITA}${extra}`,
+      `,habitual_departure_min,availability_reviewed,route_school_availability(id,destination_id,days,gate_lat,gate_lng,${VISITA}${extra})`);
+    // Abertura da escola (migração 0016): lida quando existir; senão, formatos anteriores.
+    let { data: rotas, error: errR } = await etapa1(',opening_time_min');
+    if (colunaAusente(errR)) ({ data: rotas, error: errR } = await etapa1(''));
+    if (colunaAusente(errR)) ({ data: rotas, error: errR } = await consultar(PARADA_BASE));
     if (errR) return reply(res, 500, { erro: 'Falha ao consultar rotas.' });
 
     const linhas = (rotas ?? []) as unknown as LinhaRota[];
-    if (linhas.length === 0) return reply(res, 200, { resultados: [], totalRotasAvaliadas: 0, inconclusivas: 0 });
+    const semNada = { candidatas: 0, compativeis: 0, sobConfirmacao: 0, incompativeis: 0, dadosInsuficientes: 0, avaliacaoIncompleta: 0 };
+    if (linhas.length === 0) return reply(res, 200, { resultados: [], totalRotasAvaliadas: 0, inconclusivas: 0, resumo: semNada, aguardando: 0, continuacao: null, semProvedor: false, reiniciada: !!body.continuacao });
 
     const vehicleIds = [...new Set(linhas.map((r) => r.vehicle_id).filter((v): v is string => !!v))];
     const vmap = new Map<string, LinhaVeiculo>();
@@ -246,7 +232,13 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       veiculo: mapVeiculo(r.vehicle_id ? vmap.get(r.vehicle_id) : undefined),
     }));
 
-    const { resultados, totalRotasAvaliadas, inconclusivas } = await avaliarComTemposReais(entradas, pedido);
+    const key = process.env.GEOAPIFY_API_KEY;
+    const maxConsultas = Math.max(1, Math.min(40, Number(process.env.BUSCAR_ROTAS_MAX_VIARIAS) || 8));
+    const { resultados, totalRotasAvaliadas, inconclusivas, resumo, aguardando, continuacao, semProvedor, reiniciada } = await avaliarComTemposReais(entradas, pedido, {
+      consultar: key ? (origens, destinos) => consultarBlocoViario(origens, destinos, key) : null,
+      maxConsultas,
+      continuacao: lerContinuacao(body.continuacao),
+    });
 
     // Resposta SEM PII: dados da PRÓPRIA rota (nome + van), nenhum dado de aluno.
     const publico = resultados.map((res0) => {
@@ -260,10 +252,15 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
         precoMensal: linha?.price_month ?? null,
         precoTipo: linha?.price_type ?? null,
         vanLugares: van?.seats_passenger ?? null,
+        // Lugares livres no TRECHO calculado para a família (null = não calculado).
         vagas: res0.vagas,
         atendeEscola: res0.atendeEscola,
+        origemEscola: res0.origemEscola,
         sentido: res0.sentido,
         status: res0.status,
+        pendencia: res0.pendencia ?? null,
+        // Versão opaca da rota + van avaliadas: muda quando o motorista edita algo que altera o encaixe.
+        versao: res0.versao ?? null,
         passagemCasaMin: res0.passagemCasaMin,
         horarioEscolaMin: res0.horarioEscolaMin,
         minutosABordo: res0.minutosABordo,
@@ -273,7 +270,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       };
     });
 
-    return reply(res, 200, { resultados: publico, totalRotasAvaliadas, inconclusivas });
+    return reply(res, 200, { resultados: publico, totalRotasAvaliadas, inconclusivas, resumo, aguardando, continuacao, semProvedor, reiniciada });
   } catch (e) {
     return reply(res, 500, { erro: 'Erro interno ao avaliar rotas.' });
   }

@@ -189,10 +189,13 @@ export async function listarRotas(): Promise<Rota[]> {
       .eq('owner_id', ownerId)
       .eq('is_demo', false)
       .order('updated_at', { ascending: false });
-    let { data, error } = await ler(SELECT_ROTA);
+    const faltaColuna = (e: unknown) => !!e && ['42703', '42P01', 'PGRST200', 'PGRST204'].includes(String((e as { code?: string }).code));
+    // Abertura da escola (migração 0016): lida quando existir; sem ela, fica "não informada".
+    let { data, error } = await ler(SELECT_ROTA_COM_ABERTURA);
+    if (faltaColuna(error)) ({ data, error } = await ler(SELECT_ROTA));
     // Banco ainda sem a migração da etapa 1 (coluna/tabela nova inexistente):
     // lê só o que já existia. Os campos novos ficam "não informados".
-    if (error && ['42703', '42P01', 'PGRST200', 'PGRST204'].includes(String((error as { code?: string }).code))) {
+    if (faltaColuna(error)) {
       console.warn('[rotas] banco sem a migração da etapa 1 — lendo o cadastro no formato anterior.');
       ({ data, error } = await ler(SELECT_ROTA_LEGADO));
     }
@@ -220,6 +223,11 @@ const SELECT_ROTA =
   'route_passengers(id,identificacao,board_stop_id,alight_stop_id,destination_id,' +
   'horario_habitual_min,ajuste_antes_min,ajuste_depois_min,atendimento_min,atendimento_origem),' +
   'route_school_availability(id,destination_id,days,gate_lat,gate_lng,arrival_deadline_min,release_time_min,group_service_min)';
+
+/** + abertura do portão da escola (migração 0016). */
+const SELECT_ROTA_COM_ABERTURA = SELECT_ROTA
+  .replace('group_service_min,gate_custom)', 'group_service_min,gate_custom,opening_time_min)')
+  .replace('release_time_min,group_service_min)', 'release_time_min,group_service_min,opening_time_min)');
 
 const minutoDoDia = (v: number | null | undefined): number | null =>
   typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1439 ? Math.round(v) : null;
@@ -252,6 +260,7 @@ export function normalizarRotaParaSalvar(rota: Rota): Rota {
       tempoAteProximaMin: typeof p.tempoAteProximaMin === 'number' && p.tempoAteProximaMin >= 0 ? Math.round(p.tempoAteProximaMin) : null,
       portaoEspecifico: p.tipo === 'escola' && temPonto && !!p.portaoEspecifico,
       limiteChegadaMin: p.tipo === 'escola' ? minutoDoDia(p.limiteChegadaMin) : null,
+      aberturaMin: p.tipo === 'escola' ? minutoDoDia(p.aberturaMin) : null,
       liberacaoMin: p.tipo === 'escola' ? minutoDoDia(p.liberacaoMin) : null,
       atendimentoGrupoMin: p.tipo === 'escola' ? duracaoMin(p.atendimentoGrupoMin) : null,
     };
@@ -395,10 +404,12 @@ interface LinhaStop {
   id: string; ordem: number; type: string; label: string | null;
   lat: number | null; lng: number | null; confirmed: boolean; destination_id: string | null; leg_time_min: number | null; habitual_arrival_min?: number | null;
   arrival_deadline_min?: number | null; release_time_min?: number | null; group_service_min?: number | string | null; gate_custom?: boolean | null;
+  opening_time_min?: number | null;
 }
 interface LinhaEscolaDisponivel {
   id: string; destination_id: string; days: string[] | null; gate_lat: number | null; gate_lng: number | null;
   arrival_deadline_min: number | null; release_time_min: number | null; group_service_min: number | string | null;
+  opening_time_min?: number | null;
 }
 /** numeric do Postgres pode chegar como texto: vira número; NULL continua NULL. */
 const numeroOuNulo = (v: number | string | null | undefined): number | null => {
@@ -443,7 +454,7 @@ export function mapRotaDoBanco(r: unknown): Rota {
       id: e.id, destinoId: e.destination_id, dias: e.days ?? null,
       portaoLat: e.gate_lat ?? null, portaoLng: e.gate_lng ?? null,
       limiteChegadaMin: e.arrival_deadline_min ?? null, liberacaoMin: e.release_time_min ?? null,
-      atendimentoGrupoMin: numeroOuNulo(e.group_service_min),
+      atendimentoGrupoMin: numeroOuNulo(e.group_service_min), aberturaMin: e.opening_time_min ?? null,
     })),
     status: (x.status as Rota['status']) ?? 'rascunho',
     isPublished: !!x.is_published,
@@ -455,6 +466,7 @@ export function mapRotaDoBanco(r: unknown): Rota {
         confirmado: s.confirmed, destinoId: s.destination_id, tempoAteProximaMin: s.leg_time_min, horarioChegadaMin: s.habitual_arrival_min ?? null,
         portaoEspecifico: !!s.gate_custom, limiteChegadaMin: s.arrival_deadline_min ?? null,
         liberacaoMin: s.release_time_min ?? null, atendimentoGrupoMin: numeroOuNulo(s.group_service_min),
+        aberturaMin: s.opening_time_min ?? null,
       }))
       .sort((a, b) => a.ordem - b.ordem),
     passageiros: (x.route_passengers ?? []).map((p) => ({
@@ -493,6 +505,9 @@ export function rotaParaBanco(r: Rota): unknown {
       destination_id: p.destinoId ?? null, leg_time_min: p.tempoAteProximaMin ?? null, habitual_arrival_min: p.horarioChegadaMin ?? null,
       arrival_deadline_min: p.limiteChegadaMin ?? null, release_time_min: p.liberacaoMin ?? null,
       group_service_min: p.atendimentoGrupoMin ?? null, gate_custom: !!p.portaoEspecifico,
+      // Só vai no payload quando informada: sem a migração 0016 a RPC a ignora,
+      // e com ela "chave ausente" preserva o valor já gravado.
+      ...(p.aberturaMin != null ? { opening_time_min: p.aberturaMin } : {}),
     })),
     passengers: r.passageiros.map((p) => ({
       id: p.id, identificacao: p.identificacao,
@@ -509,7 +524,7 @@ export function rotaParaBanco(r: Rota): unknown {
       id: e.id, destination_id: e.destinoId, days: e.dias ?? null,
       gate_lat: e.portaoLat ?? null, gate_lng: e.portaoLng ?? null,
       arrival_deadline_min: e.limiteChegadaMin ?? null, release_time_min: e.liberacaoMin ?? null,
-      group_service_min: e.atendimentoGrupoMin ?? null,
+      group_service_min: e.atendimentoGrupoMin ?? null, opening_time_min: e.aberturaMin ?? null,
     })),
   };
 }

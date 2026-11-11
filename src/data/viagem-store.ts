@@ -82,8 +82,33 @@ function enfileirar(op: Operacao): void {
 /** Registros ainda não confirmados pelo servidor. */
 export const pendentesDeEnvio = (): number => (USAR_BANCO ? ler<Operacao[]>(K_FILA, []).length : 0);
 
-/** Abre uma viagem (toque em "Iniciar rota") e devolve o id dela. */
-export function iniciarViagem(rota: Rota, em = new Date()): string {
+/** Viagem de SIMULAÇÃO (percurso de demonstração, sem GPS): existe só na tela.
+ *  Nada dela entra no histórico de viagens — nem no servidor, nem no aparelho. */
+const PREFIXO_SIMULADA = 'sim-';
+export const viagemSimulada = (viagemId: string | null | undefined): boolean => !!viagemId && viagemId.startsWith(PREFIXO_SIMULADA);
+
+/**
+ * Sequência que a viagem segue: a que estava SALVA quando o motorista tocou em
+ * "Iniciar rota". Uma edição (ou simulação de encaixe) feita depois não muda a
+ * viagem em andamento — vale a partir da próxima. `alterada` avisa que a rota
+ * salva hoje é diferente da que a viagem está seguindo.
+ */
+export function rotaDaViagem(doInicio: Rota | null | undefined, salvaAgora: Rota): { rota: Rota; alterada: boolean } {
+  if (!doInicio) return { rota: salvaAgora, alterada: false };
+  return { rota: doInicio, alterada: assinaturaDaSequencia(doInicio) !== assinaturaDaSequencia(salvaAgora) };
+}
+
+/** Resumo do que define a operação de uma viagem: ordem e ponto das paradas e quem embarca/desce onde. */
+export function assinaturaDaSequencia(rota: Pick<Rota, 'paradas' | 'passageiros'>): string {
+  const paradas = [...rota.paradas].sort((a, b) => a.ordem - b.ordem).map((p) => `${p.id}@${p.lat ?? ''},${p.lng ?? ''}`);
+  const alunos = [...rota.passageiros].sort((a, b) => (a.id < b.id ? -1 : 1)).map((x) => `${x.id}:${x.embarqueParadaId ?? ''}>${x.desembarqueParadaId ?? ''}`);
+  return paradas.join('|') + '#' + alunos.join('|');
+}
+
+/** Abre uma viagem (toque em "Iniciar rota") e devolve o id dela. Com
+ *  `simulada`, devolve um id local e NÃO registra nada. */
+export function iniciarViagem(rota: Rota, em = new Date(), opcoes: { simulada?: boolean } = {}): string {
+  if (opcoes.simulada) return PREFIXO_SIMULADA + novoId();
   const id = novoId();
   enfileirar({ tabela: 'route_trips', acao: 'insert', linha: {
     id, route_id: uuidOuNulo(rota.id), route_name: rota.nome ?? '', direction: rota.sentido, started_at: em.toISOString(),
@@ -92,6 +117,7 @@ export function iniciarViagem(rota: Rota, em = new Date()): string {
 }
 
 export function registrarEvento(viagemId: string, e: EventoViagem): void {
+  if (viagemSimulada(viagemId)) return; // simulação não gera histórico
   enfileirar({ tabela: 'route_trip_events', acao: 'insert', linha: {
     id: novoId(), trip_id: viagemId, type: e.tipo,
     stop_id: uuidOuNulo(e.parada.id), stop_type: e.parada.tipo, stop_order: e.parada.ordem,
@@ -104,5 +130,6 @@ export function registrarEvento(viagemId: string, e: EventoViagem): void {
 }
 
 export function finalizarViagem(viagemId: string, em = new Date()): void {
+  if (viagemSimulada(viagemId)) return;
   enfileirar({ tabela: 'route_trips', acao: 'update', id: viagemId, linha: { finished_at: em.toISOString() } });
 }

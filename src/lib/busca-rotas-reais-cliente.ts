@@ -5,9 +5,11 @@ import {
   buscarEmRotasReais,
   rotaElegivelParaBusca,
   type EntradaBuscaReal,
+  type OrigemEscola,
+  type PendenciaAvaliacao,
   type StatusBuscaReal,
 } from '@/lib/busca-rotas-reais';
-import { horaParaMinutoDoDia } from '@/lib/searchParams';
+import { horaParaMinutoDoDia, horarioDoSentido } from '@/lib/searchParams';
 
 /**
  * Cliente da BUSCA REAL. Produz os dados de cartão (`CartaoRotaRealDados`) a
@@ -15,6 +17,10 @@ import { horaParaMinutoDoDia } from '@/lib/searchParams';
  *  - PROD: a função server-side `/api/buscar-rotas` (service role, sem PII);
  *  - DEMO: as rotas do próprio navegador (localStorage), rodando o MESMO núcleo.
  * O cliente NUNCA lê rotas reais direto do banco (RLS/PII).
+ *
+ * Cada SENTIDO (ida, volta) é uma consulta independente, com o SEU horário da
+ * família: a falha de um não apaga o resultado do outro, e uma ida válida
+ * nunca é apresentada como pacote de ida e volta.
  */
 
 /** Dados mínimos, SEM PII, para renderizar o cartão de uma rota real. */
@@ -28,12 +34,17 @@ export interface CartaoRotaRealDados {
   /** Tipo de preço: 'fixo' | 'dinamico' | 'a_combinar'. */
   precoTipo?: string | null;
   vanLugares: number | null;
-  /** Vagas livres para novos passageiros (capacidade − ocupação). */
+  /** Lugares livres NO TRECHO calculado para a família (antes de incluí-la).
+   *  `null` = não calculado. Nunca é o pico global da rota. */
   vagas: number | null;
-  /** A rota já atende a escola pedida (Tier A) ou foi avaliada por proximidade (Tier B). */
+  /** A rota já visita a escola pedida. */
   atendeEscola: boolean;
+  /** Visita a escola, aceita incluí-la ou cadastro antigo avaliado por proximidade. */
+  origemEscola?: OrigemEscola;
   sentido: 'ida' | 'volta';
   status: StatusBuscaReal;
+  /** Só com status 'indeterminado': faltam dados no cadastro x avaliação não concluída. */
+  pendencia?: PendenciaAvaliacao | null;
   /** Ida: hora que passa na CASA (coleta). Volta: hora que deixa em CASA. */
   passagemCasaMin: number | null;
   /** Ida: chegada à ESCOLA. Volta: saída da ESCOLA. */
@@ -42,67 +53,197 @@ export interface CartaoRotaRealDados {
   /** Tempos de trajeto estimados (sem consulta viária): nunca "compatível". */
   temposEstimados?: boolean;
   motivo: string;
+  /** Versão (opaca) da rota + van avaliadas. Vai junto no pedido de interesse
+   *  para o motorista saber sobre QUAL versão da rota a conta foi feita. */
+  versao?: string | null;
 }
 
 export type EstadoBuscaReal = 'nao_configurado' | 'ok' | 'erro';
+export type Sentido = 'ida' | 'volta';
+/** Posição na fila de avaliação do servidor (devolvida por ele; o cliente só reenvia). */
+export interface ContinuacaoBusca { inicio: number; repetir: string[]; assinatura?: string }
 
-const sentidosDe = (m: ModalidadeTrajeto): ('ida' | 'volta')[] => (m === 'ambos' ? ['ida', 'volta'] : [m]);
-const mostravel = (s: StatusBuscaReal) => s === 'compativel' || s === 'sob_confirmacao';
+export const sentidosDe = (m: ModalidadeTrajeto): Sentido[] => (m === 'ambos' ? ['ida', 'volta'] : [m]);
+export const mostravel = (s: StatusBuscaReal) => s === 'compativel' || s === 'sob_confirmacao';
+
+/** O que aconteceu com UM sentido da busca — separa as quatro situações que a
+ *  tela precisa distinguir. */
+export interface SituacaoSentido {
+  sentido: Sentido;
+  /** 'erro' = a consulta DESTE sentido falhou (o outro sentido continua valendo). */
+  estado: EstadoBuscaReal;
+  /** Rotas deste sentido que visitam/aceitam a escola. 0 = AUSÊNCIA DE OFERTA. */
+  candidatas: number;
+  /** Cartões exibíveis (compatível / sob confirmação) de rotas REAIS. */
+  encontradas: number;
+  /** Cartões exibíveis de rotas de DEMONSTRAÇÃO (fictícias): aparecem rotulados,
+   *  mas não contam como disponibilidade real nem recebem pedidos. */
+  demonstrativas: number;
+  /** INCOMPATIBILIDADE comprovada com trajetos reais. */
+  incompativeis: number;
+  /** DADOS INSUFICIENTES no cadastro da rota (repetir não resolve). */
+  dadosInsuficientes: number;
+  /** AVALIAÇÃO INCOMPLETA: tentadas sem veredito + ainda na fila (`aguardando`). */
+  avaliacaoIncompleta: number;
+  aguardando: number;
+  /** Há mais a calcular: pedir o próximo lote com `continuarBuscaReal`. */
+  continuacao: ContinuacaoBusca | null;
+  /** O ambiente não tem provedor viário (continuar não adianta). */
+  semProvedor: boolean;
+  /** As rotas mudaram entre uma consulta e outra: os resultados antigos deste
+   *  sentido foram descartados e a avaliação recomeçou. */
+  reavaliada?: boolean;
+}
 
 export interface RespostaBuscaReal {
+  /** 'ok' se ao menos um sentido respondeu; 'erro' só quando TODOS falharam. */
   estado: EstadoBuscaReal;
   /** Só compatível / sob confirmação (nunca um falso encaixe). */
   resultados: CartaoRotaRealDados[];
-  /** Rotas candidatas que NÃO puderam ser avaliadas (dado faltando, van sem
-   *  cadastro, trecho sem tempo, avaliação não concluída). Não é "sem vaga". */
+  /** Rotas candidatas sem veredito (dados insuficientes + avaliação incompleta). Não é "sem vaga". */
   inconclusivas: number;
+  /** Situação de cada sentido pedido. */
+  sentidos: SituacaoSentido[];
+  /** Todos os resultados recebidos (inclusive os não exibíveis) — base da continuação. */
+  todos: CartaoRotaRealDados[];
 }
 
-/** PROD: consulta a função server-side. Só mostra compatível/sob confirmação. */
+interface RespostaServidor {
+  resultados?: CartaoRotaRealDados[]; totalRotasAvaliadas?: number; inconclusivas?: number;
+  aguardando?: number; continuacao?: ContinuacaoBusca | null; semProvedor?: boolean; reiniciada?: boolean;
+}
+interface RespostaSentido { estado: EstadoBuscaReal; dados: RespostaServidor | null }
+
+const chave = (r: Pick<CartaoRotaRealDados, 'rotaId' | 'sentido'>) => `${r.sentido}:${r.rotaId}`;
+
+function situacaoDe(sentido: Sentido, estado: EstadoBuscaReal, lista: CartaoRotaRealDados[], d: RespostaServidor | null): SituacaoSentido {
+  const aguardando = Math.max(0, d?.aguardando ?? 0);
+  const indeterminadas = lista.filter((x) => x.status === 'indeterminado');
+  // Servidor antigo (sem `pendencia`): trata como avaliação incompleta — nunca como "não cabe".
+  const dados = indeterminadas.filter((x) => x.pendencia === 'dados_insuficientes').length;
+  return {
+    sentido, estado,
+    candidatas: Math.max(d?.totalRotasAvaliadas ?? 0, lista.length + aguardando),
+    encontradas: lista.filter((x) => mostravel(x.status) && !x.demo).length,
+    demonstrativas: lista.filter((x) => mostravel(x.status) && !!x.demo).length,
+    incompativeis: lista.filter((x) => x.status === 'incompativel').length,
+    dadosInsuficientes: dados,
+    avaliacaoIncompleta: indeterminadas.length - dados + aguardando,
+    aguardando,
+    continuacao: d?.continuacao && (aguardando > 0 || (d.continuacao.repetir?.length ?? 0) > 0) ? d.continuacao : null,
+    semProvedor: !!d?.semProvedor,
+  };
+}
+
+function montar(sentidos: SituacaoSentido[], todos: CartaoRotaRealDados[]): RespostaBuscaReal {
+  const estado: EstadoBuscaReal = sentidos.some((s) => s.estado === 'ok') ? 'ok'
+    : sentidos.some((s) => s.estado === 'nao_configurado') ? 'nao_configurado' : sentidos.length ? 'erro' : 'ok';
+  return {
+    estado, sentidos, todos,
+    resultados: todos.filter((x) => mostravel(x.status)),
+    inconclusivas: sentidos.reduce((n, s) => n + s.dadosInsuficientes + s.avaliacaoIncompleta, 0),
+  };
+}
+
+async function consultarSentido(
+  criterios: CriteriosBusca, escolaPonto: { lat: number; lng: number } | null | undefined, sentido: Sentido,
+  continuacao: ContinuacaoBusca | null, signal?: AbortSignal,
+): Promise<RespostaSentido> {
+  try {
+    const r = await fetch('/api/buscar-rotas', {
+      method: 'POST',
+      signal,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        origem: { lat: criterios.origemLat, lng: criterios.origemLng },
+        destinoId: criterios.destinoId,
+        escolaPonto: escolaPonto ?? null,
+        sentido,
+        turno: criterios.turno,
+        contratacao: criterios.contratacao,
+        // Horário DESTE sentido — ida: precisa chegar até; volta: liberado a partir de.
+        horarioMin: horaParaMinutoDoDia(horarioDoSentido(criterios, sentido)),
+        ...(continuacao ? { continuacao } : {}),
+      }),
+    });
+    if (r.status === 503) return { estado: 'nao_configurado', dados: null };
+    if (!r.ok) return { estado: 'erro', dados: null };
+    return { estado: 'ok', dados: (await r.json()) as RespostaServidor };
+  } catch {
+    return { estado: 'erro', dados: null };
+  }
+}
+
+/** PROD: consulta a função server-side, um sentido por vez. Só mostra
+ *  compatível/sob confirmação; o resto vira contagem por situação. */
 export async function buscarRotasReais(
   criterios: CriteriosBusca,
   escolaPonto?: { lat: number; lng: number } | null,
   signal?: AbortSignal,
 ): Promise<RespostaBuscaReal> {
   if (!Number.isFinite(criterios.origemLat) || !Number.isFinite(criterios.origemLng) || !criterios.destinoId) {
-    return { estado: 'ok', resultados: [], inconclusivas: 0 };
+    return montar([], []);
   }
+  const sentidos: SituacaoSentido[] = [];
   const todos: CartaoRotaRealDados[] = [];
-  let inconclusivas = 0;
   for (const sentido of sentidosDe(criterios.modalidade)) {
-    try {
-      const r = await fetch('/api/buscar-rotas', {
-        method: 'POST',
-        signal,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          origem: { lat: criterios.origemLat, lng: criterios.origemLng },
-          destinoId: criterios.destinoId,
-          escolaPonto: escolaPonto ?? null,
-          sentido,
-          turno: criterios.turno,
-          contratacao: criterios.contratacao,
-          // Ida: precisa chegar até; volta: sai da escola a partir de.
-          horarioMin: horaParaMinutoDoDia(criterios.horario),
-        }),
-      });
-      if (r.status === 503) return { estado: 'nao_configurado', resultados: [], inconclusivas: 0 };
-      if (!r.ok) return { estado: 'erro', resultados: [], inconclusivas: 0 };
-      const d = (await r.json()) as { resultados?: CartaoRotaRealDados[]; inconclusivas?: number };
-      const lista = d.resultados ?? [];
-      for (const x of lista) if (mostravel(x.status)) todos.push(x);
-      inconclusivas += typeof d.inconclusivas === 'number' ? d.inconclusivas : lista.filter((x) => x.status === 'indeterminado').length;
-    } catch {
-      return { estado: 'erro', resultados: [], inconclusivas: 0 };
-    }
+    const { estado, dados } = await consultarSentido(criterios, escolaPonto, sentido, null, signal);
+    const lista = dados?.resultados ?? [];
+    todos.push(...lista);
+    sentidos.push(situacaoDe(sentido, estado, lista, dados));
+    // Servidor sem a busca configurada: o outro sentido responderia o mesmo.
+    if (estado === 'nao_configurado') break;
   }
-  return { estado: 'ok', resultados: todos, inconclusivas };
+  return montar(sentidos, todos);
+}
+
+/** Há algo a continuar/repetir nesta resposta? */
+export const podeContinuar = (r: RespostaBuscaReal): boolean => r.sentidos.some((s) => s.continuacao !== null || s.estado === 'erro');
+
+/**
+ * CONTINUA a avaliação: pede ao servidor o próximo lote dos sentidos que ainda
+ * têm rotas sem cálculo e refaz a consulta dos sentidos que falharam.
+ * Os resultados já obtidos são PRESERVADOS: um resultado válido só é
+ * substituído por outro resultado conclusivo da mesma rota.
+ */
+export async function continuarBuscaReal(
+  criterios: CriteriosBusca,
+  escolaPonto: { lat: number; lng: number } | null | undefined,
+  anterior: RespostaBuscaReal,
+  signal?: AbortSignal,
+): Promise<RespostaBuscaReal> {
+  const porChave = new Map(anterior.todos.map((x) => [chave(x), x]));
+  const sentidos: SituacaoSentido[] = [];
+  for (const s of anterior.sentidos) {
+    if (s.estado === 'ok' && !s.continuacao) { sentidos.push(s); continue; }
+    const { estado, dados } = await consultarSentido(criterios, escolaPonto, s.sentido, s.estado === 'ok' ? s.continuacao : null, signal);
+    if (estado !== 'ok' || !dados) {
+      // Falhou de novo: mantém o que já havia (inclusive a continuação).
+      sentidos.push(s.estado === 'ok' ? s : { ...s, estado });
+      continue;
+    }
+    // As rotas (ou a van) foram editadas desde o lote anterior: o que estava
+    // guardado para este sentido não vale mais — descarta e recomeça do que veio.
+    if (dados.reiniciada) for (const k of [...porChave.keys()]) if (k.startsWith(s.sentido + ':')) porChave.delete(k);
+    for (const novo of dados.resultados ?? []) {
+      const antigo = porChave.get(chave(novo));
+      if (antigo && mostravel(antigo.status) && !mostravel(novo.status) && novo.status !== 'incompativel') continue; // preserva o válido
+      porChave.set(chave(novo), novo);
+    }
+    const lista = [...porChave.values()].filter((x) => x.sentido === s.sentido);
+    sentidos.push({
+      ...situacaoDe(s.sentido, 'ok', lista, dados.reiniciada ? dados : { ...dados, totalRotasAvaliadas: Math.max(dados.totalRotasAvaliadas ?? 0, s.candidatas) }),
+      ...(dados.reiniciada ? { reavaliada: true } : {}),
+    });
+  }
+  return montar(sentidos, [...porChave.values()]);
 }
 
 /* ===================== Modo demonstração (localStorage) =====================
  * Sem backend, as rotas reais vivem no navegador do próprio usuário. Rodamos o
  * MESMO núcleo (buscarEmRotasReais) sobre as rotas ELEGÍVEIS (concluídas),
- * provando o fluxo ponta a ponta sem infra. */
+ * provando o fluxo ponta a ponta sem infra. Os tempos são ESTIMADOS: o núcleo
+ * limita tudo a "sob confirmação" e o cartão avisa que não houve consulta às ruas. */
 export async function buscarRotasReaisDemo(
   criterios: CriteriosBusca,
   escolaPonto?: { lat: number; lng: number } | null,
@@ -114,49 +255,50 @@ export async function buscarRotasReaisDemoCompleta(
   criterios: CriteriosBusca,
   escolaPonto?: { lat: number; lng: number } | null,
 ): Promise<RespostaBuscaReal> {
-  const vazio: RespostaBuscaReal = { estado: 'ok', resultados: [], inconclusivas: 0 };
-  if (!Number.isFinite(criterios.origemLat) || !Number.isFinite(criterios.origemLng) || !criterios.destinoId) return vazio;
+  if (!Number.isFinite(criterios.origemLat) || !Number.isFinite(criterios.origemLng) || !criterios.destinoId) return montar([], []);
   const [rotas, veiculos] = await Promise.all([listarRotas(), listarVeiculos()]);
   const veicPorId = new Map(veiculos.map((v) => [v.id, v]));
   const rotaPorId = new Map(rotas.map((r) => [r.id, r]));
   const entradas: EntradaBuscaReal[] = rotas
     .filter((r) => rotaElegivelParaBusca(r))
     .map((r) => ({ rota: r, veiculo: r.veiculoId ? veicPorId.get(r.veiculoId) ?? null : null }));
-  if (entradas.length === 0) return vazio;
 
-  const out: CartaoRotaRealDados[] = [];
-  let inconclusivas = 0;
+  const todos: CartaoRotaRealDados[] = [];
+  const sentidos: SituacaoSentido[] = [];
   for (const sentido of sentidosDe(criterios.modalidade)) {
-    const { resultados, inconclusivas: n } = buscarEmRotasReais(entradas, {
+    const { resultados, totalRotasAvaliadas } = buscarEmRotasReais(entradas, {
       origem: { lat: criterios.origemLat!, lng: criterios.origemLng! },
       destinoId: criterios.destinoId,
       escolaPonto: escolaPonto ?? null,
       sentido,
       turno: criterios.turno,
       contratacao: criterios.contratacao,
-      horarioFamiliaMin: horaParaMinutoDoDia(criterios.horario),
+      horarioFamiliaMin: horaParaMinutoDoDia(horarioDoSentido(criterios, sentido)),
     // Demonstração local: tempos ESTIMADOS — o núcleo limita a "sob confirmação".
     }, criarMatrizDemo());
-    inconclusivas += n;
-    for (const r of resultados) {
-      if (!mostravel(r.status)) continue; // nunca mostrar falso encaixe
+    const lista: CartaoRotaRealDados[] = resultados.map((r) => {
       const rota = rotaPorId.get(r.rotaId);
       const van = rota?.veiculoId ? veicPorId.get(rota.veiculoId) : undefined;
-      out.push({
+      return {
         rotaId: r.rotaId,
         rotaNome: rota?.nome || 'Rota',
         vanLugares: van?.lugaresPassageiro ?? null,
         vagas: r.vagas,
         atendeEscola: r.atendeEscola,
+        origemEscola: r.origemEscola,
         sentido: r.sentido,
         status: r.status,
+        pendencia: r.pendencia ?? null,
         passagemCasaMin: r.passagemCasaMin,
         horarioEscolaMin: r.horarioEscolaMin,
         minutosABordo: r.minutosABordo,
         temposEstimados: r.temposEstimados,
         motivo: r.motivo,
-      });
-    }
+      };
+    });
+    todos.push(...lista);
+    // Sem provedor viário no navegador: o que não coube pela estimativa fica "incompleto".
+    sentidos.push({ ...situacaoDe(sentido, 'ok', lista, { totalRotasAvaliadas }), semProvedor: true });
   }
-  return { estado: 'ok', resultados: out, inconclusivas };
+  return montar(sentidos, todos);
 }

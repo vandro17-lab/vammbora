@@ -16,12 +16,14 @@ import { useVitrine } from '@/data/VitrineProvider';
 import { DIA_LABEL, DIAS_SEMANA, horaDoCampo, pendenciasDeRevisao, textoDuracao } from '@/lib/cadastro-rota';
 import {
   adicionarAluno, adicionarEscola, alunosDaCasa, atualizarAluno, atualizarEscola, candidatosADescer, casaDoAluno, definirSaida,
-  escolaParadaDoAluno, escolasDaRota, excluirParada, moverParada, podeMover, removerAlunoDaRota,
+  escolaParadaDoAluno, escolasDaRota, escolasEsvaziadas, escolasSemAlunos, excluirParada, moverParada, podeMover, removerAlunoDaRota,
+  resolverEscolaSemAlunos, type DecisaoEscolaVazia,
 } from '@/lib/edicao-rota';
 import { ENDERECO_VAZIO, type Coord, type EnderecoCampo } from '@/lib/endereco';
 import { locaisDeDestinos, type SugestaoEndereco } from '@/lib/geocode';
 import { capacidadeAlunos, picoOcupacao, podeFinalizar, validarRota } from '@/lib/ocupacao-rota';
 import { planejarRotaDoCadastro } from '@/lib/rota-para-motor';
+import { conferirRotaDoCadastro } from '@/lib/rota-para-encaixe';
 import { USE_SUPABASE } from '@/lib/supabase';
 import { useAlturaVisivel } from '@/lib/useAlturaVisivel';
 import { cn, nomeDestinoParaExibicao } from '@/lib/utils';
@@ -83,6 +85,8 @@ export function ConstrutorRota({ voltarPara = '/painel/rotas' }: { voltarPara?: 
 
   const [veiculos, setVeiculos] = useState<Veiculo[]>([]);
   const [rota, setRota] = useState<Rota>(rotaNova());
+  // Escolas que ficaram sem alunos por uma edição DESTA sessão e ainda esperam a decisão do motorista.
+  const [escolasADecidir, setEscolasADecidir] = useState<string[]>([]);
   const [etapa, setEtapa] = useState<Etapa>('dados');
   const [painel, setPainel] = useState<Painel>({ tipo: 'lista' });
   const [carregando, setCarregando] = useState(true);
@@ -179,6 +183,11 @@ export function ConstrutorRota({ voltarPara = '/painel/rotas' }: { voltarPara?: 
   }, []);
 
   async function salvar(status: Rota['status']) {
+    // Concluir com uma escola sem alunos e sem decisão gravaria a visita "por acaso".
+    if (status === 'concluida' && escolasSemAlunos(rota).some((p) => escolasADecidir.includes(p.id))) {
+      setErro('Antes de concluir, diga o que fazer com a escola que ficou sem alunos (aviso acima).');
+      return;
+    }
     setSalvando(status); setErro(null);
     try {
       const nome = rota.nome.trim() || `Rota ${rota.sentido === 'ida' ? 'de ida' : 'de volta'}`;
@@ -196,6 +205,23 @@ export function ConstrutorRota({ voltarPara = '/painel/rotas' }: { voltarPara?: 
       setSalvando(null);
     }
   }
+
+  // Edição feita nos painéis: se ela deixou uma ESCOLA sem nenhum aluno, o app
+  // não decide sozinho o que fazer com a visita — pergunta ao motorista.
+  const editar = (nova: Rota) => {
+    const esvaziadas = escolasEsvaziadas(rota, nova).map((p) => p.id);
+    if (esvaziadas.length) setEscolasADecidir((ids) => [...new Set([...ids, ...esvaziadas])]);
+    setRota(nova);
+  };
+  const escolasPendentes = escolasSemAlunos(rota).filter((p) => escolasADecidir.includes(p.id));
+  const decidirEscola = (paradaId: string, decisao: DecisaoEscolaVazia) => {
+    const escola = rota.paradas.find((p) => p.id === paradaId);
+    setEscolasADecidir((ids) => ids.filter((id) => id !== paradaId));
+    setRota(resolverEscolaSemAlunos(rota, paradaId, decisao, novoId));
+    setErro(null);
+    setAviso(decisao === 'manter' ? `A van continua passando em ${escola ? nomeEscola(escola) : 'escola'}.`
+      : decisao === 'remover' ? 'A escola saiu da rota.' : 'A escola saiu do percurso e continua na lista das que você aceita incluir.');
+  };
 
   const fecharPainel = (mensagem?: string) => { setPainel({ tipo: 'lista' }); setNoMapa(null); if (mensagem) setAviso(mensagem); };
   const abrirParada = (paradaId: string) => {
@@ -238,7 +264,7 @@ export function ConstrutorRota({ voltarPara = '/painel/rotas' }: { voltarPara?: 
   }
 
   const indice = ETAPAS.findIndex((e) => e.id === etapa);
-  const comum = { rota, setRota, novoId };
+  const comum = { rota, setRota: editar, novoId };
   const alturaMapa = tecladoAberto ? 'h-28' : painel.tipo === 'lista' && etapa === 'revisao' ? 'h-[26%]' : 'h-[32%]';
 
   return (
@@ -275,6 +301,17 @@ export function ConstrutorRota({ voltarPara = '/painel/rotas' }: { voltarPara?: 
         {/* PAINEL — só o cadastro atual */}
         <section className="flex min-h-0 flex-1 flex-col rounded-t-3xl bg-white shadow-[0_-8px_24px_-12px_rgba(0,0,0,.25)] lg:max-w-md lg:rounded-none" aria-live="polite">
           {erro && <p role="alert" className="mx-4 mt-3 rounded-2xl bg-red-50 p-3 text-sm font-medium text-red-700">{erro}</p>}
+          {escolasPendentes.map((p) => (
+            <div key={p.id} role="alertdialog" aria-label="Escola sem alunos" data-testid="escola-sem-alunos" className="mx-4 mt-3 rounded-2xl bg-amber-50 p-3 ring-1 ring-amber-200">
+              <p className="text-sm font-bold text-amber-900">{nomeEscola(p)} ficou sem alunos nesta rota.</p>
+              <p className="mt-0.5 text-xs text-amber-900">O que você quer fazer com a visita a esta escola? Nada muda até você escolher.</p>
+              <div className="mt-2 grid gap-2">
+                <button type="button" onClick={() => decidirEscola(p.id, 'manter')} className="min-h-[2.75rem] rounded-xl bg-white px-3 text-left text-sm font-bold ring-1 ring-neutral-300">Continuar passando na escola<span className="block text-xs font-medium text-neutral-500">A parada e o horário ficam como estão.</span></button>
+                <button type="button" onClick={() => decidirEscola(p.id, 'disponibilidade')} className="min-h-[2.75rem] rounded-xl bg-white px-3 text-left text-sm font-bold ring-1 ring-neutral-300">Parar de passar, mas aceitar incluir<span className="block text-xs font-medium text-neutral-500">Sai do percurso; famílias desta escola ainda encontram a rota.</span></button>
+                <button type="button" onClick={() => decidirEscola(p.id, 'remover')} className="min-h-[2.75rem] rounded-xl bg-white px-3 text-left text-sm font-bold text-red-700 ring-1 ring-red-200">Tirar a escola desta rota<span className="block text-xs font-medium text-neutral-500">Famílias desta escola deixam de encontrar a rota.</span></button>
+              </div>
+            </div>
+          ))}
           {painel.tipo === 'aluno' ? (
             <FormAluno key={painel.alunoId ?? `novo-${painel.naCasaId ?? ''}`} {...comum} alunoId={painel.alunoId} naCasaId={painel.naCasaId} locais={locaisBusca} nomeEscola={nomeEscola}
               setNoMapa={setNoMapa} onFechar={fecharPainel} />
@@ -290,10 +327,10 @@ export function ConstrutorRota({ voltarPara = '/painel/rotas' }: { voltarPara?: 
             <EtapaParadas rota={rota} paradas={paradas} veiculo={veiculo} previsto={previstoPorId} nomeEscola={nomeEscola}
               onAbrir={abrirParada} onAluno={() => setPainel({ tipo: 'aluno' })} onEscola={() => setPainel({ tipo: 'escola' })} onContinuar={() => irPara('escolas')} />
           ) : etapa === 'escolas' ? (
-            <EtapaEscolas rota={rota} setRota={setRota} paradas={paradas} destinos={destinos} listaGeral={listaGeral} nomeEscola={nomeEscola}
+            <EtapaEscolas rota={rota} setRota={editar} paradas={paradas} destinos={destinos} listaGeral={listaGeral} nomeEscola={nomeEscola}
               onAbrir={abrirParada} onNova={() => setPainel({ tipo: 'escola' })} onContinuar={() => irPara('revisao')} />
           ) : (
-            <EtapaRevisao rota={rota} setRota={setRota} paradas={paradas} veiculo={veiculo} destinos={destinos} nomeEscola={nomeEscola} previsto={previstoPorId}
+            <EtapaRevisao rota={rota} setRota={editar} paradas={paradas} veiculo={veiculo} destinos={destinos} nomeEscola={nomeEscola} previsto={previstoPorId}
               planejamento={planejamento} salvando={salvando} onAbrir={abrirParada} onAluno={(alunoId) => setPainel({ tipo: 'aluno', alunoId })} onIr={irPara}
               onConcluir={() => salvar('concluida')} onRascunho={() => salvar('rascunho')} />
           )}
@@ -1010,6 +1047,10 @@ function EtapaRevisao({ rota, setRota, paradas, veiculo, destinos, nomeEscola, p
         </div>
       )}
 
+      {/* Mesma conferência usada para encaixar novos alunos: saída, limite de cada
+          escola, liberação, horário e flexibilidade de cada aluno, lotação por trecho. */}
+      <ConferenciaEncaixe rota={rota} veiculo={veiculo} />
+
       {/* Tempo de deslocamento entre paradas (ajuste manual, como sempre) */}
       {paradas.length >= 2 && (
         <details className="rounded-2xl bg-neutral-50 p-3.5 ring-1 ring-neutral-200 [&_.card]:mt-2 [&_.card]:p-0 [&_.card]:shadow-none [&_.card]:ring-0 [&_.card]:bg-transparent">
@@ -1018,5 +1059,21 @@ function EtapaRevisao({ rota, setRota, paradas, veiculo, destinos, nomeEscola, p
         </details>
       )}
     </Quadro>
+  );
+}
+
+/** Diz ao motorista se a rota "fecha" pelas regras de encaixe (as da busca e do simulador). */
+function ConferenciaEncaixe({ rota, veiculo }: { rota: Rota; veiculo: Veiculo | null }) {
+  const c = useMemo(() => conferirRotaDoCadastro(rota, veiculo), [rota, veiculo]);
+  if (rota.paradas.length < 2) return null;
+  if (c.situacao === 'ok') {
+    return <p data-testid="conferencia-encaixe" className="rounded-2xl bg-mint-50 p-3 text-sm font-medium text-mint-900">Com os horários informados a rota fecha: é sobre ela que novas famílias são avaliadas.</p>;
+  }
+  return (
+    <div data-testid="conferencia-encaixe" className="rounded-2xl bg-amber-50 p-3 text-sm text-amber-900 ring-1 ring-amber-200">
+      <p className="font-bold">{c.situacao === 'inconsistente' ? 'Com os horários informados, a rota não fecha:' : 'Ainda não dá para conferir a rota:'}</p>
+      <ul className="mt-1 list-disc space-y-0.5 pl-5">{c.problemas.map((t, i) => <li key={i}>{t}</li>)}</ul>
+      <p className="mt-1 text-xs">Enquanto isso, as buscas das famílias mostram esta rota como “dados insuficientes” (nenhuma família é recusada nem aceita por engano). Ajuste a saída, a ordem ou os horários.</p>
+    </div>
   );
 }

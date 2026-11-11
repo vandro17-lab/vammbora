@@ -125,9 +125,13 @@ export interface CriteriosBusca {
    *  autocomplete (geocodificado). Quando ausentes, estima-se pela região. */
   origemLat?: number;
   origemLng?: number;
-  /** Horário informado pela família (HH:MM). Ida: precisa chegar à escola até
-   *  esse horário. Volta: sai da escola a partir dele. */
+  /** Horário informado pela família (HH:MM) para o sentido buscado. "Só ida"
+   *  ou "ida e volta": até quando precisa CHEGAR à escola. "Só volta": a partir
+   *  de quando o aluno está liberado. */
   horario?: string;
+  /** "Ida e volta": horário da VOLTA, separado — a partir de quando o aluno
+   *  está liberado na escola. (O da ida fica em `horario`.) */
+  horarioVolta?: string;
 }
 
 /** Resultado de uma avaliação de compatibilidade para um motorista. */

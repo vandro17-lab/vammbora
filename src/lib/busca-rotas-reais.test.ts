@@ -118,7 +118,8 @@ describe('avaliarRotaReal — capacidade por trecho (T08)', () => {
 
   it('van LOTADA no pico: o motor decide por TRECHO — nunca há mais gente a bordo do que lugares', () => {
     const r = avaliarRotaReal(rotaIda(), veiculo(2), pedidoIda());
-    expect(r.vagas).toBe(0);
+    // Vaga exibida = lugares livres NO TRECHO calculado; sem encaixe calculado, não há número (nunca "0" pelo pico).
+    expect(r.vagas === null ? r.status !== 'compativel' : r.vagas >= 1).toBe(true);
     const sim = simularEncaixeProgressivo(rotaIda(), veiculo(2), {
       alunoId: 'familia', nome: 'F', casa: { id: 'familia-casa', nome: 'Casa', ...C.familia }, escolaId: 'esc1',
     }, FIXTURE, { horarioEscolaMin: 7 * 60 });
@@ -236,7 +237,7 @@ describe('buscarEmRotasReais — agregação por sentido + capacidade por trecho
     // Van de 1 lugar. Aluno atual: casaA → escola X. Família: casa (perto de B) → escola Y, depois de X.
     const rota = rotaIdaDuasEscolas();
     const r = avaliarRotaReal(rota, veiculo(1), pedidoIda({ destinoId: 'escY', escolaPonto: C.casaB }));
-    expect(r.vagas).toBe(0); // pico lotado…
+    expect(r.vagas).toBe(1); // pico global lotado, mas há 1 lugar no trecho da família…
     expect(r.status).toBe('compativel'); // …mas o lugar vaga em X antes de a família embarcar
   });
 });

@@ -116,9 +116,11 @@ export function sugerirVolta(ida: Rota, opcoes: { voltamIds?: string[]; distanci
     id: novoId(), identificacao: x.identificacao, destinoId: x.destinoId ?? null,
     embarqueParadaId: novoIdDe.get(x.desembarqueParadaId!) ?? null,
     desembarqueParadaId: novoIdDe.get(x.embarqueParadaId!) ?? null,
-    // Horário combinado e tolerância são da IDA; na volta ainda não foram informados.
+    // Horário combinado, tolerância e tempo de atendimento são da IDA (embarque
+    // de manhã, na casa). Na volta o atendimento é outro (desembarque): fica
+    // "não informado" até o motorista dizer — o cálculo usa o padrão e avisa.
     horarioHabitualMin: null, ajusteAntesMin: null, ajusteDepoisMin: null,
-    atendimentoMin: x.atendimentoMin ?? null, atendimentoOrigem: x.atendimentoOrigem ?? null,
+    atendimentoMin: null, atendimentoOrigem: null,
   }));
 
   return {
@@ -142,11 +144,16 @@ export function reordenarParadas(rota: Rota, idsEmOrdem: string[]): Rota {
   return { ...rota, paradas };
 }
 
-/** Tira um aluno da rota e as paradas que ficarem sem ninguém. */
+/**
+ * Tira um aluno da rota e a CASA que ficar sem ninguém. A visita a uma ESCOLA
+ * que fique sem alunos NÃO é apagada aqui: manter a visita, removê-la ou
+ * preservar só a disponibilidade para inclusão é decisão do motorista
+ * (`escolasEsvaziadas` + `resolverEscolaSemAlunos`, em `edicao-rota`).
+ */
 export function removerAluno(rota: Rota, alunoId: string): Rota {
   const passageiros = rota.passageiros.filter((x) => x.id !== alunoId);
   const emUso = new Set(passageiros.flatMap((x) => [x.embarqueParadaId, x.desembarqueParadaId]));
-  const paradas = ordenadas(rota).filter((p) => p.tipo === 'saida' || emUso.has(p.id)).map((p, i) => ({ ...p, ordem: i }));
+  const paradas = ordenadas(rota).filter((p) => p.tipo !== 'casa' || emUso.has(p.id)).map((p, i) => ({ ...p, ordem: i }));
   return { ...rota, paradas, passageiros };
 }
 
@@ -181,4 +188,60 @@ export function alunosForaDeOrdem(rota: Rota): PassageiroRota[] {
     const d = x.desembarqueParadaId ? ordem.get(x.desembarqueParadaId) : undefined;
     return e != null && d != null && d <= e;
   });
+}
+
+/* ------------------------ ordem pelas RUAS (não em linha reta) ------------------------ */
+
+const chaveDoPonto = (p: Ponto) => `${p.lat.toFixed(6)},${p.lng.toFixed(6)}`;
+
+/** Pontos (escolas, casas e garagem da ida) cujos trechos a volta precisa conhecer
+ *  para ser ordenada pelas ruas. O id de cada ponto é a própria coordenada. */
+export function pontosParaOrdenarVolta(ida: Rota, voltamIds?: string[]): { id: string; nome: string; lat: number; lng: number }[] {
+  const podem = alunosQuePodemVoltar(ida);
+  const voltam = voltamIds ? podem.filter((x) => voltamIds.includes(x.id)) : podem;
+  const usadas = new Set(voltam.flatMap((x) => [x.embarqueParadaId, x.desembarqueParadaId]));
+  const vistos = new Map<string, { id: string; nome: string; lat: number; lng: number }>();
+  for (const p of ordenadas(ida)) {
+    if (!temPonto(p) || !(p.tipo === 'saida' || usadas.has(p.id))) continue;
+    const id = chaveDoPonto(p);
+    if (!vistos.has(id)) vistos.set(id, { id, nome: p.tipo, lat: p.lat, lng: p.lng });
+  }
+  return [...vistos.values()];
+}
+
+/**
+ * "Distância" entre dois pontos a partir de uma matriz viária real: os MINUTOS
+ * do trecho pelas ruas, no sentido de quem vai de `a` para `b` (mão única e
+ * retornos contam). Trecho que a matriz não tem cai na linha reta, convertida
+ * em minutos — só para não deixar de ordenar; o aviso de "ordem pelas ruas" só
+ * deve ser mostrado quando `completa` voltar verdadeiro.
+ */
+export function distanciaPelasRuas(
+  matriz: { obter(de: { id: string; nome: string; lat: number; lng: number }, para: { id: string; nome: string; lat: number; lng: number }, partidaMin: number): { minutos: number } | null },
+): { distancia: Distancia; completa: () => boolean } {
+  let faltou = false;
+  const ponto = (p: Ponto) => ({ id: chaveDoPonto(p), nome: '', lat: p.lat, lng: p.lng });
+  return {
+    distancia: (a, b) => {
+      const t = matriz.obter(ponto(a), ponto(b), 0);
+      if (t && Number.isFinite(t.minutos)) return t.minutos;
+      faltou = true;
+      return metrosEntre(a, b) / 400; // ~24 km/h, só como último recurso
+    },
+    completa: () => !faltou,
+  };
+}
+
+/** A volta pode ser CONCLUÍDA? Lista o que falta (vazio = pode). Não copia nem
+ *  presume nada da ida: liberação e ordem são da volta. */
+export function pendenciasParaConcluirVolta(volta: Rota): string[] {
+  const faltas: string[] = [];
+  if (!volta.veiculoId) faltas.push('escolher a van');
+  if (volta.paradas.some((p) => !p.confirmado)) faltas.push('confirmar os endereços no mapa');
+  const escolas = volta.paradas.filter((p) => p.tipo === 'escola');
+  const semLiberacao = escolas.filter((p) => p.liberacaoMin == null).length;
+  if (semLiberacao) faltas.push(semLiberacao === 1 ? 'informar o horário de liberação da escola' : `informar o horário de liberação de ${semLiberacao} escolas`);
+  if (alunosForaDeOrdem(volta).length) faltas.push('colocar a escola antes das casas dos alunos dela');
+  if (volta.passageiros.length === 0) faltas.push('ter ao menos um aluno');
+  return faltas;
 }

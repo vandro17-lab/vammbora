@@ -257,3 +257,34 @@ capacidade e reservar de forma atômica no servidor. Esta função pura sozinha 
 resolve concorrência. Condições sob consulta exigem confirmação/renegociação externa.
 
 Nenhuma integração com telas, banco, mapas ou confirmação foi adicionada nesta etapa.
+
+## Etapa 2 — incluir um aluno é reprogramar a viagem inteira
+
+Código: `src/engine/encaixe-geografico.ts` (motor) e `src/lib/rota-para-encaixe.ts`,
+`src/lib/busca-rotas-reais.ts`, `api/buscar-rotas.ts` (adaptadores). Testes do cenário de
+referência (saída → 1 → 2 → 3 → escola A → 4 → escola B): `src/lib/encaixe-viagem-inteira.test.ts`.
+
+**Como o motor decide.** Para cada posição de embarque e de desembarque do novo aluno, a viagem é
+recalculada do começo ao fim, trecho por trecho: deslocamento pelas ruas, chegada, espera (quando
+a van chega antes do horário combinado ou da liberação), atendimento, saída e ocupação. Uma
+candidata só vale se TODOS os compromissos continuam cumpridos.
+
+| Regra | Como é aplicada |
+|---|---|
+| Saída habitual | A cadastrada (`saidaHabitualMin`). Sem ela, é calculada de trás para frente e o resultado indica `fontePartida: 'calculada'`. |
+| Antecipação | Calculada pela folga real, já descontando esperas (`antecipacaoNecessariaMin`); a van sai em minuto cheio (`antecipacaoMin`). Dentro do autorizado = viável; acima = aprovação. Com saída cadastrada e antecipação não informada, nada é presumido. |
+| Janelas individuais | Horário habitual − "antes" / + "depois" de cada aluno. Embarque cedo = a van espera; tarde = inviável. Nunca são deslocadas. |
+| Limites das escolas | Cada escola tem o seu (ida: chegar até; volta com liberação cadastrada: não sair antes, a van espera). |
+| Ponto final | Na ida, a última escola com limite continua sendo a última parada. Na volta, "última entrega até" vale para a viagem inteira. |
+| Capacidade | Conferida a cada trecho com o novo aluno a bordo; lugares = van − monitor (se ocupa) − reservados. |
+| Atendimento | Individual na casa; do grupo na escola, uma vez. Escola nova soma o tempo do grupo uma vez. Mesma coordenada: deslocamento 0, atendimento soma. |
+| Escola aceita e não visitada | Casa e escola entram juntas na avaliação, com o portão, o limite e o tempo de grupo informados na lista de aceitas. Lista revisada sem a escola = não avaliada. Lista nunca revisada (cadastro antigo) = avaliada, mas a inclusão depende de aprovação. |
+| Reorganização | Só quando a ordem atual não resolve: por compromisso (até 8) ou por parada (rotas maiores), mantendo precedência, limites e ponto final. Sempre depende de aprovação. Uma parada existente não é partida ao meio. |
+| Precisão | Trechos reais em minutos com duas casas (não mais arredondados para cima). |
+
+**Situação final** (`situacao`): `viavel`, `aprovacao` (com a lista em `aprovacoes`),
+`incompativel` (todas as posições calculadas, com dados completos) ou `inconclusivo` (faltou dado,
+rota-base inconsistente ou a busca atingiu o limite de ordens — nunca significa "não cabe").
+
+**Explicação.** `explicacao` traz o resumo em texto; `trechos` traz a viagem recalculada linha a
+linha, com a chegada atual e a diferença de cada compromisso.

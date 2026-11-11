@@ -1,3 +1,4 @@
+import { resumoDoContexto, type ContextoInteresse } from '@/lib/contexto-interesse';
 import type {
   Destino,
   Motorista,
@@ -161,26 +162,42 @@ export interface InteressePayload {
   regiao?: string;
   destinoId?: string | null;
   turno?: Turno | null;
+  /** O que foi buscado e, se houver, a rota e as condições do encaixe (sem
+   *  endereço da família e sem dado de terceiros). */
+  contexto?: ContextoInteresse | null;
 }
 
 export async function registrarInteresse(
   p: InteressePayload,
-): Promise<{ ok: boolean; id?: string; erro?: string; demo?: boolean }> {
+): Promise<{ ok: boolean; id?: string; erro?: string; demo?: boolean; contexto?: 'completo' | 'resumido' | 'nenhum' }> {
   if (!USE_SUPABASE || !supabase) {
     // Modo demo: NÃO há servidor; o envio é apenas simulado (não gravado).
     return { ok: true, demo: true };
   }
+  const contexto = p.contexto ?? null;
+  if (contexto) {
+    // Com a migração 0017: o contexto vai no campo próprio (e a rota fica ligada ao pedido).
+    const v2 = await supabase.rpc('registrar_interesse_v2', {
+      p_city_id: p.cidadeId, p_contact_name: p.nome, p_contact_whatsapp: p.whatsapp, p_consent: p.consentimento,
+      p_region: p.regiao ?? null, p_destination_id: p.destinoId ?? null, p_turno: p.turno ?? null, p_context: contexto,
+    });
+    if (!v2.error) return { ok: true, id: v2.data as string, contexto: 'completo' };
+    // Função ainda não existe no banco: cai no formato anterior, levando um
+    // RESUMO do contexto junto da região (para o sentido e o horário não se perderem).
+    if (!['PGRST202', '42883'].includes(String(v2.error.code))) return { ok: false, erro: v2.error.message };
+  }
+  const regiao = contexto ? `${p.regiao ? p.regiao + ' ' : ''}${resumoDoContexto(contexto)}` : p.regiao ?? null;
   const { data, error } = await supabase.rpc('registrar_interesse', {
     p_city_id: p.cidadeId,
     p_contact_name: p.nome,
     p_contact_whatsapp: p.whatsapp,
     p_consent: p.consentimento,
-    p_region: p.regiao ?? null,
+    p_region: regiao,
     p_destination_id: p.destinoId ?? null,
     p_turno: p.turno ?? null,
   });
   if (error) return { ok: false, erro: error.message };
-  return { ok: true, id: data as string };
+  return { ok: true, id: data as string, contexto: contexto ? 'resumido' : 'nenhum' };
 }
 
 export interface ContatoPayload {

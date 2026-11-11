@@ -63,14 +63,14 @@ export function OportunidadesPage() {
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-bold text-navy-900">{op.regiao} → {op.escola}</p>
                     <p className="text-xs text-navy-500">{op.alunos} aluno{op.alunos > 1 ? 's' : ''} · {op.turno}</p>
-                    <p className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-mint-700"><CheckCircle2 className="h-3.5 w-3.5" /> {r.compatibilidadePct}% de compatibilidade</p>
+                    <p className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-mint-700"><CheckCircle2 className="h-3.5 w-3.5" /> {r.compatibilidadePct}% de compatibilidade (estimativa){r.dependeDoMotorista ? ' · depende de você' : ''}</p>
                   </div>
                   <ChevronRight className="h-5 w-5 shrink-0 text-navy-300" />
                 </Card>
               </Link>
             ))}
             {compativeis.length > 0 && (
-              <p className="pt-1 text-center text-[11px] text-navy-400">Compatibilidade calculada pelo motor de encaixe, sobre a sua rota. Sem dados pessoais das famílias.</p>
+              <p className="pt-1 text-center text-[11px] text-navy-400">Exemplos fictícios, avaliados pela mesma regra da busca das famílias com tempos estimados pela distância — não confirmam encaixe nem reservam vaga.</p>
             )}
           </div>
         ) : (
@@ -160,9 +160,18 @@ export function SimularEncaixePage() {
               <p className="font-display font-bold text-navy-900">Análise da oportunidade</p>
               <p className="mt-0.5 text-sm text-navy-600">
                 {r.cabe
-                  ? `O novo aluno acrescenta cerca de ${formatBRL(c.custoExtraDia)} por dia em combustível e mantém os horários da escola.`
-                  : 'Esse aluno não cabe sem atrasar os outros além da tolerância ou passar do horário da escola.'}
+                  ? `Pela estimativa, o novo aluno cabe${r.dependeDoMotorista ? ', mas só com um ajuste que depende de você (sair mais cedo ou mudar a ordem)' : ' sem passar do horário da escola nem do combinado com os alunos atuais'}. Combustível a mais nos trajetos avaliados: cerca de ${formatBRL(c.custoExtraDia)} por dia.`
+                  : r.status === 'incompativel' ? 'Pela estimativa, este aluno não cabe sem passar do horário da escola ou do combinado com os alunos atuais.'
+                  : r.motivo}
               </p>
+              {r.cabe && (
+                <p className="mt-1 text-xs text-navy-500" data-testid="custo-por-trajeto">
+                  Ida: +{(c.kmExtraIda ?? 0).toFixed(1).replace('.', ',')} km.{' '}
+                  {c.kmExtraVolta != null
+                    ? `Volta: +${c.kmExtraVolta.toFixed(1).replace('.', ',')} km (calculada na rota de volta).`
+                    : 'Volta: não avaliada — o custo da volta não está incluído (não supomos que seja igual ao da ida).'}
+                </p>
+              )}
             </div>
           </div>
         </Card>
@@ -179,7 +188,7 @@ export function SimularEncaixePage() {
             <Link to="/painel/rotas" className="font-semibold text-mint-700 underline">construtor de rotas</Link> e confirme.
           </p>
         )}
-        <p className="pb-2 text-center text-[11px] text-navy-400"><Users className="mr-1 inline h-3 w-3" />Cálculo do motor real sobre a sua rota · receita extra estimada {formatBRL(c.receitaExtraMes)}/mês ({DIAS_UTEIS_MES} dias úteis).</p>
+        <p className="pb-2 text-center text-[11px] text-navy-400"><Users className="mr-1 inline h-3 w-3" />Demonstração: tempos estimados pela distância (sem consulta às ruas) · receita extra estimada {formatBRL(c.receitaExtraMes)}/mês ({DIAS_UTEIS_MES} dias úteis). Para um cálculo com as ruas reais, use “Simular novo aluno”.</p>
       </div>
     </VMShell>
   );

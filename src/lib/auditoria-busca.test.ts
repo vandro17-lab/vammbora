@@ -44,7 +44,7 @@ describe('F01/F07 — capacidade: por trecho, nunca por pico; zero é zero', () 
       passageiros: [pax('p1', 'a', 'ex', { destinoId: 'escX' })],
     });
     const r = avaliarRotaReal(rota, van(1), pedido({ destinoId: 'escY', origem: C.casaB }));
-    expect(r.vagas).toBe(0);
+    expect(r.vagas).toBe(1); // lugar livre no trecho da família (o pico global estava lotado)
     expect(r.status).toBe('compativel');
     expect(candidatasParaBusca([{ rota, veiculo: van(1) }], pedido({ destinoId: 'escY' }))).toHaveLength(1);
   });
@@ -169,7 +169,8 @@ describe('F09 — tempo na escola é do grupo: o novo aluno não soma', () => {
     const evEscola = noItinerario.opcao!.eventos.find((e) => e.compromisso.id === 'novo:desembarque:familia')!;
     expect(evEscola.saidaMin - evEscola.chegadaMin).toBe(0);
     const outraEscola = { ...familia, escolaId: 'esc2', escolaPonto: { id: 'esc2', nome: 'Nova', lat: -21.2150, lng: -50.4250 } };
-    const nova = simularEncaixeProgressivo(rotaIda({ ultimoDesembarqueMin: null }), van(4), outraEscola, FIXTURE, { horarioEscolaMin: 7 * 60 + 40 });
+    // (rota sem NENHUM horário não é calculável — ver "sem_horarios"; aqui a saída habitual ancora a viagem)
+    const nova = simularEncaixeProgressivo(rotaIda({ ultimoDesembarqueMin: null, saidaHabitualMin: 6 * 60 + 30 }), van(4), outraEscola, FIXTURE, { horarioEscolaMin: 7 * 60 + 40 });
     expect(nova.elegivel).toBe(true);
     const evNova = nova.opcao!.eventos.find((e) => e.compromisso.id === 'novo:desembarque:familia')!;
     expect(evNova.saidaMin - evNova.chegadaMin).toBe(PARADA_ESCOLA_MIN);

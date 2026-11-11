@@ -10,6 +10,7 @@ import { VanEscolar } from '@/components/vm/VanEscolar';
 import { SlotIlustracao } from '@/components/vm/SlotImagem';
 import { useDadosMotorista, lerPrefs, salvarPrefs } from '@/lib/vm/useDadosMotorista';
 import { salvarVeiculo } from '@/data/motorista-store';
+import { impactoDaVanNasRotas, textoDoImpacto, type ImpactoNaRota } from '@/lib/veiculo-rotas';
 import { formatBRL, cn } from '@/lib/utils';
 import type { Veiculo } from '@/types/motorista';
 
@@ -109,6 +110,8 @@ export function CadastroVanPage() {
   const prefs = lerPrefs();
   const [passo, setPasso] = useState(1);
   const [salvo, setSalvo] = useState(false);
+  // Rotas cuja capacidade mudou por causa desta edição (lugares da van).
+  const [impactos, setImpactos] = useState<ImpactoNaRota[]>([]);
   const [erro, setErro] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
 
@@ -146,8 +149,9 @@ export function CadastroVanPage() {
       fotos: existente?.fotos ?? [],
     };
     setErro(null); setSalvando(true);
+    let gravado: Veiculo;
     try {
-      await salvarVeiculo(veic);
+      gravado = await salvarVeiculo(veic);
     } catch (e) {
       // Qualquer falha real precisa aparecer (nunca "Van salva!" sem ter salvo).
       setSalvando(false);
@@ -157,8 +161,13 @@ export function CadastroVanPage() {
     salvarPrefs({ consumoKmL: consumo, precoDiesel: preco, mensalidade });
     setSalvando(false);
     setSalvo(true);
-    // Volta para onde veio (fluxo de criar rota ou Minha Van).
-    setTimeout(() => navigate(-1), 900);
+    // A capacidade das rotas é recalculada a partir da van a cada busca/simulação:
+    // mostramos ao motorista o que mudou. Nenhuma rota é alterada por aqui.
+    const afetadas = existente ? impactoDaVanNasRotas(existente, gravado, dados.rotas) : [];
+    setImpactos(afetadas);
+    // Volta para onde veio (fluxo de criar rota ou Minha Van) — a menos que haja
+    // rotas afetadas para o motorista ler antes.
+    if (afetadas.length === 0) setTimeout(() => navigate(-1), 900);
   }
 
   return (
@@ -257,7 +266,18 @@ export function CadastroVanPage() {
               <>
                 <span className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-mint-100 text-mint-600"><Check className="h-8 w-8" /></span>
                 <p className="mt-3 font-display text-lg font-bold">Van salva!</p>
-                <p className="text-sm text-navy-500">Abrindo seu aplicativo…</p>
+                {impactos.length === 0 ? <p className="text-sm text-navy-500">Abrindo seu aplicativo…</p> : (
+                  <div className="mt-3 text-left" data-testid="impacto-van">
+                    <p className="text-sm font-semibold text-navy-800">A mudança de lugares altera a disponibilidade destas rotas:</p>
+                    <ul className="mt-2 space-y-2">
+                      {impactos.map((i) => (
+                        <li key={i.rotaId} className={cn('rounded-xl p-3 text-sm', i.efeito === 'excede' || i.efeito === 'sem_lugar' ? 'bg-amber-50 text-amber-900' : 'bg-navy-50 text-navy-700')}>{textoDoImpacto(i)}</li>
+                      ))}
+                    </ul>
+                    <p className="mt-2 text-xs text-navy-500">Avaliações e simulações feitas antes desta mudança não valem mais: refaça-as.</p>
+                    <button type="button" className="btn btn-primary mt-3 w-full" onClick={() => navigate(-1)}>Entendi</button>
+                  </div>
+                )}
               </>
             ) : (
               <>

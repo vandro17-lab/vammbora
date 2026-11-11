@@ -237,7 +237,7 @@ export function DriverProfilePage() {
               </p>
             )}
             <p className="mt-3 text-center text-xs text-navy-400">
-              {m.demo ? 'Explore o perfil e conheça a proposta de atendimento.' : 'Você revisa a mensagem antes de enviar. Sem compromisso.'}
+              {m.demo ? 'Explore o perfil e conheça a proposta de atendimento.' : 'Você revisa a mensagem antes de enviar — nada é enviado automaticamente. A mensagem leva a escola, o trajeto e o horário que você buscou; falar com o motorista não reserva vaga.'}
             </p>
 
             {/* Status de verificação — honesto */}

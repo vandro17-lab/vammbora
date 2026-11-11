@@ -24,6 +24,6 @@ describe('inteligência operacional — estimativas explícitas, sem aprendizado
   it('matriz com fator multiplica só os tempos', () => {
     const m = matrizComFator({ origem: 'fixture-testada', obter: () => ({ minutos: 10, metros: 3000 }) }, 1.15);
     const p = { id: 'a', nome: '', lat: 0, lng: 0 };
-    expect(m.obter(p, p, 0)).toEqual({ minutos: 12, metros: 3000 });
+    expect(m.obter(p, p, 0)).toEqual({ minutos: 11.5, metros: 3000 }); // 10 × 1,15, com fração de minuto
   });
 });

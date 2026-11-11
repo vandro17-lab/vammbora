@@ -4,28 +4,20 @@ import {
   ArrowRight, Lock,
 } from 'lucide-react';
 import { MotoristaShell, ExigirMotorista } from './MotoristaShell';
-import { listarRotas, listarVeiculos } from '@/data/motorista-store';
+import { listarRotas, listarVeiculos, obterRota } from '@/data/motorista-store';
 import type { Rota, Veiculo } from '@/types/motorista';
 import type { PontoGeo, MatrizViaria } from '@/engine/encaixe-geografico';
 import { CampoEndereco } from '@/components/search/CampoEndereco';
 import { ENDERECO_VAZIO, type EnderecoCampo } from '@/lib/endereco';
+import { MARGEM_OPERACIONAL_MIN, type ResultadoSimulacao } from '@/lib/rota-para-encaixe';
 import {
-  simularEncaixeRota, coletarPontos, limitePadraoDoTurno, MARGEM_OPERACIONAL_MIN,
-  type ResultadoSimulacao, type AlunoNovo,
-} from '@/lib/rota-para-encaixe';
+  ancoraHorarioEscola, avaliarRotaDetalhada, pontosDoPedido, versaoDaAvaliacao,
+  type AvaliacaoDetalhada, type PedidoFamilia,
+} from '@/lib/busca-rotas-reais';
 import { obterMatrizViaria, FalhaMatriz } from '@/lib/matriz-viaria';
-import { horarioDaEscola } from '@/lib/cadastro-rota';
-import { minutosParaTextoHora, horaParaMinutos, TURNO_LABEL, nomeDestinoParaExibicao } from '@/lib/utils';
-
-function escolasDaRota(rota: Rota): { id: string; nome: string }[] {
-  const vistos = new Map<string, string>();
-  for (const p of rota.paradas) {
-    if (p.tipo === 'escola' && p.destinoId && !vistos.has(p.destinoId)) {
-      vistos.set(p.destinoId, nomeDestinoParaExibicao(p.destinoNome || p.rotulo || 'Escola'));
-    }
-  }
-  return [...vistos.entries()].map(([id, nome]) => ({ id, nome }));
-}
+import { useVitrine } from '@/data/VitrineProvider';
+import { CONFIRMACAO_DE_ENCAIXE_HABILITADA, REQUISITOS_DA_CONFIRMACAO, escolasSimulaveis, seloDoResultado } from '@/lib/simulador-encaixe';
+import { minutosParaTextoHora, horaParaMinutos, TURNO_LABEL, cn } from '@/lib/utils';
 
 export function SimuladorEncaixePage() {
   return (
@@ -54,8 +46,13 @@ function Simulador() {
   const [escolaId, setEscolaId] = useState('');
   const [horario, setHorario] = useState('');
   const [simulando, setSimulando] = useState(false);
+  // Abertura do portão (ida), opcional: chegando antes, a van espera.
+  const [abertura, setAbertura] = useState('');
   const [erro, setErro] = useState('');
-  const [resultado, setResultado] = useState<ResultadoSimulacao | null>(null);
+  const [resultado, setResultado] = useState<AvaliacaoDetalhada | null>(null);
+  // A rota (ou a van) foi alterada depois que esta tela abriu: a simulação usa sempre o que está salvo agora.
+  const [rotaMudou, setRotaMudou] = useState(false);
+  const { destinosPorId } = useVitrine();
 
   useEffect(() => {
     let vivo = true;
@@ -75,40 +72,69 @@ function Simulador() {
   }, []);
 
   const rota = useMemo(() => rotas.find((r) => r.id === rotaId) ?? null, [rotas, rotaId]);
-  const veiculo = useMemo(() => veiculos.find((v) => v.id === rota?.veiculoId) ?? null, [veiculos, rota]);
-  const escolas = useMemo(() => (rota ? escolasDaRota(rota) : []), [rota]);
+  const escolas = useMemo(() => (rota ? escolasSimulaveis(rota, (id) => destinosPorId[id]?.nome) : []), [rota, destinosPorId]);
 
-  // Ao trocar de rota, ajusta a escola escolhida.
+  // Ao trocar de rota, ajusta a escola escolhida e limpa os horários do aluno.
   useEffect(() => {
     setResultado(null);
     setErro('');
+    setHorario('');
+    setAbertura('');
     if (!rota) return;
-    setEscolaId(escolasDaRota(rota)[0]?.id ?? '');
+    setEscolaId(escolasSimulaveis(rota)[0]?.id ?? '');
   }, [rota]);
-  // Horário sugerido É O DA ESCOLA ESCOLHIDA (mesma regra da busca das famílias):
-  // horário próprio da parada; o "último desembarque" só vale para a última
-  // escola da rota; por fim o padrão do turno.
-  useEffect(() => {
-    if (!rota) return;
-    const escolas = [...rota.paradas].filter((p) => p.tipo === 'escola').sort((a, b) => a.ordem - b.ordem);
-    const alvo = escolas.find((p) => p.destinoId === escolaId);
-    const ehUltima = !!alvo && alvo.ordem === escolas[escolas.length - 1]?.ordem;
-    const min = (alvo ? horarioDaEscola(alvo, rota.sentido) : null) ?? (ehUltima ? rota.ultimoDesembarqueMin : null) ?? limitePadraoDoTurno(rota.turno);
-    setHorario(min != null ? minutosParaTextoHora(min).replace('h', ':') : '');
-  }, [rota, escolaId]);
 
-  const horarioMin = /^\d{1,2}:\d{2}$/.test(horario) ? horaParaMinutos(horario) : null;
-  const prontoParaSimular = !!rota && !!casa && !!escolaId && horarioMin != null && nomeAluno.trim().length > 0;
+  const paraMin = (h: string) => (/^\d{1,2}:\d{2}$/.test(h) ? horaParaMinutos(h) : null);
+  const horarioMin = paraMin(horario);
+  const aberturaMin = paraMin(abertura);
+  // O MESMO pedido que a família faria na busca: casa, escola, sentido da rota e
+  // o horário do aluno (ida: prazo de chegada; volta: liberação). É ele que
+  // garante o mesmo resultado nas duas telas.
+  const pedido = useMemo<PedidoFamilia | null>(() => {
+    if (!rota || !casa || !escolaId) return null;
+    const catalogo = destinosPorId[escolaId];
+    return {
+      origem: { lat: casa.lat, lng: casa.lng }, destinoId: escolaId,
+      escolaPonto: catalogo && catalogo.lat != null && catalogo.lng != null ? { lat: catalogo.lat, lng: catalogo.lng } : null,
+      sentido: rota.sentido, turno: rota.turno, contratacao: 'mensal',
+      horarioFamiliaMin: horarioMin, aberturaEscolaMin: rota.sentido === 'ida' ? aberturaMin : null,
+    };
+  }, [rota, casa, escolaId, destinosPorId, horarioMin, aberturaMin]);
+  // Horário DA ESCOLA nesta rota (base do cálculo) — vem do cadastro, não do campo do aluno.
+  const ancora = useMemo(() => (rota && escolaId
+    ? ancoraHorarioEscola(rota, { origem: null, destinoId: escolaId, sentido: rota.sentido, turno: rota.turno, horarioFamiliaMin: horarioMin })
+    : null), [rota, escolaId, horarioMin]);
+  const horarioInvalido = horario !== '' && horarioMin == null;
+  const prontoParaSimular = !!pedido && !horarioInvalido && nomeAluno.trim().length > 0;
 
   async function onSimular() {
-    if (!rota || !casa || horarioMin == null) return;
-    setSimulando(true); setErro(''); setResultado(null);
+    if (!pedido) return;
+    const aberta = rotas.find((r) => r.id === rotaId) ?? null;
+    if (!aberta) return;
+    setSimulando(true); setErro(''); setResultado(null); setRotaMudou(false);
     try {
-      const aluno: AlunoNovo = { alunoId: 'novo-aluno', nome: nomeAluno.trim(), casa, escolaId };
+      // Avaliação antiga não vale: relê a rota e a van SALVAS agora. Se o
+      // motorista mudou alunos, escolas, horários, van, lugares ou monitor em
+      // outra tela, é com esses dados que a simulação é feita.
+      const [atual, vans] = await Promise.all([obterRota(aberta.id).catch(() => null), listarVeiculos().catch(() => null)]);
+      const rota = atual ?? aberta;
+      const frota = vans ?? veiculos;
+      const veiculo = frota.find((v) => v.id === rota.veiculoId) ?? null;
+      const antes = versaoDaAvaliacao(aberta, veiculos.find((v) => v.id === aberta.veiculoId) ?? null);
+      if (versaoDaAvaliacao(rota, veiculo) !== antes) {
+        setRotaMudou(true);
+        if (atual) setRotas((lista) => lista.map((r) => (r.id === atual.id ? atual : r)));
+        if (vans) setVeiculos(vans);
+        // A escola escolhida pode ter saído da rota nessa mudança.
+        if (!escolasSimulaveis(rota).some((e) => e.id === pedido.destinoId)) {
+          setErro('Esta rota foi alterada e não tem mais a escola escolhida. Escolha a escola de novo e simule.');
+          return;
+        }
+      }
       // Pontos reais -> matriz viária real (nunca linha reta).
-      const { pontos, faltamCoordenadas } = coletarPontos(rota, aluno);
+      const { pontos, faltamCoordenadas } = pontosDoPedido(rota, pedido);
       if (faltamCoordenadas.length > 0) {
-        setResultado(simularEncaixeRota(rota, veiculo, aluno, vazia(), { horarioEscolaMin: horarioMin }));
+        setResultado(avaliarRotaDetalhada(rota, veiculo, pedido, vazia()));
         return;
       }
       let matriz: MatrizViaria;
@@ -118,7 +144,7 @@ function Simulador() {
         if (e instanceof FalhaMatriz) { setErro(mensagemFalhaMatriz(e)); return; }
         throw e;
       }
-      setResultado(simularEncaixeRota(rota, veiculo, aluno, matriz, { horarioEscolaMin: horarioMin }));
+      setResultado(avaliarRotaDetalhada(rota, veiculo, pedido, matriz));
     } catch (e) {
       setErro('Não foi possível concluir a simulação: ' + (e as Error).message);
     } finally {
@@ -187,27 +213,48 @@ function Simulador() {
 
           {/* 4. Escola + turno/horário */}
           <div className="card mt-4 p-5">
-            <label className="field-label">Para qual escola desta rota?</label>
-            <select className="field-input appearance-none" value={escolaId} onChange={(e) => setEscolaId(e.target.value)}>
+            <label className="field-label">Para qual escola?</label>
+            <select className="field-input appearance-none" value={escolaId} onChange={(e) => { setEscolaId(e.target.value); setResultado(null); }}>
               {escolas.length === 0 && <option value="">Esta rota não tem escola cadastrada</option>}
-              {escolas.map((e) => <option key={e.id} value={e.id}>{e.nome}</option>)}
+              {escolas.map((e) => <option key={e.id} value={e.id}>{e.nome}{e.origem === 'aceita' ? ' — você aceita incluir (ainda sem parada)' : ''}</option>)}
             </select>
+            {escolas.find((e) => e.id === escolaId)?.origem === 'aceita' && (
+              <p className="mt-1 text-xs text-navy-500">Esta escola ainda não é parada da rota: a casa e a escola do aluno são calculadas juntas, como na busca das famílias.</p>
+            )}
+            {ancora && (
+              <p className="mt-2 text-xs text-navy-500">
+                {ancora.min == null ? 'Esta rota não tem horário para esta escola: o resultado ficará sem cálculo.'
+                  : ancora.fonte === 'turno' ? `Sem horário cadastrado para esta escola: usamos o padrão do período (${minutosParaTextoHora(ancora.min)}) e o resultado fica sob confirmação.`
+                  : ancora.fonte === 'familia' ? 'O motorista não informou horário para esta escola: vale o horário do aluno, abaixo.'
+                  : rota.sentido === 'ida'
+                    ? `Limite de chegada desta escola na rota: ${minutosParaTextoHora(ancora.min)} (a van é planejada para chegar ${MARGEM_OPERACIONAL_MIN} min antes).`
+                    : `Saída desta escola na rota: a partir de ${minutosParaTextoHora(ancora.min)}.`}
+              </p>
+            )}
 
             <label className="field-label mt-4">
-              {rota.sentido === 'ida' ? 'Horário máximo de chegada à escola' : 'Horário permitido de saída da escola'}
+              {rota.sentido === 'ida' ? 'O aluno precisa chegar à escola até (opcional)' : 'O aluno está liberado na escola a partir de (opcional)'}
             </label>
-            <input className="field-input" type="time" value={horario} onChange={(e) => setHorario(e.target.value)} />
+            <input className="field-input" type="time" value={horario} onChange={(e) => { setHorario(e.target.value); setResultado(null); }} />
             <p className="mt-1 text-xs text-navy-500">
               {rota.sentido === 'ida'
-                ? `Planejamos a van para chegar ${MARGEM_OPERACIONAL_MIN} minutos antes, sem nunca passar do horário-limite.`
-                : 'A van não sai da escola antes deste horário.'}
+                ? 'É o prazo do novo aluno. Não muda o horário da escola na rota: calculamos se dá para chegar até ele com os ajustes permitidos, sem prejudicar os atuais. Em branco = o horário da escola.'
+                : 'A van não busca o novo aluno antes deste horário. Em branco = o horário de saída da escola na rota.'}
             </p>
+
+            {rota.sentido === 'ida' && (
+              <>
+                <label className="field-label mt-4">A escola abre o portão às (opcional)</label>
+                <input className="field-input" type="time" value={abertura} onChange={(e) => { setAbertura(e.target.value); setResultado(null); }} />
+                <p className="mt-1 text-xs text-navy-500">Se a van chegar antes de a escola abrir, ela espera — e a entrega só conta a partir da abertura.</p>
+              </>
+            )}
           </div>
 
           <button className="btn btn-lg btn-primary mt-4 w-full" disabled={!prontoParaSimular || simulando} onClick={onSimular}>
             {simulando ? <><Loader2 className="h-5 w-5 animate-spin" /> Calculando com as ruas reais…</> : <>Simular inclusão <ArrowRight className="h-5 w-5" /></>}
           </button>
-          {!prontoParaSimular && <p className="mt-2 text-center text-xs text-navy-400">Preencha o aluno, o endereço, a escola e o horário para simular.</p>}
+          {!prontoParaSimular && <p className="mt-2 text-center text-xs text-navy-400">Preencha o aluno, o endereço e a escola para simular.</p>}
 
           {erro && (
             <p role="alert" className="mt-3 flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-sm text-amber-800">
@@ -215,7 +262,12 @@ function Simulador() {
             </p>
           )}
 
-          {resultado && <ResultadoEncaixe resultado={resultado} nomeAluno={nomeAluno.trim()} sentido={rota.sentido} />}
+          {rotaMudou && (
+            <p role="status" data-testid="rota-mudou" className="mt-3 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
+              Esta rota (ou a van) foi alterada depois que você abriu esta tela. A simulação abaixo já usa os dados salvos agora; resultados anteriores não valem mais.
+            </p>
+          )}
+          {resultado && <ResultadoEncaixe avaliacao={resultado} nomeAluno={nomeAluno.trim()} sentido={rota.sentido} />}
         </>
       )}
     </MotoristaShell>
@@ -226,31 +278,38 @@ const vazia = (): MatrizViaria => ({ origem: 'fixture-testada', obter: () => nul
 
 function mensagemFalhaMatriz(e: FalhaMatriz): string {
   if (e.codigo === 'sem_sessao') return 'Entre na sua conta de motorista (com Supabase ativo) para calcular trajetos reais.';
-  if (e.codigo === 'muitos_pontos') return 'Esta rota tem endereços demais para o cálculo automático. Reduza as paradas e tente de novo.';
-  return 'Não foi possível calcular os trajetos pelas ruas agora. Tente novamente em instantes.';
+  if (e.codigo === 'muitos_pontos') return 'Esta rota tem endereços demais para o cálculo automático: a avaliação não foi feita (isso não significa que o aluno não cabe).';
+  return 'Não foi possível calcular os trajetos pelas ruas agora: a avaliação não foi feita (isso não significa que o aluno não cabe). Tente novamente em instantes.';
 }
 
 /* ------------------------------- resultado ------------------------------- */
-function ResultadoEncaixe({ resultado, nomeAluno, sentido }: { resultado: ResultadoSimulacao; nomeAluno: string; sentido: 'ida' | 'volta' }) {
-  if (!resultado.elegivel || !resultado.opcao) {
+function ResultadoEncaixe({ avaliacao, nomeAluno, sentido }: { avaliacao: AvaliacaoDetalhada; nomeAluno: string; sentido: 'ida' | 'volta' }) {
+  const publico = avaliacao.publico;
+  const selo = seloDoResultado(publico);
+  const resultado: ResultadoSimulacao | null = avaliacao.simulacao;
+  const cabecalho = (
+    <div className={cn('flex items-center gap-3 p-5', selo.tom === 'ok' ? 'bg-mint-50 text-mint-900' : selo.tom === 'atencao' ? 'bg-amber-50 text-amber-900' : 'bg-navy-50 text-navy-900')}>
+      {selo.tom === 'ok' ? <ShieldCheck className="h-7 w-7 shrink-0" /> : <AlertTriangle className="h-7 w-7 shrink-0" />}
+      <div>
+        <h2 className="font-display text-lg font-extrabold">{selo.titulo}{publico.status === 'compativel' || publico.status === 'sob_confirmacao' ? ` — ${nomeAluno || 'o aluno'}` : ''}</h2>
+        <p className="text-sm">{selo.subtitulo}</p>
+        <p className="mt-1 text-xs opacity-80">É o mesmo resultado que a família recebe na busca para este pedido.</p>
+      </div>
+    </div>
+  );
+  if (!resultado || !resultado.elegivel || !resultado.opcao) {
     return (
       <section className="card mt-5 overflow-hidden">
-        <div className="flex items-center gap-3 bg-amber-50 p-5 text-amber-900">
-          <AlertTriangle className="h-7 w-7 shrink-0" />
-          <div>
-            <h2 className="font-display text-lg font-extrabold">Não foi possível encaixar este aluno</h2>
-            <p className="text-sm">Veja abaixo o motivo. Ajuste os dados e simule de novo.</p>
-          </div>
-        </div>
+        {cabecalho}
         <div className="p-5">
           <ul className="space-y-2">
-            {resultado.motivos.map((m, i) => (
+            {(resultado?.motivos.length ? resultado.motivos : [publico.motivo]).map((m, i) => (
               <li key={i} className="flex items-start gap-2 text-sm text-navy-700">
                 <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />{m}
               </li>
             ))}
           </ul>
-          <Explicacao linhas={resultado.explicacao} />
+          <Explicacao linhas={resultado?.explicacao} />
           <ConfirmacaoBloqueada elegivel={false} />
         </div>
       </section>
@@ -265,13 +324,7 @@ function ResultadoEncaixe({ resultado, nomeAluno, sentido }: { resultado: Result
 
   return (
     <section className="card mt-5 overflow-hidden">
-      <div className="flex items-center gap-3 bg-mint-50 p-5 text-mint-900">
-        <ShieldCheck className="h-7 w-7 shrink-0" />
-        <div>
-          <h2 className="font-display text-lg font-extrabold">Dá para encaixar {nomeAluno || 'o aluno'}</h2>
-          <p className="text-sm">Sem passar do horário da escola e respeitando quem já está na rota.</p>
-        </div>
-      </div>
+      {cabecalho}
 
       <div className="space-y-5 p-5">
         {resultado.classe && resultado.classe !== 'imediato' && (
@@ -280,14 +333,20 @@ function ResultadoEncaixe({ resultado, nomeAluno, sentido }: { resultado: Result
               ? `Exige sair ${resultado.antecipacaoMin} min mais cedo — dentro da antecipação que você já cadastrou para esta rota.`
               : (resultado.antecipacaoMin ?? 0) > 0
                 ? `Só cabe se você sair ${resultado.antecipacaoMin} min mais cedo, além do limite de antecipação cadastrado. A decisão é sua.`
-                : 'Só cabe mudando a ordem das paradas atuais. A decisão é sua.'}
+                : 'Depende da sua aprovação. A decisão é sua.'}
           </p>
+        )}
+        {resultado.aprovacoes.length > 0 && (
+          <ul className="list-disc space-y-1 pl-5 text-sm text-amber-900">{resultado.aprovacoes.map((a, i) => <li key={i}>{a}</li>)}</ul>
+        )}
+        {resultado.vagasNoTrecho != null && (
+          <p className="text-sm text-navy-600">{resultado.vagasNoTrecho} {resultado.vagasNoTrecho === 1 ? 'lugar livre' : 'lugares livres'} no trecho que o novo aluno ocupa (antes de incluí-lo).</p>
         )}
         <div className="grid grid-cols-2 gap-3">
           <Metrica rotulo={sentido === 'ida' ? 'Busca em casa' : 'Busca na escola'} valor={horaBusca} icon={sentido === 'ida' ? Home : School} />
           <Metrica rotulo={sentido === 'ida' ? 'Chegada à escola' : 'Chegada em casa'} valor={horaEntrega} icon={sentido === 'ida' ? School : Home} />
-          <Metrica rotulo="Tempo dentro da van" valor={`${o.minutosABordo} min`} icon={Clock} />
-          <Metrica rotulo="Tempo a mais no percurso" valor={`${o.desvioMin} min`} icon={ArrowRight} />
+          <Metrica rotulo="Tempo dentro da van" valor={`${Math.round(o.minutosABordo * 10) / 10} min`} icon={Clock} />
+          <Metrica rotulo="Tempo a mais no percurso" valor={`${Math.round(o.desvioMin * 10) / 10} min`} icon={ArrowRight} />
         </div>
 
         {/* Alterações de horário dos alunos existentes */}
@@ -302,7 +361,7 @@ function ResultadoEncaixe({ resultado, nomeAluno, sentido }: { resultado: Result
                   <span className="text-navy-700">{nome(a.id)}</span>
                   <span className="text-navy-500">
                     {minutosParaTextoHora(a.antesMin)} → <strong className="text-navy-800">{minutosParaTextoHora(a.depoisMin)}</strong>
-                    {' '}({a.diferencaMin > 0 ? '+' : ''}{a.diferencaMin} min)
+                    {' '}({a.diferencaMin > 0 ? '+' : ''}{Math.round(a.diferencaMin * 10) / 10} min)
                   </span>
                 </li>
               ))}
@@ -348,14 +407,21 @@ function ResultadoEncaixe({ resultado, nomeAluno, sentido }: { resultado: Result
 function ConfirmacaoBloqueada({ elegivel }: { elegivel: boolean }) {
   return (
     <div className="mt-5 rounded-xl border border-navy-200 bg-navy-50 p-4">
-      <button type="button" disabled className="btn btn-lg w-full cursor-not-allowed bg-navy-200 text-navy-500" aria-disabled>
+      {/* Sempre desativado enquanto CONFIRMACAO_DE_ENCAIXE_HABILITADA for false (ver simulador-encaixe.ts). */}
+      <button type="button" disabled={!CONFIRMACAO_DE_ENCAIXE_HABILITADA || !elegivel} className="btn btn-lg w-full cursor-not-allowed bg-navy-200 text-navy-500" aria-disabled data-testid="confirmar-inclusao">
         <Lock className="h-5 w-5" /> Confirmar inclusão
       </button>
       <p className="mt-2 text-xs text-navy-500">
         {elegivel
-          ? 'A confirmação definitiva ainda está desativada. Ela depende de uma gravação transacional no banco (migração já incluída no projeto) que precisa ser revisada e aplicada com segurança antes de liberar a reserva de vaga.'
-          : 'Uma simulação inviável nunca pode ser confirmada.'}
+          ? 'A confirmação por aqui está desativada: esta simulação não reserva vaga nem altera a rota. Para incluir o aluno, edite a rota no construtor (é o que passa a valer a partir da próxima viagem).'
+          : 'Uma simulação sem encaixe calculado nunca pode ser confirmada.'}
       </p>
+      {elegivel && (
+        <details className="mt-2 text-xs text-navy-500">
+          <summary className="cursor-pointer font-semibold">Por que ainda não dá para confirmar aqui</summary>
+          <ul className="mt-1 list-disc space-y-1 pl-5">{REQUISITOS_DA_CONFIRMACAO.map((r, i) => <li key={i}>{r}</li>)}</ul>
+        </details>
+      )}
     </div>
   );
 }
