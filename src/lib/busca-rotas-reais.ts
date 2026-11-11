@@ -7,6 +7,7 @@ import {
 } from '@/lib/rota-para-encaixe';
 import { haversineMetros, type MatrizViaria } from '@/lib/encaixe';
 import { capacidadeAlunos, vagasParaNovos } from '@/lib/ocupacao-rota';
+import { horarioDaEscola } from '@/lib/cadastro-rota';
 
 /** Distância máxima (m) de uma parada da rota à escola pedida para a rota ser
  *  CANDIDATA quando não atende a escola (Tier B). Pré-filtro barato: o motor
@@ -167,10 +168,10 @@ function ancoraHorarioEscola(rota: Rota, pedido: PedidoFamilia): { min: number |
     return { min: pedido.horarioEscolaMin, fonte: 'rota' };
   }
   const esc = escolaEscolhida(rota, pedido.destinoId);
-  // 2) Horário habitual de chegada da parada da escola escolhida (dado real).
-  if (esc && esc.alvo.horarioChegadaMin != null && Number.isFinite(esc.alvo.horarioChegadaMin)) {
-    return { min: esc.alvo.horarioChegadaMin, fonte: 'rota' };
-  }
+  // 2) Horário declarado da visita à escola escolhida (dado real): limite de
+  //    chegada na ida, liberação na volta; cadastro antigo: horário habitual.
+  const declarado = esc ? horarioDaEscola(esc.alvo, rota.sentido) : null;
+  if (declarado != null) return { min: declarado, fonte: 'rota' };
   // 3) Último desembarque só vale para a ÚLTIMA escola da rota.
   if (esc && esc.ehUltimaEscola && rota.ultimoDesembarqueMin != null && Number.isFinite(rota.ultimoDesembarqueMin)) {
     return { min: rota.ultimoDesembarqueMin, fonte: 'rota' };

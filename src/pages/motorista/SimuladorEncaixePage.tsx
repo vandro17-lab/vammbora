@@ -14,6 +14,7 @@ import {
   type ResultadoSimulacao, type AlunoNovo,
 } from '@/lib/rota-para-encaixe';
 import { obterMatrizViaria, FalhaMatriz } from '@/lib/matriz-viaria';
+import { horarioDaEscola } from '@/lib/cadastro-rota';
 import { minutosParaTextoHora, horaParaMinutos, TURNO_LABEL, nomeDestinoParaExibicao } from '@/lib/utils';
 
 function escolasDaRota(rota: Rota): { id: string; nome: string }[] {
@@ -92,7 +93,7 @@ function Simulador() {
     const escolas = [...rota.paradas].filter((p) => p.tipo === 'escola').sort((a, b) => a.ordem - b.ordem);
     const alvo = escolas.find((p) => p.destinoId === escolaId);
     const ehUltima = !!alvo && alvo.ordem === escolas[escolas.length - 1]?.ordem;
-    const min = alvo?.horarioChegadaMin ?? (ehUltima ? rota.ultimoDesembarqueMin : null) ?? limitePadraoDoTurno(rota.turno);
+    const min = (alvo ? horarioDaEscola(alvo, rota.sentido) : null) ?? (ehUltima ? rota.ultimoDesembarqueMin : null) ?? limitePadraoDoTurno(rota.turno);
     setHorario(min != null ? minutosParaTextoHora(min).replace('h', ':') : '');
   }, [rota, escolaId]);
 

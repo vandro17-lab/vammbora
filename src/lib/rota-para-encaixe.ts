@@ -17,6 +17,7 @@ import {
 } from '@/engine/encaixe-geografico';
 import { capacidadeAlunos, picoOcupacao } from '@/lib/ocupacao-rota';
 import { ESTIMATIVAS_INICIAIS, matrizConservadora, type EstimativasOperacionais } from '@/lib/inteligencia-operacional';
+import { atendimentoGrupo, horarioDaEscola } from '@/lib/cadastro-rota';
 
 /**
  * Adaptador do SIMULADOR de encaixe: converte a rota real do motorista
@@ -171,11 +172,13 @@ function motivosDe(codigos: CodigoMotivo[]): string[] {
 }
 
 /** Limite de chegada de UMA parada de escola, HONESTO: horário declarado da
- *  própria escola; e só a ÚLTIMA escola da rota herda o `ultimoDesembarqueMin`
+ *  própria escola (ida: limite de chegada; volta: liberação — no cadastro
+ *  antigo, o horário habitual da parada); e só a ÚLTIMA escola da rota herda o `ultimoDesembarqueMin`
  *  (senão seria o horário de OUTRA escola). Escola intermediária sem horário
  *  fica SEM limite rígido — o motor não inventa o que não sabe. */
 function limiteDaEscola(parada: ParadaRota, rota: Rota, ehUltimaEscola: boolean): number | undefined {
-  if (parada.horarioChegadaMin != null && Number.isFinite(parada.horarioChegadaMin)) return parada.horarioChegadaMin;
+  const declarado = horarioDaEscola(parada, rota.sentido);
+  if (declarado != null) return declarado;
   if (ehUltimaEscola && rota.ultimoDesembarqueMin != null && Number.isFinite(rota.ultimoDesembarqueMin)) return rota.ultimoDesembarqueMin;
   return undefined;
 }
@@ -215,7 +218,7 @@ function montarOperacional(
     // Marcador de escola carrega o limite mesmo sem passageiro descendo nela e
     // o tempo parado na escola (uma vez, para o grupo — não por aluno).
     if (ehEscola) {
-      compromissos.push({ id: 'escola:' + parada.id, ponto, tipo: 'escola', atendimentoMin: PARADA_ESCOLA_MIN, ...(limiteEscola != null ? { limiteEscolaMin: limiteEscola } : {}) });
+      compromissos.push({ id: 'escola:' + parada.id, ponto, tipo: 'escola', atendimentoMin: atendimentoGrupo(parada), ...(limiteEscola != null ? { limiteEscolaMin: limiteEscola } : {}) });
     }
     for (const pax of rota.passageiros.filter((x) => x.embarqueParadaId === parada.id)) {
       compromissos.push({ id: 'emb:' + pax.id, ponto, tipo: 'embarque', alunoId: pax.id, atendimentoMin: ehEscola ? 0 : atendimentoDe(pax) });

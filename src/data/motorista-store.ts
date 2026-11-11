@@ -1,5 +1,6 @@
-import type { Rota, Veiculo, OrigemAtendimento } from '@/types/motorista';
+import type { Rota, Veiculo, OrigemAtendimento, EscolaDisponivel } from '@/types/motorista';
 import { supabase, USE_SUPABASE, DEMO_MOTORISTA } from '@/lib/supabase';
+import { copiarRota, duracaoMin, normalizarEscolasDisponiveis } from '@/lib/cadastro-rota';
 
 /**
  * Padrão: banco real (Supabase) sempre que ele estiver configurado. O
@@ -183,17 +184,18 @@ export async function listarRotas(): Promise<Rota[]> {
     // libera rotas de demonstração e, para admin, as de todos).
     const ownerId = await usuarioLogadoId();
     if (!ownerId) return [];
-    const { data, error } = await supabase
-      .from('routes')
-      .select(
-        'id,name,direction,turno,days,vehicle_id,monitor,monitor_ocupa_lugar,reserved_seats,last_dropoff_min,early_leave_limit_min,status,is_published,updated_at,' +
-          'route_stops(id,ordem,type,label,lat,lng,confirmed,destination_id,leg_time_min,habitual_arrival_min),' +
-          'route_passengers(id,identificacao,board_stop_id,alight_stop_id,destination_id,' +
-          'horario_habitual_min,ajuste_antes_min,ajuste_depois_min,atendimento_min,atendimento_origem)',
-      )
+    const ler = (colunas: string) => supabase!
+      .from('routes').select(colunas)
       .eq('owner_id', ownerId)
       .eq('is_demo', false)
       .order('updated_at', { ascending: false });
+    let { data, error } = await ler(SELECT_ROTA);
+    // Banco ainda sem a migração da etapa 1 (coluna/tabela nova inexistente):
+    // lê só o que já existia. Os campos novos ficam "não informados".
+    if (error && ['42703', '42P01', 'PGRST200', 'PGRST204'].includes(String((error as { code?: string }).code))) {
+      console.warn('[rotas] banco sem a migração da etapa 1 — lendo o cadastro no formato anterior.');
+      ({ data, error } = await ler(SELECT_ROTA_LEGADO));
+    }
     if (error) throw erroDoBanco(error, 'rota');
     return (data ?? []).map(mapRotaDoBanco);
   }
@@ -205,8 +207,25 @@ export async function obterRota(id: string): Promise<Rota | null> {
   return todas.find((r) => r.id === id) ?? null;
 }
 
+const SELECT_ROTA_LEGADO =
+  'id,name,direction,turno,days,vehicle_id,monitor,monitor_ocupa_lugar,reserved_seats,last_dropoff_min,early_leave_limit_min,status,is_published,updated_at,' +
+  'route_stops(id,ordem,type,label,lat,lng,confirmed,destination_id,leg_time_min,habitual_arrival_min),' +
+  'route_passengers(id,identificacao,board_stop_id,alight_stop_id,destination_id,' +
+  'horario_habitual_min,ajuste_antes_min,ajuste_depois_min,atendimento_min,atendimento_origem)';
+/** Etapa 1 da busca/encaixe: saída habitual, período confirmado, visita à
+ *  escola (limite, liberação, tempo do grupo, portão) e escolas disponíveis. */
+const SELECT_ROTA =
+  'id,name,direction,turno,turno_confirmed,days,vehicle_id,monitor,monitor_ocupa_lugar,reserved_seats,last_dropoff_min,early_leave_limit_min,habitual_departure_min,availability_reviewed,status,is_published,updated_at,' +
+  'route_stops(id,ordem,type,label,lat,lng,confirmed,destination_id,leg_time_min,habitual_arrival_min,arrival_deadline_min,release_time_min,group_service_min,gate_custom),' +
+  'route_passengers(id,identificacao,board_stop_id,alight_stop_id,destination_id,' +
+  'horario_habitual_min,ajuste_antes_min,ajuste_depois_min,atendimento_min,atendimento_origem),' +
+  'route_school_availability(id,destination_id,days,gate_lat,gate_lng,arrival_deadline_min,release_time_min,group_service_min)';
+
 const minutoDoDia = (v: number | null | undefined): number | null =>
   typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1439 ? Math.round(v) : null;
+/** Inteiro de minutos 0..max; qualquer outra coisa = não informado. ZERO É ZERO. */
+const minutosInteiros = (v: number | null | undefined, max: number): number | null =>
+  typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.min(max, Math.round(v)) : null;
 
 /**
  * Deixa a rota no formato que o banco aceita, SEM perder paradas nem alunos:
@@ -214,7 +233,9 @@ const minutoDoDia = (v: number | null | undefined): number | null =>
  *    cenário de exemplo) ganham um UUID, e os vínculos embarque/desembarque
  *    são reapontados para o novo id;
  *  - paradas são renumeradas 0..n-1 na ordem atual;
- *  - coordenadas e horários inválidos viram "não informado".
+ *  - coordenadas e horários inválidos viram "não informado" (zero continua zero);
+ *  - dados de visita à escola só existem em parada de escola;
+ *  - escolas disponíveis: só do catálogo, sem repetir e sem as que já são parada.
  * A RPC apaga e recria paradas e alunos a cada salvamento — por isso a rota
  * enviada precisa estar sempre COMPLETA e coerente.
  */
@@ -229,6 +250,10 @@ export function normalizarRotaParaSalvar(rota: Rota): Rota {
       lat: temPonto ? p.lat : undefined, lng: temPonto ? p.lng : undefined,
       horarioChegadaMin: minutoDoDia(p.horarioChegadaMin),
       tempoAteProximaMin: typeof p.tempoAteProximaMin === 'number' && p.tempoAteProximaMin >= 0 ? Math.round(p.tempoAteProximaMin) : null,
+      portaoEspecifico: p.tipo === 'escola' && temPonto && !!p.portaoEspecifico,
+      limiteChegadaMin: p.tipo === 'escola' ? minutoDoDia(p.limiteChegadaMin) : null,
+      liberacaoMin: p.tipo === 'escola' ? minutoDoDia(p.liberacaoMin) : null,
+      atendimentoGrupoMin: p.tipo === 'escola' ? duracaoMin(p.atendimentoGrupoMin) : null,
     };
   });
   const vistos = new Set<string>();
@@ -240,10 +265,22 @@ export function normalizarRotaParaSalvar(rota: Rota): Rota {
       embarqueParadaId: x.embarqueParadaId ? idParada.get(x.embarqueParadaId) ?? null : null,
       desembarqueParadaId: x.desembarqueParadaId ? idParada.get(x.desembarqueParadaId) ?? null : null,
       horarioHabitualMin: minutoDoDia(x.horarioHabitualMin),
+      ajusteAntesMin: minutosInteiros(x.ajusteAntesMin, 120),
+      ajusteDepoisMin: minutosInteiros(x.ajusteDepoisMin, 120),
+      atendimentoMin: duracaoMin(x.atendimentoMin),
     };
   });
+  const idsEscola = new Set<string>();
+  const escolasDisponiveis: EscolaDisponivel[] = normalizarEscolasDisponiveis({ ...rota, paradas }).map((e) => {
+    const id = UUID_RE.test(e.id) && !idsEscola.has(e.id) ? e.id : novoId();
+    idsEscola.add(id);
+    return { ...e, id };
+  });
   return {
-    ...rota, id: UUID_RE.test(rota.id) ? rota.id : '', paradas, passageiros,
+    ...rota, id: UUID_RE.test(rota.id) ? rota.id : '', paradas, passageiros, escolasDisponiveis,
+    saidaHabitualMin: minutoDoDia(rota.saidaHabitualMin),
+    periodoConfirmado: !!rota.turno && !!rota.periodoConfirmado,
+    disponibilidadeRevisada: !!rota.disponibilidadeRevisada,
     ultimoDesembarqueMin: minutoDoDia(rota.ultimoDesembarqueMin),
     limiteAntecipacaoMin: typeof rota.limiteAntecipacaoMin === 'number' && rota.limiteAntecipacaoMin >= 0 ? Math.round(rota.limiteAntecipacaoMin) : null,
     lugaresReservados: Math.max(0, Math.round(rota.lugaresReservados || 0)),
@@ -255,6 +292,9 @@ export function validarRotaParaSalvar(rota: Rota): string | null {
   if (rota.sentido !== 'ida' && rota.sentido !== 'volta') return 'Escolha se a rota é de ida ou de volta.';
   if (rota.veiculoId && !UUID_RE.test(rota.veiculoId)) return 'Escolha uma van cadastrada na sua conta (a van de exemplo não pode ser usada).';
   if (rota.status === 'concluida' && !rota.veiculoId) return 'Escolha a van desta rota.';
+  // Toda escola vem do catálogo (o mesmo das famílias) e mantém o ID da unidade.
+  if (rota.status === 'concluida' && rota.paradas.some((p) => p.tipo === 'escola' && !p.destinoId)) return 'Há uma parada de escola sem escola escolhida. Escolha a escola na lista do catálogo.';
+  if ((rota.escolasDisponiveis ?? []).some((e) => !e.destinoId)) return 'Há uma escola disponível sem escola escolhida no catálogo.';
   const semEmbarque = rota.passageiros.find((x) => !x.embarqueParadaId);
   if (semEmbarque) return `O aluno "${semEmbarque.identificacao || 'sem nome'}" está sem parada de embarque.`;
   if (rota.passageiros.some((x) => !x.identificacao)) return 'Há um aluno sem identificação.';
@@ -303,6 +343,38 @@ export async function excluirRota(id: string): Promise<void> {
   lsSet(K_ROTAS, lista);
 }
 
+/** Cópia independente de uma rota (ainda não salva): novos ids, mesmos dados. */
+export function copiaDaRota(rota: Rota): Rota {
+  return copiarRota(rota, novoId);
+}
+
+/** Duplica uma rota salva e grava a cópia como rascunho não publicado. */
+export async function duplicarRota(id: string): Promise<Rota> {
+  const original = await obterRota(id);
+  if (!original) throw new Error('Rota não encontrada na sua conta.');
+  return salvarRota(copiaDaRota(original));
+}
+
+/**
+ * LISTA GERAL de escolas do motorista (perfil). Serve só para FACILITAR o
+ * preenchimento das escolas disponíveis de uma rota: nada daqui autoriza rota
+ * nenhuma sozinho — a escola só vale na rota em que o motorista a incluir.
+ * Sem banco, sem cadastro ou em caso de erro: lista vazia (é só uma ajuda).
+ */
+export async function listarEscolasGeraisDoMotorista(): Promise<string[]> {
+  if (!(USAR_BANCO_MOTORISTA && supabase)) return [];
+  try {
+    const ownerId = await usuarioLogadoId();
+    if (!ownerId) return [];
+    const { data, error } = await supabase.from('drivers').select('driver_destinations(destination_id)').eq('owner_id', ownerId).eq('is_demo', false);
+    if (error) return [];
+    const linhas = (data ?? []) as unknown as { driver_destinations: { destination_id: string }[] | null }[];
+    return [...new Set(linhas.flatMap((d) => (d.driver_destinations ?? []).map((x) => x.destination_id)))];
+  } catch {
+    return [];
+  }
+}
+
 /**
  * Publica/despublica uma rota na busca pública (ação explícita do motorista).
  * Atualização direta (RLS: o dono pode alterar sua própria rota) — NÃO passa
@@ -322,12 +394,23 @@ export async function publicarRota(id: string, publicar: boolean): Promise<void>
 interface LinhaStop {
   id: string; ordem: number; type: string; label: string | null;
   lat: number | null; lng: number | null; confirmed: boolean; destination_id: string | null; leg_time_min: number | null; habitual_arrival_min?: number | null;
+  arrival_deadline_min?: number | null; release_time_min?: number | null; group_service_min?: number | string | null; gate_custom?: boolean | null;
 }
+interface LinhaEscolaDisponivel {
+  id: string; destination_id: string; days: string[] | null; gate_lat: number | null; gate_lng: number | null;
+  arrival_deadline_min: number | null; release_time_min: number | null; group_service_min: number | string | null;
+}
+/** numeric do Postgres pode chegar como texto: vira número; NULL continua NULL. */
+const numeroOuNulo = (v: number | string | null | undefined): number | null => {
+  if (v == null || v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+};
 interface LinhaPax {
   id: string; identificacao: string; board_stop_id: string | null;
   alight_stop_id: string | null; destination_id: string | null;
   horario_habitual_min?: number | null; ajuste_antes_min?: number | null;
-  ajuste_depois_min?: number | null; atendimento_min?: number | null;
+  ajuste_depois_min?: number | null; atendimento_min?: number | string | null;
   atendimento_origem?: string | null;
 }
 interface LinhaRota {
@@ -335,7 +418,8 @@ interface LinhaRota {
   vehicle_id: string | null; monitor: boolean; monitor_ocupa_lugar: boolean; reserved_seats: number;
   last_dropoff_min: number | null; early_leave_limit_min: number | null; status: string; updated_at: string;
   is_published?: boolean | null;
-  route_stops: LinhaStop[]; route_passengers: LinhaPax[];
+  habitual_departure_min?: number | null; turno_confirmed?: boolean | null; availability_reviewed?: boolean | null;
+  route_stops: LinhaStop[]; route_passengers: LinhaPax[]; route_school_availability?: LinhaEscolaDisponivel[] | null;
 }
 
 export function mapRotaDoBanco(r: unknown): Rota {
@@ -345,13 +429,22 @@ export function mapRotaDoBanco(r: unknown): Rota {
     nome: x.name ?? '',
     sentido: (x.direction as Rota['sentido']) ?? 'ida',
     turno: (x.turno as Rota['turno']) ?? null,
+    periodoConfirmado: !!x.turno_confirmed,
     dias: x.days ?? [],
     veiculoId: x.vehicle_id,
     monitor: x.monitor,
     monitorOcupaLugar: x.monitor_ocupa_lugar,
     lugaresReservados: x.reserved_seats,
     ultimoDesembarqueMin: x.last_dropoff_min,
+    saidaHabitualMin: x.habitual_departure_min ?? null,
     limiteAntecipacaoMin: x.early_leave_limit_min,
+    disponibilidadeRevisada: !!x.availability_reviewed,
+    escolasDisponiveis: (x.route_school_availability ?? []).map((e) => ({
+      id: e.id, destinoId: e.destination_id, dias: e.days ?? null,
+      portaoLat: e.gate_lat ?? null, portaoLng: e.gate_lng ?? null,
+      limiteChegadaMin: e.arrival_deadline_min ?? null, liberacaoMin: e.release_time_min ?? null,
+      atendimentoGrupoMin: numeroOuNulo(e.group_service_min),
+    })),
     status: (x.status as Rota['status']) ?? 'rascunho',
     isPublished: !!x.is_published,
     atualizadoEm: x.updated_at,
@@ -360,6 +453,8 @@ export function mapRotaDoBanco(r: unknown): Rota {
         id: s.id, ordem: s.ordem, tipo: s.type as 'saida' | 'casa' | 'escola',
         rotulo: s.label ?? '', lat: s.lat ?? undefined, lng: s.lng ?? undefined,
         confirmado: s.confirmed, destinoId: s.destination_id, tempoAteProximaMin: s.leg_time_min, horarioChegadaMin: s.habitual_arrival_min ?? null,
+        portaoEspecifico: !!s.gate_custom, limiteChegadaMin: s.arrival_deadline_min ?? null,
+        liberacaoMin: s.release_time_min ?? null, atendimentoGrupoMin: numeroOuNulo(s.group_service_min),
       }))
       .sort((a, b) => a.ordem - b.ordem),
     passageiros: (x.route_passengers ?? []).map((p) => ({
@@ -369,7 +464,7 @@ export function mapRotaDoBanco(r: unknown): Rota {
       horarioHabitualMin: p.horario_habitual_min ?? null,
       ajusteAntesMin: p.ajuste_antes_min ?? null,
       ajusteDepoisMin: p.ajuste_depois_min ?? null,
-      atendimentoMin: p.atendimento_min ?? null,
+      atendimentoMin: numeroOuNulo(p.atendimento_min),
       atendimentoOrigem: (p.atendimento_origem as OrigemAtendimento | null) ?? null,
     })),
   };
@@ -388,11 +483,16 @@ export function rotaParaBanco(r: Rota): unknown {
     reserved_seats: r.lugaresReservados,
     last_dropoff_min: r.ultimoDesembarqueMin,
     early_leave_limit_min: r.limiteAntecipacaoMin,
+    habitual_departure_min: r.saidaHabitualMin ?? null,
+    turno_confirmed: !!r.periodoConfirmado,
+    availability_reviewed: !!r.disponibilidadeRevisada,
     status: r.status,
     stops: r.paradas.map((p) => ({
       id: p.id, ordem: p.ordem, type: p.tipo, label: p.rotulo,
       lat: p.lat ?? null, lng: p.lng ?? null, confirmed: p.confirmado,
       destination_id: p.destinoId ?? null, leg_time_min: p.tempoAteProximaMin ?? null, habitual_arrival_min: p.horarioChegadaMin ?? null,
+      arrival_deadline_min: p.limiteChegadaMin ?? null, release_time_min: p.liberacaoMin ?? null,
+      group_service_min: p.atendimentoGrupoMin ?? null, gate_custom: !!p.portaoEspecifico,
     })),
     passengers: r.passageiros.map((p) => ({
       id: p.id, identificacao: p.identificacao,
@@ -403,6 +503,13 @@ export function rotaParaBanco(r: Rota): unknown {
       ajuste_depois_min: p.ajusteDepoisMin ?? null,
       atendimento_min: p.atendimentoMin ?? null,
       atendimento_origem: p.atendimentoOrigem ?? null,
+    })),
+    // Escolas que o motorista aceita incluir NESTA rota (não são paradas).
+    school_availability: (r.escolasDisponiveis ?? []).map((e) => ({
+      id: e.id, destination_id: e.destinoId, days: e.dias ?? null,
+      gate_lat: e.portaoLat ?? null, gate_lng: e.portaoLng ?? null,
+      arrival_deadline_min: e.limiteChegadaMin ?? null, release_time_min: e.liberacaoMin ?? null,
+      group_service_min: e.atendimentoGrupoMin ?? null,
     })),
   };
 }

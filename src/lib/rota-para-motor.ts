@@ -1,4 +1,4 @@
-import { PARADA_ESCOLA_MIN, atendimentoNaCasa } from '@/lib/tempos-parada';
+import { atendimentoNaCasa } from '@/lib/tempos-parada';
 import type { Rota, Veiculo, PassageiroRota } from '@/types/motorista';
 import {
   planejarRota,
@@ -9,6 +9,7 @@ import {
   type AvaliacaoCandidata,
 } from '@/engine/planejamento';
 import { capacidadeAlunos } from '@/lib/ocupacao-rota';
+import { atendimentoGrupo } from '@/lib/cadastro-rota';
 
 /**
  * Adaptador: converte a rota do cadastro (telas/banco) na ENTRADA do motor
@@ -85,7 +86,7 @@ export function montarEntradaMotor(rota: Rota, veiculo: Veiculo | null): RotaPla
       ? rota.passageiros.filter((x) => (rota.sentido === 'ida' ? x.embarqueParadaId : x.desembarqueParadaId) === p.id)
       : [];
     const naEscola = p.tipo === 'escola' && embarques.length + desembarques.length > 0;
-    const atendimentoMin = naEscola ? PARADA_ESCOLA_MIN : atendidos.reduce((s, x) => s + atendimentoNaCasa(x), 0);
+    const atendimentoMin = naEscola ? atendimentoGrupo(p) : atendidos.reduce((s, x) => s + atendimentoNaCasa(x), 0);
     const janela = intersecaoJanelas(atendidos);
     return { id: p.id, embarques, desembarques, atendimentoMin, ...(janela ? { janela } : {}) };
   });
