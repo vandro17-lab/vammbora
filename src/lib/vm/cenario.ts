@@ -165,7 +165,13 @@ export function calcularIndicadores(d: DadosMotorista): Indicadores {
   const capacidade = veiculo ? capacidadeAlunos(rotas[0] ?? ({ monitor: false, monitorOcupaLugar: false, lugaresReservados: 0 } as Rota), veiculo) : 0;
   const pico = rotas.reduce((m, r) => Math.max(m, picoOcupacao(r)), 0);
   const ocupacaoPct = capacidade > 0 ? Math.round((pico / capacidade) * 100) : 0;
-  const vagas = Math.max(0, capacidade - pico);
+  // Lugares livres no trecho MAIS CHEIO, rota a rota — cada rota com o SEU
+  // monitor e as SUAS reservas (a capacidade muda com a van e com a rota).
+  // É um resumo do painel: a vaga de um novo aluno é decidida por trecho, no
+  // cálculo de encaixe, e pode existir mesmo com este número em zero.
+  const vagas = veiculo && rotas.length
+    ? Math.max(0, Math.min(...rotas.map((r) => capacidadeAlunos(r, veiculo) - picoOcupacao(r))))
+    : Math.max(0, capacidade - pico);
 
   // Distância do dia = soma das rotas (ida + volta).
   const distanciaDiaKm = rotas.reduce((s, r) => s + distanciaRotaKm(r), 0);

@@ -7,7 +7,7 @@ import type { CartaoRotaRealDados } from '@/lib/busca-rotas-reais-cliente';
  * Mostra o horário estimado conforme o sentido, calculado pelo motor — sempre
  * rotulado como ESTIMATIVA, nunca como confirmado.
  */
-export function CartaoRotaReal({ r }: { r: CartaoRotaRealDados }) {
+export function CartaoRotaReal({ r, onInteresse }: { r: CartaoRotaRealDados; onInteresse?: (r: CartaoRotaRealDados) => void }) {
   const hora = (m: number | null) => (m != null ? minutosParaTextoHora(m) : '—');
   const compat = r.status === 'compativel';
   const ida = r.sentido === 'ida';
@@ -83,6 +83,16 @@ export function CartaoRotaReal({ r }: { r: CartaoRotaRealDados }) {
         <p className="text-xs font-semibold leading-snug text-amber-700">Horários aproximados pela distância, sem consulta às ruas — não comprovam que cabe.</p>
       )}
       <p className="text-xs leading-snug text-navy-400">{r.motivo}</p>
+
+      {onInteresse && (r.demo ? (
+        // Rota fictícia: não recebe pedidos (não se mistura com disponibilidade real).
+        <p className="rounded-xl bg-amber-50 p-2.5 text-center text-xs font-semibold text-amber-800">Rota de demonstração — não recebe pedidos.</p>
+      ) : (
+        <>
+          <button type="button" className="btn btn-primary w-full" onClick={() => onInteresse(r)}>Tenho interesse nesta rota</button>
+          <p className="text-center text-[11px] leading-snug text-navy-400">Demonstrar interesse não reserva vaga.</p>
+        </>
+      ))}
     </div>
   );
 }

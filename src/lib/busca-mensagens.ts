@@ -10,7 +10,7 @@ import type { RespostaBuscaReal, SituacaoSentido } from '@/lib/busca-rotas-reais
  * Nenhum texto cita aluno, endereço ou horário de quem já está na rota.
  */
 
-export type TipoAviso = 'sem_oferta' | 'incompativel' | 'dados_insuficientes' | 'avaliacao_incompleta' | 'erro';
+export type TipoAviso = 'sem_oferta' | 'incompativel' | 'dados_insuficientes' | 'avaliacao_incompleta' | 'erro' | 'reavaliada' | 'so_demonstracao';
 export interface AvisoBusca { tipo: TipoAviso; texto: string; acao?: 'continuar' | 'tentar' }
 
 const rotas = (n: number) => (n === 1 ? '1 rota' : `${n} rotas`);
@@ -21,10 +21,16 @@ export function avisosDoSentido(s: SituacaoSentido): AvisoBusca[] {
     return [{ tipo: 'erro', acao: 'tentar', texto: `Não foi possível consultar as rotas de ${nomeSentido(s.sentido)} agora. O que já apareceu continua valendo.` }];
   }
   if (s.estado !== 'ok') return [];
-  if (s.candidatas === 0) {
-    return [{ tipo: 'sem_oferta', texto: `Ainda não há rota de ${nomeSentido(s.sentido)} cadastrada que visite esta escola ou aceite incluí-la.` }];
-  }
   const out: AvisoBusca[] = [];
+  if (s.reavaliada) {
+    out.push({ tipo: 'reavaliada', texto: `As rotas de ${nomeSentido(s.sentido)} foram alteradas pelos motoristas enquanto você olhava. Descartamos o cálculo anterior e refizemos a avaliação com os dados atuais.` });
+  }
+  if (s.candidatas === 0) {
+    return [...out, { tipo: 'sem_oferta', texto: `Ainda não há rota de ${nomeSentido(s.sentido)} cadastrada que visite esta escola ou aceite incluí-la.` }];
+  }
+  if (s.demonstrativas > 0 && s.encontradas === 0) {
+    out.push({ tipo: 'so_demonstracao', texto: `As rotas de ${nomeSentido(s.sentido)} mostradas são de demonstração (fictícias): não representam vaga real nem recebem pedidos.` });
+  }
   if (s.avaliacaoIncompleta > 0) {
     const n = s.avaliacaoIncompleta;
     out.push({

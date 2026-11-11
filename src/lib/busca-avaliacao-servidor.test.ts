@@ -72,7 +72,7 @@ describe('[simulado] sem consulta real nada é confirmado nem recusado', () => {
     const consultar = provedorSimulado({ falhar: () => fora });
     const r1 = await avaliarComTemposReais([entrada(rotaIda())], P650, { consultar, maxConsultas: 8 });
     expect(r1.resultados[0]).toMatchObject({ status: 'indeterminado', pendencia: 'avaliacao_incompleta' });
-    expect(r1.continuacao).toEqual({ inicio: 1, repetir: ['rota-ida'] });
+    expect(r1.continuacao).toMatchObject({ inicio: 1, repetir: ['rota-ida'] });
     fora = false;
     const r2 = await avaliarComTemposReais([entrada(rotaIda())], P650, { consultar, maxConsultas: 8, continuacao: r1.continuacao });
     expect(r2.resultados[0]).toMatchObject({ status: 'compativel', horarioEscolaMin: HM(6, 50) });
@@ -92,11 +92,11 @@ describe('[simulado] candidata viável FORA do primeiro lote', () => {
     expect(r1.aguardando).toBe(3);
     expect(r1.totalRotasAvaliadas).toBe(5);
     expect(r1.inconclusivas).toBe(3); // aguardando conta como "ainda sem veredito", nunca como recusa
-    expect(r1.continuacao).toEqual({ inicio: 2, repetir: [] });
+    expect(r1.continuacao).toMatchObject({ inicio: 2, repetir: [] });
 
     const r2 = await avaliarComTemposReais(entradas(), P650, { consultar, maxConsultas: 2, continuacao: r1.continuacao });
     expect(ids(r2)).toEqual(['a3', 'a4']);
-    expect(r2.continuacao).toEqual({ inicio: 4, repetir: [] });
+    expect(r2.continuacao).toMatchObject({ inicio: 4, repetir: [] });
 
     const r3 = await avaliarComTemposReais(entradas(), P650, { consultar, maxConsultas: 2, continuacao: r2.continuacao });
     expect(de(r3, 'v-viavel')).toMatchObject({ status: 'compativel', horarioEscolaMin: HM(6, 50), temposEstimados: false });
@@ -124,16 +124,16 @@ describe('[simulado] candidata viável FORA do primeiro lote', () => {
     };
     const r1 = await rodar(null, ['a1', 'a2']);
     expect(r1.resultados.map((x) => x.pendencia)).toEqual(['avaliacao_incompleta', 'avaliacao_incompleta']);
-    expect(r1.continuacao).toEqual({ inicio: 2, repetir: ['a1', 'a2'] });
+    expect(r1.continuacao).toMatchObject({ inicio: 2, repetir: ['a1', 'a2'] });
     // 2ª chamada: NÃO insiste em a1/a2 — avança para a3 e a4.
     const r2 = await rodar(r1.continuacao, ['a3', 'a4']);
     expect(ids(r2)).toEqual(['a3', 'a4']);
-    expect(r2.continuacao).toEqual({ inicio: 4, repetir: ['a1', 'a2'] });
+    expect(r2.continuacao).toMatchObject({ inicio: 4, repetir: ['a1', 'a2'] });
     // 3ª chamada: a viável (nova) primeiro; com o que sobra, repete a1.
     const r3 = await rodar(r2.continuacao, ['v-viavel', 'a1']);
     expect(de(r3, 'v-viavel')).toMatchObject({ status: 'compativel' });
     expect(de(r3, 'a1')).toMatchObject({ status: 'indeterminado', pendencia: 'avaliacao_incompleta' });
-    expect(r3.continuacao).toEqual({ inicio: 5, repetir: ['a1', 'a2'] });
+    expect(r3.continuacao).toMatchObject({ inicio: 5, repetir: ['a1', 'a2'] });
   });
 });
 
@@ -191,7 +191,7 @@ describe('[simulado] EXCESSO DE PONTOS', () => {
     const p = pedido(pt(2000, 100), { horarioFamiliaMin: HM(7, 40) });
     const r1 = await avaliarComTemposReais([{ rota: longa, veiculo: van(40) }], p, { consultar, maxConsultas: 8 });
     expect(r1.resultados[0]).toMatchObject({ status: 'indeterminado', pendencia: 'avaliacao_incompleta' });
-    expect(r1.continuacao).toEqual({ inicio: 1, repetir: ['longa'] });
+    expect(r1.continuacao).toMatchObject({ inicio: 1, repetir: ['longa'] });
     const r2 = await avaliarComTemposReais([{ rota: longa, veiculo: van(40) }], p, { consultar, maxConsultas: 8, continuacao: r1.continuacao });
     expect(r2.resultados[0].status === 'compativel' || r2.resultados[0].status === 'sob_confirmacao').toBe(true);
     expect(r2.continuacao).toBeNull();

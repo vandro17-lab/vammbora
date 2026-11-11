@@ -142,7 +142,7 @@ describe('api/buscar-rotas (handler, mock Supabase)', () => {
     const out = JSON.parse(res.body);
     expect(res.statusCode).toBe(200);
     expect(out.resultados[0]).toMatchObject({ status: 'indeterminado', pendencia: 'avaliacao_incompleta', horarioEscolaMin: null });
-    expect(out.continuacao).toEqual({ inicio: 1, repetir: ['rota-1'] });
+    expect(out.continuacao).toMatchObject({ inicio: 1, repetir: ['rota-1'] });
   });
 
   it('rota de outro turno (ida) não é avaliada', async () => {
@@ -205,7 +205,7 @@ describe('api/buscar-rotas (handler, mock Supabase)', () => {
     // Só uma coube no orçamento desta chamada; a outra AGUARDA (não vira recusa nem some).
     expect(out.resultados).toHaveLength(1);
     expect(out.aguardando).toBe(1);
-    expect(out.continuacao).toEqual({ inicio: 1, repetir: [] });
+    expect(out.continuacao).toMatchObject({ inicio: 1, repetir: [] });
     expect(out.inconclusivas).toBeGreaterThanOrEqual(1);
     expect(out.resultados.some((r: { status: string; temposEstimados: boolean }) => r.status === 'incompativel' && r.temposEstimados)).toBe(false);
     // Continuar calcula a que ficou de fora — e a fila acaba.
@@ -233,7 +233,8 @@ describe('api/buscar-rotas (handler, mock Supabase)', () => {
       String(C.casaA.lat), String(C.casaA.lng), String(C.casaB.lat), String(C.casaB.lng), String(C.garagem.lat)];
     const conferir = (corpo: string) => { for (const p of privados) expect(corpo, `vazou "${p}"`).not.toContain(p); };
     const campos = ['rotaId', 'rotaNome', 'demo', 'precoMensal', 'precoTipo', 'vanLugares', 'vagas', 'atendeEscola', 'origemEscola', 'sentido', 'status', 'pendencia',
-      'passagemCasaMin', 'horarioEscolaMin', 'minutosABordo', 'fonteHorario', 'temposEstimados', 'motivo'].sort();
+      'passagemCasaMin', 'horarioEscolaMin', 'minutosABordo', 'fonteHorario', 'temposEstimados', 'motivo',
+      'versao'].sort(); // `versao`: resumo opaco da rota + van avaliadas (não revela dado; serve para invalidar avaliação antiga)
     const rodar = async (corpo: unknown) => { const res = fakeRes(); await handler(fakeReq(corpo), res as never); conferir(res.body); return JSON.parse(res.body); };
 
     estado.canned = { routes: [rotaRealCanon()], vehicles: [{ id: 'veic-1', seats_passenger: 6 }] };

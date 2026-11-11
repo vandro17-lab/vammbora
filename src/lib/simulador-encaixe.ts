@@ -39,3 +39,23 @@ export function seloDoResultado(p: ResultadoRotaReal): { titulo: string; subtitu
   if (p.pendencia === 'avaliacao_incompleta') return { tom: 'atencao', titulo: 'Avaliação incompleta', subtitulo: 'O cálculo não foi concluído — isso não significa que o aluno não cabe.' };
   return { tom: 'atencao', titulo: 'Faltam dados para calcular', subtitulo: 'Complete o cadastro da rota para avaliar este aluno.' };
 }
+
+/* ------------------------- confirmação da inclusão ------------------------- */
+
+/**
+ * A CONFIRMAÇÃO DEFINITIVA do encaixe (gravar o novo aluno na rota a partir de
+ * uma simulação) está DESATIVADA. Não ligue esta chave sem cumprir TODOS os
+ * requisitos abaixo — a função `confirmar_encaixe_rota` da migração 0009 não os
+ * cumpre (ver `docs/REVISAO-FLUXOS-AFETADOS.md`, seção "Confirmação").
+ */
+export const CONFIRMACAO_DE_ENCAIXE_HABILITADA = false as const;
+
+/** O que falta para a confirmação poder ser ligada com segurança. */
+export const REQUISITOS_DA_CONFIRMACAO: readonly string[] = [
+  'Revalidar no SERVIDOR a versão da rota e da van usadas na simulação (rota, alunos, escolas, horários, lugares, reservas e monitor).',
+  'Recalcular no SERVIDOR horários e capacidade por trecho com trajetos reais imediatamente antes de gravar — hoje a validação é só do navegador.',
+  'Gravar de forma atômica a parada (ou as paradas, quando a escola entra junto), a renumeração da ordem e o aluno, com os campos de compromisso (horário, flexibilidade, atendimento).',
+  'Bloquear duas inclusões simultâneas na mesma última vaga (trava da rota + conferência de versão + capacidade conferida dentro da transação).',
+  'Registrar a aprovação do motorista quando o encaixe depende dela (sair mais cedo, mudar a ordem, incluir escola).',
+  'Não alterar viagens em andamento: a rota confirmada vale a partir da próxima viagem.',
+];

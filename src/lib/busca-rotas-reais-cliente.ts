@@ -53,12 +53,15 @@ export interface CartaoRotaRealDados {
   /** Tempos de trajeto estimados (sem consulta viária): nunca "compatível". */
   temposEstimados?: boolean;
   motivo: string;
+  /** Versão (opaca) da rota + van avaliadas. Vai junto no pedido de interesse
+   *  para o motorista saber sobre QUAL versão da rota a conta foi feita. */
+  versao?: string | null;
 }
 
 export type EstadoBuscaReal = 'nao_configurado' | 'ok' | 'erro';
 export type Sentido = 'ida' | 'volta';
 /** Posição na fila de avaliação do servidor (devolvida por ele; o cliente só reenvia). */
-export interface ContinuacaoBusca { inicio: number; repetir: string[] }
+export interface ContinuacaoBusca { inicio: number; repetir: string[]; assinatura?: string }
 
 export const sentidosDe = (m: ModalidadeTrajeto): Sentido[] => (m === 'ambos' ? ['ida', 'volta'] : [m]);
 export const mostravel = (s: StatusBuscaReal) => s === 'compativel' || s === 'sob_confirmacao';
@@ -71,8 +74,11 @@ export interface SituacaoSentido {
   estado: EstadoBuscaReal;
   /** Rotas deste sentido que visitam/aceitam a escola. 0 = AUSÊNCIA DE OFERTA. */
   candidatas: number;
-  /** Cartões exibíveis (compatível / sob confirmação). */
+  /** Cartões exibíveis (compatível / sob confirmação) de rotas REAIS. */
   encontradas: number;
+  /** Cartões exibíveis de rotas de DEMONSTRAÇÃO (fictícias): aparecem rotulados,
+   *  mas não contam como disponibilidade real nem recebem pedidos. */
+  demonstrativas: number;
   /** INCOMPATIBILIDADE comprovada com trajetos reais. */
   incompativeis: number;
   /** DADOS INSUFICIENTES no cadastro da rota (repetir não resolve). */
@@ -84,6 +90,9 @@ export interface SituacaoSentido {
   continuacao: ContinuacaoBusca | null;
   /** O ambiente não tem provedor viário (continuar não adianta). */
   semProvedor: boolean;
+  /** As rotas mudaram entre uma consulta e outra: os resultados antigos deste
+   *  sentido foram descartados e a avaliação recomeçou. */
+  reavaliada?: boolean;
 }
 
 export interface RespostaBuscaReal {
@@ -101,7 +110,7 @@ export interface RespostaBuscaReal {
 
 interface RespostaServidor {
   resultados?: CartaoRotaRealDados[]; totalRotasAvaliadas?: number; inconclusivas?: number;
-  aguardando?: number; continuacao?: ContinuacaoBusca | null; semProvedor?: boolean;
+  aguardando?: number; continuacao?: ContinuacaoBusca | null; semProvedor?: boolean; reiniciada?: boolean;
 }
 interface RespostaSentido { estado: EstadoBuscaReal; dados: RespostaServidor | null }
 
@@ -115,7 +124,8 @@ function situacaoDe(sentido: Sentido, estado: EstadoBuscaReal, lista: CartaoRota
   return {
     sentido, estado,
     candidatas: Math.max(d?.totalRotasAvaliadas ?? 0, lista.length + aguardando),
-    encontradas: lista.filter((x) => mostravel(x.status)).length,
+    encontradas: lista.filter((x) => mostravel(x.status) && !x.demo).length,
+    demonstrativas: lista.filter((x) => mostravel(x.status) && !!x.demo).length,
     incompativeis: lista.filter((x) => x.status === 'incompativel').length,
     dadosInsuficientes: dados,
     avaliacaoIncompleta: indeterminadas.length - dados + aguardando,
@@ -212,13 +222,19 @@ export async function continuarBuscaReal(
       sentidos.push(s.estado === 'ok' ? s : { ...s, estado });
       continue;
     }
+    // As rotas (ou a van) foram editadas desde o lote anterior: o que estava
+    // guardado para este sentido não vale mais — descarta e recomeça do que veio.
+    if (dados.reiniciada) for (const k of [...porChave.keys()]) if (k.startsWith(s.sentido + ':')) porChave.delete(k);
     for (const novo of dados.resultados ?? []) {
       const antigo = porChave.get(chave(novo));
       if (antigo && mostravel(antigo.status) && !mostravel(novo.status) && novo.status !== 'incompativel') continue; // preserva o válido
       porChave.set(chave(novo), novo);
     }
     const lista = [...porChave.values()].filter((x) => x.sentido === s.sentido);
-    sentidos.push(situacaoDe(s.sentido, 'ok', lista, { ...dados, totalRotasAvaliadas: Math.max(dados.totalRotasAvaliadas ?? 0, s.candidatas) }));
+    sentidos.push({
+      ...situacaoDe(s.sentido, 'ok', lista, dados.reiniciada ? dados : { ...dados, totalRotasAvaliadas: Math.max(dados.totalRotasAvaliadas ?? 0, s.candidatas) }),
+      ...(dados.reiniciada ? { reavaliada: true } : {}),
+    });
   }
   return montar(sentidos, [...porChave.values()]);
 }

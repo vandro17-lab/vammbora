@@ -121,7 +121,8 @@ function lerContinuacao(v: unknown): Continuacao | null {
   const c = v as { inicio?: unknown; repetir?: unknown };
   const inicio = typeof c.inicio === 'number' && Number.isInteger(c.inicio) && c.inicio >= 0 && c.inicio <= 100000 ? c.inicio : 0;
   const repetir = Array.isArray(c.repetir) ? c.repetir.filter((x): x is string => typeof x === 'string' && x.length > 0 && x.length <= 64).slice(0, 40) : [];
-  return { inicio, repetir };
+  const assinatura = typeof (c as { assinatura?: unknown }).assinatura === 'string' ? String((c as { assinatura?: unknown }).assinatura).slice(0, 40) : undefined;
+  return { inicio, repetir, ...(assinatura !== undefined ? { assinatura } : {}) };
 }
 
 export default async function handler(req: IncomingMessage, res: ServerResponse) {
@@ -214,7 +215,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
 
     const linhas = (rotas ?? []) as unknown as LinhaRota[];
     const semNada = { candidatas: 0, compativeis: 0, sobConfirmacao: 0, incompativeis: 0, dadosInsuficientes: 0, avaliacaoIncompleta: 0 };
-    if (linhas.length === 0) return reply(res, 200, { resultados: [], totalRotasAvaliadas: 0, inconclusivas: 0, resumo: semNada, aguardando: 0, continuacao: null, semProvedor: false });
+    if (linhas.length === 0) return reply(res, 200, { resultados: [], totalRotasAvaliadas: 0, inconclusivas: 0, resumo: semNada, aguardando: 0, continuacao: null, semProvedor: false, reiniciada: !!body.continuacao });
 
     const vehicleIds = [...new Set(linhas.map((r) => r.vehicle_id).filter((v): v is string => !!v))];
     const vmap = new Map<string, LinhaVeiculo>();
@@ -233,7 +234,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
 
     const key = process.env.GEOAPIFY_API_KEY;
     const maxConsultas = Math.max(1, Math.min(40, Number(process.env.BUSCAR_ROTAS_MAX_VIARIAS) || 8));
-    const { resultados, totalRotasAvaliadas, inconclusivas, resumo, aguardando, continuacao, semProvedor } = await avaliarComTemposReais(entradas, pedido, {
+    const { resultados, totalRotasAvaliadas, inconclusivas, resumo, aguardando, continuacao, semProvedor, reiniciada } = await avaliarComTemposReais(entradas, pedido, {
       consultar: key ? (origens, destinos) => consultarBlocoViario(origens, destinos, key) : null,
       maxConsultas,
       continuacao: lerContinuacao(body.continuacao),
@@ -258,6 +259,8 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
         sentido: res0.sentido,
         status: res0.status,
         pendencia: res0.pendencia ?? null,
+        // Versão opaca da rota + van avaliadas: muda quando o motorista edita algo que altera o encaixe.
+        versao: res0.versao ?? null,
         passagemCasaMin: res0.passagemCasaMin,
         horarioEscolaMin: res0.horarioEscolaMin,
         minutosABordo: res0.minutosABordo,
@@ -267,7 +270,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       };
     });
 
-    return reply(res, 200, { resultados: publico, totalRotasAvaliadas, inconclusivas, resumo, aguardando, continuacao, semProvedor });
+    return reply(res, 200, { resultados: publico, totalRotasAvaliadas, inconclusivas, resumo, aguardando, continuacao, semProvedor, reiniciada });
   } catch (e) {
     return reply(res, 500, { erro: 'Erro interno ao avaliar rotas.' });
   }

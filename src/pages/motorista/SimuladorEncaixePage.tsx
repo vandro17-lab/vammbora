@@ -4,19 +4,19 @@ import {
   ArrowRight, Lock,
 } from 'lucide-react';
 import { MotoristaShell, ExigirMotorista } from './MotoristaShell';
-import { listarRotas, listarVeiculos } from '@/data/motorista-store';
+import { listarRotas, listarVeiculos, obterRota } from '@/data/motorista-store';
 import type { Rota, Veiculo } from '@/types/motorista';
 import type { PontoGeo, MatrizViaria } from '@/engine/encaixe-geografico';
 import { CampoEndereco } from '@/components/search/CampoEndereco';
 import { ENDERECO_VAZIO, type EnderecoCampo } from '@/lib/endereco';
 import { MARGEM_OPERACIONAL_MIN, type ResultadoSimulacao } from '@/lib/rota-para-encaixe';
 import {
-  ancoraHorarioEscola, avaliarRotaDetalhada, pontosDoPedido,
+  ancoraHorarioEscola, avaliarRotaDetalhada, pontosDoPedido, versaoDaAvaliacao,
   type AvaliacaoDetalhada, type PedidoFamilia,
 } from '@/lib/busca-rotas-reais';
 import { obterMatrizViaria, FalhaMatriz } from '@/lib/matriz-viaria';
 import { useVitrine } from '@/data/VitrineProvider';
-import { escolasSimulaveis, seloDoResultado } from '@/lib/simulador-encaixe';
+import { CONFIRMACAO_DE_ENCAIXE_HABILITADA, REQUISITOS_DA_CONFIRMACAO, escolasSimulaveis, seloDoResultado } from '@/lib/simulador-encaixe';
 import { minutosParaTextoHora, horaParaMinutos, TURNO_LABEL, cn } from '@/lib/utils';
 
 export function SimuladorEncaixePage() {
@@ -50,6 +50,8 @@ function Simulador() {
   const [abertura, setAbertura] = useState('');
   const [erro, setErro] = useState('');
   const [resultado, setResultado] = useState<AvaliacaoDetalhada | null>(null);
+  // A rota (ou a van) foi alterada depois que esta tela abriu: a simulação usa sempre o que está salvo agora.
+  const [rotaMudou, setRotaMudou] = useState(false);
   const { destinosPorId } = useVitrine();
 
   useEffect(() => {
@@ -70,7 +72,6 @@ function Simulador() {
   }, []);
 
   const rota = useMemo(() => rotas.find((r) => r.id === rotaId) ?? null, [rotas, rotaId]);
-  const veiculo = useMemo(() => veiculos.find((v) => v.id === rota?.veiculoId) ?? null, [veiculos, rota]);
   const escolas = useMemo(() => (rota ? escolasSimulaveis(rota, (id) => destinosPorId[id]?.nome) : []), [rota, destinosPorId]);
 
   // Ao trocar de rota, ajusta a escola escolhida e limpa os horários do aluno.
@@ -107,9 +108,29 @@ function Simulador() {
   const prontoParaSimular = !!pedido && !horarioInvalido && nomeAluno.trim().length > 0;
 
   async function onSimular() {
-    if (!rota || !pedido) return;
-    setSimulando(true); setErro(''); setResultado(null);
+    if (!pedido) return;
+    const aberta = rotas.find((r) => r.id === rotaId) ?? null;
+    if (!aberta) return;
+    setSimulando(true); setErro(''); setResultado(null); setRotaMudou(false);
     try {
+      // Avaliação antiga não vale: relê a rota e a van SALVAS agora. Se o
+      // motorista mudou alunos, escolas, horários, van, lugares ou monitor em
+      // outra tela, é com esses dados que a simulação é feita.
+      const [atual, vans] = await Promise.all([obterRota(aberta.id).catch(() => null), listarVeiculos().catch(() => null)]);
+      const rota = atual ?? aberta;
+      const frota = vans ?? veiculos;
+      const veiculo = frota.find((v) => v.id === rota.veiculoId) ?? null;
+      const antes = versaoDaAvaliacao(aberta, veiculos.find((v) => v.id === aberta.veiculoId) ?? null);
+      if (versaoDaAvaliacao(rota, veiculo) !== antes) {
+        setRotaMudou(true);
+        if (atual) setRotas((lista) => lista.map((r) => (r.id === atual.id ? atual : r)));
+        if (vans) setVeiculos(vans);
+        // A escola escolhida pode ter saído da rota nessa mudança.
+        if (!escolasSimulaveis(rota).some((e) => e.id === pedido.destinoId)) {
+          setErro('Esta rota foi alterada e não tem mais a escola escolhida. Escolha a escola de novo e simule.');
+          return;
+        }
+      }
       // Pontos reais -> matriz viária real (nunca linha reta).
       const { pontos, faltamCoordenadas } = pontosDoPedido(rota, pedido);
       if (faltamCoordenadas.length > 0) {
@@ -241,6 +262,11 @@ function Simulador() {
             </p>
           )}
 
+          {rotaMudou && (
+            <p role="status" data-testid="rota-mudou" className="mt-3 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
+              Esta rota (ou a van) foi alterada depois que você abriu esta tela. A simulação abaixo já usa os dados salvos agora; resultados anteriores não valem mais.
+            </p>
+          )}
           {resultado && <ResultadoEncaixe avaliacao={resultado} nomeAluno={nomeAluno.trim()} sentido={rota.sentido} />}
         </>
       )}
@@ -381,14 +407,21 @@ function ResultadoEncaixe({ avaliacao, nomeAluno, sentido }: { avaliacao: Avalia
 function ConfirmacaoBloqueada({ elegivel }: { elegivel: boolean }) {
   return (
     <div className="mt-5 rounded-xl border border-navy-200 bg-navy-50 p-4">
-      <button type="button" disabled className="btn btn-lg w-full cursor-not-allowed bg-navy-200 text-navy-500" aria-disabled>
+      {/* Sempre desativado enquanto CONFIRMACAO_DE_ENCAIXE_HABILITADA for false (ver simulador-encaixe.ts). */}
+      <button type="button" disabled={!CONFIRMACAO_DE_ENCAIXE_HABILITADA || !elegivel} className="btn btn-lg w-full cursor-not-allowed bg-navy-200 text-navy-500" aria-disabled data-testid="confirmar-inclusao">
         <Lock className="h-5 w-5" /> Confirmar inclusão
       </button>
       <p className="mt-2 text-xs text-navy-500">
         {elegivel
-          ? 'A confirmação definitiva ainda está desativada. Ela depende de uma gravação transacional no banco (migração já incluída no projeto) que precisa ser revisada e aplicada com segurança antes de liberar a reserva de vaga.'
-          : 'Uma simulação inviável nunca pode ser confirmada.'}
+          ? 'A confirmação por aqui está desativada: esta simulação não reserva vaga nem altera a rota. Para incluir o aluno, edite a rota no construtor (é o que passa a valer a partir da próxima viagem).'
+          : 'Uma simulação sem encaixe calculado nunca pode ser confirmada.'}
       </p>
+      {elegivel && (
+        <details className="mt-2 text-xs text-navy-500">
+          <summary className="cursor-pointer font-semibold">Por que ainda não dá para confirmar aqui</summary>
+          <ul className="mt-1 list-disc space-y-1 pl-5">{REQUISITOS_DA_CONFIRMACAO.map((r, i) => <li key={i}>{r}</li>)}</ul>
+        </details>
+      )}
     </div>
   );
 }

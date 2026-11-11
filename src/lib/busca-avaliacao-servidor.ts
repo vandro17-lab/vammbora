@@ -1,6 +1,6 @@
 import {
   avaliarRotaSegura, candidatasParaBusca, compararResultados, contarInconclusivas, dependeDeConsultaViaria,
-  pontosDoPedido, resultadoPendente, resumirResultados,
+  pontosDoPedido, resultadoPendente, resumirResultados, resumo, versaoDaAvaliacao,
   type EntradaBuscaReal, type OrigemEscola, type PedidoFamilia, type ResultadoRotaReal, type ResumoBusca,
 } from '@/lib/busca-rotas-reais';
 import { criarMatrizDemo } from '@/lib/encaixe';
@@ -26,7 +26,12 @@ import {
 
 /** De onde a próxima chamada continua. `inicio`: posição na fila (ordem
  *  estável); `repetir`: rotas cuja consulta viária falhou e merecem nova tentativa. */
-export interface Continuacao { inicio: number; repetir: string[] }
+export interface Continuacao {
+  inicio: number; repetir: string[];
+  /** Assinatura da fila (rotas + vans) quando o lote anterior foi calculado. Se
+   *  algo mudou desde então, a continuação NÃO vale: a avaliação recomeça. */
+  assinatura?: string;
+}
 
 export interface OpcoesAvaliacao {
   /** Uma requisição ao provedor viário (origens × destinos). `null` = sem provedor configurado. */
@@ -49,6 +54,10 @@ export interface AvaliacaoServidor {
   continuacao: Continuacao | null;
   /** O ambiente não tem provedor viário: nada pôde ser calculado pelas ruas. */
   semProvedor: boolean;
+  /** A continuação recebida era de uma versão ANTIGA das rotas (alguém editou
+   *  rota, alunos, escolas, horários ou a van): a fila recomeçou do zero e os
+   *  resultados anteriores devem ser descartados por quem os guardou. */
+  reiniciada: boolean;
 }
 
 const MOTIVO_SEM_PROVEDOR = 'O cálculo dos trajetos pelas ruas não está disponível neste ambiente — esta rota não pôde ser avaliada.';
@@ -73,11 +82,20 @@ export async function avaliarComTemposReais(
   entradas: EntradaBuscaReal[], pedido: PedidoFamilia, opcoes: OpcoesAvaliacao,
 ): Promise<AvaliacaoServidor> {
   const candidatas = candidatasParaBusca(entradas, pedido);
-  const fim = (resultados: ResultadoRotaReal[], aguardando: number, continuacao: Continuacao | null, semProvedor = false): AvaliacaoServidor => {
+  const versoes = new Map(candidatas.map((e) => [e.rota.id, versaoDaAvaliacao(e.rota, e.veiculo)]));
+  // Assinatura do conjunto avaliado: qualquer edição em rota, alunos, escolas,
+  // horários ou van — e qualquer rota que entre/saia — muda este valor.
+  const assinatura = resumo([...versoes].sort(([a], [b]) => (a < b ? -1 : 1)).map(([id, v]) => id + ':' + v).join(';'));
+  const pedida = opcoes.continuacao ?? null;
+  const reiniciada = !!pedida && pedida.assinatura !== undefined && pedida.assinatura !== assinatura;
+  const anterior = reiniciada ? null : pedida;
+  const fim = (resultados: ResultadoRotaReal[], aguardando: number, continuacao: Omit<Continuacao, 'assinatura'> | null, semProvedor = false): AvaliacaoServidor => {
     resultados.sort(compararResultados);
     return {
-      resultados, totalRotasAvaliadas: candidatas.length, inconclusivas: contarInconclusivas(resultados) + aguardando,
-      resumo: resumirResultados(resultados, candidatas.length), aguardando, continuacao, semProvedor,
+      resultados: resultados.map((r) => ({ ...r, versao: versoes.get(r.rotaId) })),
+      totalRotasAvaliadas: candidatas.length, inconclusivas: contarInconclusivas(resultados) + aguardando,
+      resumo: resumirResultados(resultados, candidatas.length), aguardando,
+      continuacao: continuacao ? { ...continuacao, assinatura } : null, semProvedor, reiniciada,
     };
   };
   if (candidatas.length === 0) return fim([], 0, null);
@@ -105,9 +123,9 @@ export async function avaliarComTemposReais(
   // 3) Lote desta chamada: primeiro as ainda NÃO tentadas (a partir do cursor),
   //    depois as que falharam antes — com o que sobrar do orçamento.
   const orcamento = Math.max(1, Math.floor(opcoes.maxConsultas));
-  const inicio = Math.max(0, Math.min(fila.length, Math.floor(opcoes.continuacao?.inicio ?? 0)));
+  const inicio = Math.max(0, Math.min(fila.length, Math.floor(anterior?.inicio ?? 0)));
   const naFila = new Set(fila.map((r) => r.rotaId));
-  const repetirPedido = [...new Set(opcoes.continuacao?.repetir ?? [])].filter((id) => naFila.has(id));
+  const repetirPedido = [...new Set(anterior?.repetir ?? [])].filter((id) => naFila.has(id));
   const extensas: ResultadoRotaReal[] = [];
   const lote: { r: ResultadoRotaReal; pontos: { lat: number; lng: number }[] }[] = [];
   let gasto = 0;

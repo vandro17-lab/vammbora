@@ -7,7 +7,7 @@ import {
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { ExigirMotorista } from './MotoristaShell';
 import { obterRota, listarVeiculos } from '@/data/motorista-store';
-import { enviarPendentes, finalizarViagem, iniciarViagem, registrarEvento } from '@/data/viagem-store';
+import { enviarPendentes, finalizarViagem, iniciarViagem, registrarEvento, rotaDaViagem, viagemSimulada } from '@/data/viagem-store';
 import { capacidadeAlunos } from '@/lib/ocupacao-rota';
 import {
   buscarGuia, falaManobra, metros, pontoEm, projetarNaRota, proximaManobra, segundosAteFimDaPerna,
@@ -61,7 +61,11 @@ function falar(texto: string, mudo: boolean) {
 
 /* Viagem em andamento guardada no aparelho: recarregar a página no meio da
  * rota não apaga quem está a bordo nem abre uma viagem nova. */
-interface Guardado { viagemId: string; fase: Fase; indiceAlvo: number; aBordo: string[]; entregues: string[]; faltas: string[]; chegadaEm: string | null; iniciadaEm: string; salvoEm: number }
+interface Guardado {
+  /** Rota como estava SALVA quando a viagem começou: é ela que a viagem segue
+   *  até o fim, mesmo que a rota seja editada (ou um encaixe simulado) depois. */
+  rota?: Rota;
+  viagemId: string; fase: Fase; indiceAlvo: number; aBordo: string[]; entregues: string[]; faltas: string[]; chegadaEm: string | null; iniciadaEm: string; salvoEm: number }
 const chaveGuardada = (rotaId: string) => `vambora.navegacao.${rotaId}`;
 function lerGuardado(rotaId: string): Guardado | null {
   try {
@@ -78,6 +82,8 @@ function NavegacaoProtegida() {
   const [trajeto, setTrajeto] = useState<Trajeto | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
+  // A rota salva mudou depois que esta viagem começou (a viagem segue a sequência do início).
+  const [rotaAlterada, setRotaAlterada] = useState(false);
 
   const [fase, setFase] = useState<Fase>('pronta');
   const [indiceAlvo, setIndiceAlvo] = useState(0);
@@ -112,8 +118,13 @@ function NavegacaoProtegida() {
     (async () => {
       if (!id) { setErro('Rota não informada.'); setCarregando(false); return; }
       try {
-        const [r, veiculos] = await Promise.all([obterRota(id), listarVeiculos().catch(() => [] as Veiculo[])]);
-        if (!r) throw new Error('Esta rota não está disponível para o motorista conectado.');
+        const [salva, veiculos] = await Promise.all([obterRota(id), listarVeiculos().catch(() => [] as Veiculo[])]);
+        if (!salva) throw new Error('Esta rota não está disponível para o motorista conectado.');
+        // Viagem em andamento: segue a sequência com que COMEÇOU, não a que está
+        // salva agora. Edição feita no meio do caminho vale da próxima viagem em diante.
+        const guardado = lerGuardado(salva.id);
+        const { rota: r, alterada } = rotaDaViagem(guardado?.rota, salva);
+        if (vivo) setRotaAlterada(alterada);
         const ordenadas = [...r.paradas].sort((a, b) => a.ordem - b.ordem);
         if (ordenadas.length < 2) throw new Error('A rota precisa ter pelo menos duas paradas.');
         const semPonto = ordenadas.find((p) => !Number.isFinite(p.lat) || !Number.isFinite(p.lng));
@@ -127,7 +138,6 @@ function NavegacaoProtegida() {
         // A saída da van, sem aluno, não é parada de operação: o alvo já é a seguinte.
         const primeira = ordenadas[0];
         const temGente = r.passageiros.some((x) => x.embarqueParadaId === primeira.id || x.desembarqueParadaId === primeira.id);
-        const guardado = lerGuardado(r.id);
         if (guardado) {
           viagemId.current = guardado.viagemId;
           setIndiceAlvo(guardado.indiceAlvo); setABordoIds(guardado.aBordo); setEntreguesIds(guardado.entregues); setFaltasIds(guardado.faltas);
@@ -277,7 +287,7 @@ function NavegacaoProtegida() {
   useEffect(() => {
     if (!rota || !viagemId.current || !iniciadaEm) return;
     if (fase === 'finalizada') { try { localStorage.removeItem(chaveGuardada(rota.id)); } catch { /* ignora */ } return; }
-    const g: Guardado = { viagemId: viagemId.current, fase, indiceAlvo, aBordo: aBordoIds, entregues: entreguesIds, faltas: faltasIds, chegadaEm: chegadaEm?.toISOString() ?? null, iniciadaEm: iniciadaEm.toISOString(), salvoEm: Date.now() };
+    const g: Guardado = { rota, viagemId: viagemId.current, fase, indiceAlvo, aBordo: aBordoIds, entregues: entreguesIds, faltas: faltasIds, chegadaEm: chegadaEm?.toISOString() ?? null, iniciadaEm: iniciadaEm.toISOString(), salvoEm: Date.now() };
     try { localStorage.setItem(chaveGuardada(rota.id), JSON.stringify(g)); } catch { /* ignora */ }
   }, [rota, fase, indiceAlvo, aBordoIds, entreguesIds, faltasIds, chegadaEm, iniciadaEm]);
 
@@ -285,7 +295,8 @@ function NavegacaoProtegida() {
   function iniciarRota() {
     if (!rota || !guia || !paradaAlvo) return;
     const inicio = new Date();
-    viagemId.current = iniciarViagem(rota, inicio);
+    // Percurso de simulação (sem GPS) não entra no histórico de viagens.
+    viagemId.current = iniciarViagem(rota, inicio, { simulada: simulando });
     setIniciadaEm(inicio);
     setSeguir(true);
     setFase('a_caminho');
@@ -427,6 +438,16 @@ function NavegacaoProtegida() {
           <button type="button" onClick={() => { setMudo((m) => !m); if (!mudo) window.speechSynthesis?.cancel(); }} aria-pressed={mudo} aria-label={mudo ? 'Ligar a voz' : 'Desligar a voz'}
             className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-white/10 text-white hover:bg-white/20">{mudo ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}</button>
         </div>
+        {rotaAlterada && (
+          <p role="status" data-testid="rota-alterada" className="pointer-events-auto mx-auto mt-2 max-w-xl rounded-2xl bg-amber-400 px-3 py-2 text-xs font-bold text-navy-950 shadow-lg">
+            Esta rota foi alterada depois que a viagem começou. A viagem em andamento segue a sequência do início; a alteração vale a partir da próxima viagem.
+          </p>
+        )}
+        {navegando && viagemSimulada(viagemId.current) && (
+          <p role="status" data-testid="viagem-simulada" className="pointer-events-auto mx-auto mt-2 max-w-xl rounded-2xl bg-white px-3 py-2 text-xs font-bold text-navy-900 shadow-lg">
+            Simulação de percurso: nada desta viagem é gravado no histórico.
+          </p>
+        )}
         {navegando && (
           <div className="pointer-events-auto mx-auto mt-2 flex max-w-xl items-start justify-between gap-2">
             <span className={cn('rounded-full px-3 py-1.5 text-[11px] font-bold shadow-lg', simulando ? 'bg-white text-navy-900' : gps === 'ativo' ? 'bg-emerald-500 text-white' : 'bg-amber-400 text-navy-950')} data-testid="gps">

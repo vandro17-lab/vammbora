@@ -1,3 +1,5 @@
+import { contextoDoInteresse, linhasDoContexto } from '@/lib/contexto-interesse';
+import type { CartaoRotaRealDados } from '@/lib/busca-rotas-reais-cliente';
 import { nomeDestinoParaExibicao } from '@/lib/utils';
 import { useState } from 'react';
 import { CheckCircle2, Info, Loader2 } from 'lucide-react';
@@ -13,7 +15,13 @@ import { registrarInteresse } from '@/data/source';
  * - Sem Supabase (demo): o envio é apenas simulado (não gravado).
  * NÃO promete aviso automático: ainda não há esse fluxo implementado.
  */
-export function WaitlistForm({ criterios }: { criterios: CriteriosBusca }) {
+export function WaitlistForm({ criterios, cartao = null }: {
+  criterios: CriteriosBusca;
+  /** Rota em que a família se interessou (opcional). O pedido leva o contexto
+   *  dela — sentido, horários calculados e versão — e continua NÃO reservando vaga. */
+  cartao?: CartaoRotaRealDados | null;
+}) {
+  const contexto = contextoDoInteresse(criterios, cartao);
   const [enviado, setEnviado] = useState(false);
   const [foiSimulacao, setFoiSimulacao] = useState(false);
   const [enviando, setEnviando] = useState(false);
@@ -51,6 +59,8 @@ export function WaitlistForm({ criterios }: { criterios: CriteriosBusca }) {
         regiao: criterios.endereco || undefined,
         destinoId: criterios.destinoId,
         turno: criterios.turno,
+        // Sentido(s), horário de cada um e, se houver, a rota e as condições do encaixe.
+        contexto,
       });
       if (r.ok) {
         setFoiSimulacao(!!r.demo);
@@ -78,7 +88,7 @@ export function WaitlistForm({ criterios }: { criterios: CriteriosBusca }) {
         </p>
         <p className="mt-3 text-sm text-navy-500">
           Ainda <strong>não</strong> existe aviso automático: o contato é feito manualmente pela
-          equipe/motorista.
+          equipe/motorista. {cartao ? 'Seu interesse nesta rota ' : 'Este registro '}<strong>não reserva vaga</strong>.
         </p>
         {foiSimulacao && (
           <p className="mt-4 inline-flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-left text-xs text-amber-800">
@@ -93,7 +103,12 @@ export function WaitlistForm({ criterios }: { criterios: CriteriosBusca }) {
 
   return (
     <form onSubmit={onSubmit} className="card mx-auto max-w-lg p-6 sm:p-8">
-      <h3 className="font-display text-xl font-bold">Quer entrar na lista de interesse?</h3>
+      <h3 className="font-display text-xl font-bold">{cartao ? `Tenho interesse em “${cartao.rotaNome}”` : 'Quer entrar na lista de interesse?'}</h3>
+      <div className="mt-3 rounded-xl bg-navy-50 p-3 text-sm text-navy-700" data-testid="contexto-interesse">
+        <p className="font-semibold">Vai junto com o seu pedido:</p>
+        <ul className="mt-1 list-disc space-y-0.5 pl-5">{linhasDoContexto(contexto).map((l, i) => <li key={i}>{l}</li>)}</ul>
+        <p className="mt-2 text-xs text-navy-500">Seu endereço não é enviado ao motorista. Este pedido <strong>não reserva vaga</strong> e nenhuma mensagem é enviada automaticamente: a equipe faz a ponte com o motorista.</p>
+      </div>
       <p className="mt-1.5 text-sm text-navy-600">
         Deixe seu contato para {destino ? <strong>{nomeDestinoParaExibicao(destino.nome)}</strong> : 'sua região'}
         {criterios.turno && (

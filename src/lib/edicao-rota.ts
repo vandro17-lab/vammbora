@@ -310,3 +310,62 @@ export function moverParada(rota: Rota, paradaId: string, delta: -1 | 1): Rota {
 export function podeMover(rota: Rota, paradaId: string, delta: -1 | 1): boolean {
   return moverParada(rota, paradaId, delta) !== rota;
 }
+
+/* ------------------- escola que ficou sem nenhum aluno ------------------- */
+
+/**
+ * Paradas de ESCOLA em que ninguém embarca nem desce. Acontece quando o último
+ * aluno daquela escola sai da rota, troca de escola ou tem a casa excluída.
+ * O app NÃO decide sozinho o que fazer com a visita: ver `DecisaoEscolaVazia`.
+ */
+export function escolasSemAlunos(rota: Pick<Rota, 'paradas' | 'passageiros'>): ParadaRota[] {
+  const emUso = new Set(rota.passageiros.flatMap((x) => [x.embarqueParadaId, x.desembarqueParadaId]));
+  return emOrdem(rota).filter((p) => p.tipo === 'escola' && !emUso.has(p.id));
+}
+
+/** Escolas que ficaram sem aluno POR CAUSA de uma edição (não estavam vazias antes). */
+export function escolasEsvaziadas(antes: Pick<Rota, 'paradas' | 'passageiros'>, depois: Pick<Rota, 'paradas' | 'passageiros'>): ParadaRota[] {
+  const jaVazias = new Set(escolasSemAlunos(antes).map((p) => p.id));
+  return escolasSemAlunos(depois).filter((p) => !jaVazias.has(p.id));
+}
+
+/**
+ * O que o MOTORISTA quer fazer com a visita a uma escola que ficou sem alunos:
+ *  - manter ......... a van continua passando na escola (a parada, o horário e
+ *                     o tempo do grupo ficam como estão);
+ *  - remover ........ a van deixa de passar; a escola sai da rota e NÃO fica
+ *                     como aceita — famílias dela deixam de encontrar esta rota;
+ *  - disponibilidade  a van deixa de passar hoje, mas o motorista continua
+ *                     aceitando incluir a escola: ela vai para a lista de
+ *                     escolas aceitas, levando portão, limite/liberação,
+ *                     abertura e tempo do grupo que ele já tinha informado.
+ */
+export type DecisaoEscolaVazia = 'manter' | 'remover' | 'disponibilidade';
+
+/** Aplica a decisão do motorista. Não mexe em nenhuma outra parada nem aluno. */
+export function resolverEscolaSemAlunos(rota: Rota, paradaId: string, decisao: DecisaoEscolaVazia, novoId: GerarId): Rota {
+  const escola = rota.paradas.find((p) => p.id === paradaId && p.tipo === 'escola');
+  if (!escola || decisao === 'manter') return rota;
+  // Só se resolve escola realmente vazia: com aluno, excluir a parada é outra operação.
+  if (!escolasSemAlunos(rota).some((p) => p.id === paradaId)) return rota;
+  const ordenadas = emOrdem(rota);
+  const i = ordenadas.findIndex((p) => p.id === paradaId);
+  const paradas = renumerar(ordenadas.filter((p) => p.id !== paradaId).map((p, k) => (k === i - 1 ? semTempo(p) : p)));
+  if (decisao === 'remover' || !escola.destinoId) return { ...rota, paradas };
+  // Outra visita à mesma escola continua no percurso: ela já está "no percurso".
+  const aindaNoPercurso = paradas.some((p) => p.tipo === 'escola' && p.destinoId === escola.destinoId);
+  const jaAceita = (rota.escolasDisponiveis ?? []).some((e) => e.destinoId === escola.destinoId);
+  if (aindaNoPercurso || jaAceita) return { ...rota, paradas };
+  const temPonto = typeof escola.lat === 'number' && typeof escola.lng === 'number';
+  return {
+    ...rota, paradas,
+    escolasDisponiveis: [...(rota.escolasDisponiveis ?? []), {
+      id: novoId(), destinoId: escola.destinoId, destinoNome: escola.destinoNome ?? null, dias: null,
+      // Portão só quando o motorista marcou um específico; senão vale o ponto do catálogo.
+      portaoLat: escola.portaoEspecifico && temPonto ? escola.lat! : null,
+      portaoLng: escola.portaoEspecifico && temPonto ? escola.lng! : null,
+      limiteChegadaMin: escola.limiteChegadaMin ?? null, aberturaMin: escola.aberturaMin ?? null,
+      liberacaoMin: escola.liberacaoMin ?? null, atendimentoGrupoMin: escola.atendimentoGrupoMin ?? null,
+    }],
+  };
+}

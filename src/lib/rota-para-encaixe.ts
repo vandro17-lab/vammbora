@@ -293,11 +293,18 @@ function montarOperacional(
   aberturaInformada: { escolaId: string; min: number } | null = null,
 ): RotaOperacional | null {
   const ordenadas = [...rota.paradas].sort((a, b) => a.ordem - b.ordem);
-  const saida = ordenadas.find((p) => p.tipo === 'saida') ?? ordenadas[0];
+  // Rota SEM parada de saída (ex.: a volta sugerida, que começa na escola): a
+  // viagem começa no ponto da primeira parada, e essa parada CONTINUA sendo
+  // atendida — não é engolida como se fosse a garagem (senão a visita à escola
+  // e os embarques dela sumiriam do cálculo).
+  const saidaCadastrada = ordenadas.find((p) => p.tipo === 'saida') ?? null;
+  const saida = saidaCadastrada ?? ordenadas[0];
   if (!saida) return null;
-  const inicio = pontoDeParada(saida);
-  if (!inicio) return null;
-  const sequencia = ordenadas.filter((p) => p.id !== saida.id);
+  const inicioDaParada = pontoDeParada(saida);
+  if (!inicioDaParada) return null;
+  // (mesmo ponto e mesmo id da primeira parada: o trecho até ela é zero em qualquer matriz)
+  const inicio = inicioDaParada;
+  const sequencia = saidaCadastrada ? ordenadas.filter((p) => p.id !== saida.id) : ordenadas;
   const atendimentoDe = (pax: { atendimentoMin?: number | null }) => pax.atendimentoMin ?? atendimentoPadrao;
   const ultimaEscolaOrdem = ordenadas
     .filter((p) => p.tipo === 'escola')
@@ -613,4 +620,69 @@ export function simularEncaixeRota(
 export function limitePadraoDoTurno(turno: string | null): number | null {
   if (!turno) return null;
   return LIMITE_CHEGADA_POR_TURNO[turno] ?? null;
+}
+
+/* ------------- conferência da rota do cadastro pelas regras de encaixe ------------- */
+
+export interface ConferenciaDaRota {
+  /**
+   * - ok ............ com os horários informados e os trechos do mapa, a rota
+   *                   fecha: é sobre ela que as famílias são avaliadas;
+   * - inconsistente . a rota NÃO fecha (atraso na escola, horário combinado de
+   *                   aluno descumprido, lotação): nas buscas ela aparece como
+   *                   "dados insuficientes" até ser corrigida;
+   * - sem_dados ..... falta trecho do mapa, coordenada ou horário para conferir.
+   */
+  situacao: 'ok' | 'inconsistente' | 'sem_dados';
+  /** O que não fecha, em linguagem simples (vazio quando ok). */
+  problemas: string[];
+  /** Saída usada na conferência e de onde veio. */
+  partidaMin: number | null;
+  fontePartida: 'cadastrada' | 'calculada' | null;
+}
+
+/**
+ * Confere a rota do CADASTRO com as MESMAS regras usadas para encaixar um novo
+ * aluno (saída habitual, limite de cada escola, liberação, abertura, horário e
+ * flexibilidade de cada aluno, capacidade por trecho) — usando os minutos de
+ * cada trecho que o mapa já calculou no construtor. Serve para o motorista ver,
+ * antes de concluir, se a rota "fecha"; não altera nada.
+ */
+export function conferirRotaDoCadastro(rota: Rota, veiculo: Veiculo | null): ConferenciaDaRota {
+  const semDados = (problema: string): ConferenciaDaRota => ({ situacao: 'sem_dados', problemas: [problema], partidaMin: null, fontePartida: null });
+  const ordenadas = [...rota.paradas].sort((a, b) => a.ordem - b.ordem);
+  if (ordenadas.length < 2) return semDados('Inclua as paradas da rota.');
+  if (ordenadas.some((p) => !pontoDeParada(p))) return semDados('Confirme no mapa a localização de todas as paradas.');
+  // Matriz só com os trechos CONSECUTIVOS da ordem atual (é o que a conferência percorre).
+  const trechos = new Map<string, number>();
+  for (let i = 0; i + 1 < ordenadas.length; i++) {
+    const t = ordenadas[i].tempoAteProximaMin;
+    if (typeof t !== 'number' || !Number.isFinite(t) || t < 0) return semDados('O mapa ainda não calculou o tempo de todos os trechos.');
+    trechos.set(idDoPonto(ordenadas[i]) + '>' + idDoPonto(ordenadas[i + 1]), t);
+  }
+  const matriz: MatrizViaria = {
+    origem: 'outro-provedor',
+    obter: (de, para) => {
+      if (de.id === para.id) return { minutos: 0, metros: 0 };
+      const min = trechos.get(de.id + '>' + para.id);
+      return min === undefined ? null : { minutos: min, metros: 0 };
+    },
+  };
+  const montada = montarRotaAncorada(rota, veiculo, matriz);
+  if (!montada) return semDados('Confirme no mapa a localização de todas as paradas.');
+  if (montada.semAncora) return semDados('Informe o horário de saída ou o horário de pelo menos uma escola.');
+  const { base, rotaOp, fontePartida } = montada;
+  if (base.valido) return { situacao: 'ok', problemas: [], partidaMin: rotaOp.partidaMin, fontePartida };
+  if (base.motivos.some((m) => m.includes('tempo/distância'))) return semDados('O mapa ainda não calculou o tempo de todos os trechos.');
+  const traduzir = (m: string): string => {
+    const [oque, onde = ''] = m.split(': ');
+    const em = onde ? ` (${onde})` : '';
+    if (oque.startsWith('Horário-limite')) return `A van chega depois do horário-limite da escola${em}.`;
+    if (oque.startsWith('Margem')) return `A van chega em cima do horário da escola, sem a margem de segurança${em}.`;
+    if (oque.startsWith('Limite do ponto final')) return `Uma parada fica depois do limite do ponto final${em}.`;
+    if (oque.startsWith('Janela')) return `O horário combinado com um aluno não é cumprido${em}.`;
+    if (oque.startsWith('Capacidade')) return `Há mais alunos a bordo do que lugares num trecho${em}.`;
+    return m;
+  };
+  return { situacao: 'inconsistente', problemas: [...new Set(base.motivos.map(traduzir))], partidaMin: rotaOp.partidaMin, fontePartida };
 }

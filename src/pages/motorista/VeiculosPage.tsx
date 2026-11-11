@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Bus, Plus, Loader2, Snowflake, Accessibility, ShieldCheck, Check } from 'lucide-react';
 import { MotoristaShell, ExigirMotorista } from './MotoristaShell';
-import { listarVeiculos, salvarVeiculo } from '@/data/motorista-store';
+import { listarRotas, listarVeiculos, salvarVeiculo } from '@/data/motorista-store';
+import { impactoDaVanNasRotas, textoDoImpacto } from '@/lib/veiculo-rotas';
 import type { Veiculo } from '@/types/motorista';
 import { cn } from '@/lib/utils';
 
@@ -23,6 +24,8 @@ function Veiculos() {
   const [editando, setEditando] = useState<Veiculo | null>(null);
   const [salvando, setSalvando] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
+  // Rotas cuja disponibilidade mudou com a última edição da van.
+  const [impactos, setImpactos] = useState<string[]>([]);
   const [erro, setErro] = useState<string | null>(null);
 
   async function recarregar() {
@@ -38,10 +41,15 @@ function Veiculos() {
     setSalvando(true);
     setAviso(null);
     setErro(null);
+    setImpactos([]);
     try {
-      await salvarVeiculo(editando);
+      const antes = lista.find((v) => v.id === editando.id) ?? null;
+      const gravado = await salvarVeiculo(editando);
       setEditando(null);
       setAviso('Van salva!');
+      // A capacidade das rotas vem da van a cada cálculo: mostra o que mudou
+      // (nenhuma rota é alterada). Falha ao ler as rotas não desfaz o salvamento.
+      if (antes) setImpactos(impactoDaVanNasRotas(antes, gravado, await listarRotas().catch(() => [])).map(textoDoImpacto));
       await recarregar(); // relê do banco: a lista mostra o que realmente ficou gravado
     } catch (e) {
       setErro('Não foi possível salvar: ' + (e as Error).message);
@@ -53,6 +61,13 @@ function Veiculos() {
   return (
     <MotoristaShell titulo="Minha van" voltarPara="/painel">
       {aviso && <p className="mb-4 rounded-xl bg-mint-50 p-3 text-sm text-mint-800">{aviso}</p>}
+      {impactos.length > 0 && (
+        <div className="mb-4 rounded-xl bg-amber-50 p-3 text-sm text-amber-900" data-testid="impacto-van">
+          <p className="font-semibold">A mudança de lugares altera a disponibilidade destas rotas:</p>
+          <ul className="mt-1 list-disc space-y-1 pl-5">{impactos.map((t, i) => <li key={i}>{t}</li>)}</ul>
+          <p className="mt-1 text-xs">Avaliações e simulações feitas antes desta mudança não valem mais: refaça-as.</p>
+        </div>
+      )}
       {erro && <p role="alert" className="mb-4 rounded-xl bg-red-50 p-3 text-sm font-medium text-red-700">{erro}</p>}
 
       {editando ? (

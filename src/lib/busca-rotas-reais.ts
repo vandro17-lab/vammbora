@@ -100,6 +100,8 @@ export interface ResultadoRotaReal {
   origemEscola: OrigemEscola;
   /** Só com `status === 'indeterminado'`: o que faltou (ver `PendenciaAvaliacao`). */
   pendencia?: PendenciaAvaliacao;
+  /** Versão (opaca) da rota + van avaliadas — ver `versaoDaAvaliacao`. */
+  versao?: string;
   /** Alteração na rota (min) que o encaixe causaria; menor = melhor. */
   desvioMin: number | null;
   /** Ida: hora que a van passaria na CASA (coleta). Volta: hora que deixaria em CASA (entrega). */
@@ -192,7 +194,7 @@ function escolaEscolhida(rota: Rota, destinoId: string | null) {
  *   4) escola ACEITA e ainda não visitada: o limite/liberação que o motorista
  *      informou na lista de aceitas; sem ele, o horário da FAMÍLIA (é a única
  *      exigência conhecida para a parada nova — e não mexe na rota atual);
- *   5) padrão do turno — fraco, resultado nunca confirmado;
+ *   5) padrão do turno (só na IDA) — fraco, resultado nunca confirmado;
  *   6) nenhum — não dá para estimar com segurança.
  * O horário da família NUNCA vira o horário de uma escola que a rota já
  * visita: lá ele entra à parte, como prazo/liberação só do novo aluno.
@@ -214,7 +216,10 @@ export function ancoraHorarioEscola(rota: Rota, pedido: PedidoFamilia): { min: n
     const familia = minutoDoDia(pedido.horarioFamiliaMin);
     if (familia != null) return { min: familia, fonte: 'familia' };
   }
-  const padrao = limitePadraoDoTurno(pedido.turno ?? rota.turno ?? null);
+  // O padrão do turno é um horário de CHEGADA à escola: só serve à ida. Na volta
+  // não há padrão para "quando os alunos são liberados" — sem a liberação
+  // informada, não se calcula (não se usa 7h00 como saída do meio-dia).
+  const padrao = rota.sentido === 'ida' ? limitePadraoDoTurno(pedido.turno ?? rota.turno ?? null) : null;
   if (padrao != null) return { min: padrao, fonte: 'turno' };
   return { min: null, fonte: 'nenhuma' };
 }
@@ -440,6 +445,40 @@ function pesoStatus(s: StatusBuscaReal): number {
 export interface EntradaBuscaReal {
   rota: Rota;
   veiculo: Veiculo | null;
+}
+
+/**
+ * VERSÃO do que foi avaliado: muda quando muda QUALQUER coisa que altera o
+ * encaixe — passageiros, paradas, escolas (visitadas ou aceitas), horários,
+ * antecipação, veículo, lugares, reservas ou monitor. É um resumo opaco (não
+ * revela dado nenhum): serve só para saber que uma avaliação antiga não vale
+ * mais e precisa ser refeita.
+ */
+export function versaoDaAvaliacao(rota: Rota, veiculo: Veiculo | null): string {
+  const n = (v: number | null | undefined) => (v == null ? '' : String(v));
+  const partes = [
+    rota.id, rota.sentido, rota.turno ?? '', rota.status, rota.veiculoId ?? '', veiculo ? String(veiculo.lugaresPassageiro) : 'sem-van',
+    rota.monitor ? 1 : 0, rota.monitorOcupaLugar ? 1 : 0, rota.lugaresReservados,
+    n(rota.saidaHabitualMin), n(rota.limiteAntecipacaoMin), n(rota.ultimoDesembarqueMin), rota.disponibilidadeRevisada ? 1 : 0,
+    ...[...rota.paradas].sort((a, b) => a.ordem - b.ordem).map((p) =>
+      [p.id, p.tipo, n(p.lat), n(p.lng), p.destinoId ?? '', n(p.horarioChegadaMin), n(p.limiteChegadaMin), n(p.aberturaMin), n(p.liberacaoMin), n(p.atendimentoGrupoMin)].join(',')),
+    ...[...rota.passageiros].sort((a, b) => (a.id < b.id ? -1 : 1)).map((x) =>
+      [x.id, x.embarqueParadaId ?? '', x.desembarqueParadaId ?? '', n(x.horarioHabitualMin), n(x.ajusteAntesMin), n(x.ajusteDepoisMin), n(x.atendimentoMin)].join(',')),
+    ...[...(rota.escolasDisponiveis ?? [])].sort((a, b) => (a.destinoId < b.destinoId ? -1 : 1)).map((e) =>
+      [e.destinoId, n(e.portaoLat), n(e.portaoLng), n(e.limiteChegadaMin), n(e.aberturaMin), n(e.liberacaoMin), n(e.atendimentoGrupoMin)].join(',')),
+  ];
+  return resumo(partes.join('|'));
+}
+
+/** Resumo curto e determinístico de um texto (FNV-1a de 64 bits em duas metades). Não é criptografia. */
+export function resumo(texto: string): string {
+  let a = 0x811c9dc5, b = 0x01000193;
+  for (let i = 0; i < texto.length; i++) {
+    const c = texto.charCodeAt(i);
+    a = Math.imul(a ^ c, 0x01000193);
+    b = Math.imul(b ^ c, 0x85ebca6b) ^ (a >>> 13);
+  }
+  return (a >>> 0).toString(36) + (b >>> 0).toString(36);
 }
 
 export interface ResultadoBuscaReal {

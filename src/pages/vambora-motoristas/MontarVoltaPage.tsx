@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { Reorder, useDragControls } from 'framer-motion';
 import { AlertTriangle, Check, GripVertical, Home, Loader2, MapPin, RotateCcw, School, UserX, Users } from 'lucide-react';
@@ -6,10 +6,15 @@ import { VMShell } from '@/components/vm/VMShell';
 import { Card, SubHeader } from '@/components/vm/ui';
 import { MapaInterativoRota } from '@/components/motorista/MapaInterativoRota';
 import { CampoEndereco } from '@/components/search/CampoEndereco';
-import { obterRota, salvarRota } from '@/data/motorista-store';
+import { novoId, obterRota, salvarRota } from '@/data/motorista-store';
+import { escolasEsvaziadas, escolasSemAlunos, resolverEscolaSemAlunos, type DecisaoEscolaVazia } from '@/lib/edicao-rota';
+import { obterMatrizViaria } from '@/lib/matriz-viaria';
 import { CampoDuracao, PeriodoEscolar, SaidaEAntecipacao } from '@/components/motorista/CadastroRotaEtapa1';
 import { ENDERECO_VAZIO, type EnderecoCampo } from '@/lib/endereco';
-import { alunosForaDeOrdem, alunosQuePodemVoltar, removerAluno, reordenarParadas, sugerirVolta, trocarEnderecoDoAluno } from '@/lib/rota-volta';
+import {
+  alunosForaDeOrdem, alunosQuePodemVoltar, distanciaPelasRuas, pendenciasParaConcluirVolta, pontosParaOrdenarVolta,
+  removerAluno, reordenarParadas, sugerirVolta, trocarEnderecoDoAluno,
+} from '@/lib/rota-volta';
 import { cn, nomeDestinoParaExibicao } from '@/lib/utils';
 import type { ParadaRota, PassageiroRota, Rota } from '@/types/motorista';
 
@@ -34,6 +39,12 @@ export function MontarVoltaPage() {
   const [volta, setVolta] = useState<Rota | null>(null);
   const [aberta, setAberta] = useState<string | null>(null);
   const [salvando, setSalvando] = useState(false);
+  // De onde veio a ORDEM sugerida: linha reta (aproximação) ou trajetos das ruas.
+  const [ordemPor, setOrdemPor] = useState<'reta' | 'calculando' | 'ruas'>('reta');
+  // O motorista já mexeu na volta: uma sugestão que chegue depois não sobrescreve.
+  const mexeu = useRef(false);
+  // Escolas que ficaram sem alunos nesta edição e esperam a decisão do motorista.
+  const [escolasADecidir, setEscolasADecidir] = useState<string[]>([]);
 
   useEffect(() => {
     let vivo = true;
@@ -59,17 +70,53 @@ export function MontarVoltaPage() {
   function montar(ids: string[]) {
     if (!ida) return;
     setVoltam(ids);
+    // 1º: sugestão imediata por distância em LINHA RETA (só uma aproximação).
     setVolta(sugerirVolta(ida, { voltamIds: ids }));
     setAberta(null);
+    setEscolasADecidir([]);
+    mexeu.current = false;
     setPasso('ajuste');
+    // 2º: refaz a ordem com os trajetos REAIS das ruas (a volta não é a ida
+    // invertida: mão única e retornos mudam o caminho). Se o mapa não responder,
+    // fica a aproximação — e a tela diz isso.
+    const pontos = pontosParaOrdenarVolta(ida, ids);
+    if (pontos.length < 2) return;
+    setOrdemPor('calculando');
+    obterMatrizViaria(pontos).then((matriz) => {
+      const ruas = distanciaPelasRuas(matriz);
+      const sugerida = sugerirVolta(ida, { voltamIds: ids, distancia: ruas.distancia });
+      if (!ruas.completa() || mexeu.current) { setOrdemPor(mexeu.current ? 'ruas' : 'reta'); return; }
+      setVolta(sugerida);
+      setOrdemPor('ruas');
+    }).catch(() => setOrdemPor('reta'));
   }
+
+  /** Edição feita pelo motorista na volta (a partir daqui a sugestão não é mais trocada). */
+  function editarVolta(f: (v: Rota) => Rota) {
+    mexeu.current = true;
+    setVolta((v) => {
+      if (!v) return v;
+      const nova = f(v);
+      const esvaziadas = escolasEsvaziadas(v, nova).map((p) => p.id);
+      if (esvaziadas.length) setEscolasADecidir((ids) => [...new Set([...ids, ...esvaziadas])]);
+      return nova;
+    });
+  }
+  const escolasPendentes = volta ? escolasSemAlunos(volta).filter((p) => escolasADecidir.includes(p.id)) : [];
+  const decidirEscola = (paradaId: string, decisao: DecisaoEscolaVazia) => {
+    setEscolasADecidir((ids) => ids.filter((id) => id !== paradaId));
+    setVolta((v) => (v ? resolverEscolaSemAlunos(v, paradaId, decisao, novoId) : v));
+  };
+  const faltaParaConcluir = volta ? [...pendenciasParaConcluirVolta(volta), ...(escolasPendentes.length ? ['decidir o que fazer com a escola que ficou sem alunos'] : [])] : [];
 
   async function salvar() {
     if (!volta) return;
     setSalvando(true); setErro(null);
     try {
-      const completa = !!volta.veiculoId && volta.paradas.every((p) => p.confirmado);
-      const salva = await salvarRota({ ...volta, status: completa ? 'concluida' : 'rascunho' });
+      // Só é CONCLUÍDA (e passa a aparecer nas buscas) com o que é próprio da
+      // volta informado: liberação de cada escola, ordem possível, endereços.
+      // Faltando algo, fica como rascunho — nada da ida é presumido.
+      const salva = await salvarRota({ ...volta, status: faltaParaConcluir.length === 0 ? 'concluida' : 'rascunho' });
       navigate(`/app/rotas/${salva.id}`, { replace: true });
     } catch (e) {
       setErro((e as Error).message || 'Não foi possível salvar a volta.');
@@ -124,8 +171,26 @@ export function MontarVoltaPage() {
           <>
             <Card className="p-3.5">
               <div className="h-56 overflow-hidden rounded-2xl ring-1 ring-navy-100"><MapaInterativoRota paradas={volta.paradas} bare /></div>
-              <p className="mt-2 text-xs text-navy-500">Sugestão: sai da escola e entrega pelo caminho mais curto. Segure <GripVertical className="inline h-3.5 w-3.5" /> e arraste para mudar a ordem.</p>
+              <p className="mt-2 text-xs text-navy-500" data-testid="ordem-da-volta">
+                {ordemPor === 'ruas' ? 'Sugestão: sai da escola e entrega pelo caminho mais rápido pelas ruas (a volta não é a ida invertida).'
+                  : ordemPor === 'calculando' ? 'Calculando a ordem pelos trajetos das ruas…'
+                  : 'Sugestão aproximada, por distância em linha reta — o mapa das ruas não respondeu. Confira a ordem no mapa.'}
+                {' '}Segure <GripVertical className="inline h-3.5 w-3.5" /> e arraste para mudar a ordem.
+              </p>
+              <p className="mt-1 text-xs text-navy-500">Horários, flexibilidade, tempo de atendimento, antecipação e escolas que você aceita <strong>não são copiados da ida</strong>: informe os da volta.</p>
             </Card>
+
+            {escolasPendentes.map((p) => (
+              <div key={p.id} role="alertdialog" aria-label="Escola sem alunos" data-testid="escola-sem-alunos" className="rounded-2xl bg-amber-50 p-3 ring-1 ring-amber-200">
+                <p className="text-sm font-bold text-amber-900">{p.destinoNome || p.rotulo || 'A escola'} ficou sem alunos na volta.</p>
+                <p className="mt-0.5 text-xs text-amber-900">O que você quer fazer com a visita a esta escola? Nada muda até você escolher.</p>
+                <div className="mt-2 grid gap-2">
+                  <button type="button" onClick={() => decidirEscola(p.id, 'manter')} className="min-h-[2.75rem] rounded-xl bg-white px-3 text-left text-sm font-bold ring-1 ring-navy-200">Continuar passando na escola</button>
+                  <button type="button" onClick={() => decidirEscola(p.id, 'disponibilidade')} className="min-h-[2.75rem] rounded-xl bg-white px-3 text-left text-sm font-bold ring-1 ring-navy-200">Parar de passar, mas aceitar incluir</button>
+                  <button type="button" onClick={() => decidirEscola(p.id, 'remover')} className="min-h-[2.75rem] rounded-xl bg-white px-3 text-left text-sm font-bold text-red-700 ring-1 ring-red-200">Tirar a escola desta rota</button>
+                </div>
+              </div>
+            ))}
 
             {foraDeOrdem.length > 0 && (
               <p role="alert" className="flex items-start gap-2 rounded-2xl bg-amber-50 p-3 text-sm text-amber-900">
@@ -133,20 +198,20 @@ export function MontarVoltaPage() {
               </p>
             )}
 
-            <Reorder.Group axis="y" values={paradas.map((p) => p.id)} onReorder={(ids) => setVolta((v) => (v ? reordenarParadas(v, ids as string[]) : v))} className="space-y-2">
+            <Reorder.Group axis="y" values={paradas.map((p) => p.id)} onReorder={(ids) => editarVolta((v) => reordenarParadas(v, ids as string[]))} className="space-y-2">
               {paradas.map((p, i) => (
                 <ItemParada key={p.id} parada={p} numero={i + 1} aberta={aberta === p.id} onAbrir={() => setAberta((a) => (a === p.id ? null : p.id))}
                   embarcam={volta.passageiros.filter((x) => x.embarqueParadaId === p.id)} descem={volta.passageiros.filter((x) => x.desembarqueParadaId === p.id)}
-                  onHorario={(min) => setVolta((v) => (v ? { ...v, paradas: v.paradas.map((q) => (q.id === p.id ? { ...q, liberacaoMin: min } : q)) } : v))}
+                  onHorario={(min) => editarVolta((v) => ({ ...v, paradas: v.paradas.map((q) => (q.id === p.id ? { ...q, liberacaoMin: min } : q)) }))}
                   onGrupo={(min) => setVolta((v) => (v ? { ...v, paradas: v.paradas.map((q) => (q.id === p.id ? { ...q, atendimentoGrupoMin: min } : q)) } : v))}
-                  onRemover={(alunoId) => { setVolta((v) => (v ? removerAluno(v, alunoId) : v)); setAberta(null); }}
-                  onEndereco={(alunoId, rotulo, ponto) => { setVolta((v) => (v ? trocarEnderecoDoAluno(v, alunoId, rotulo, ponto) : v)); setAberta(null); }} />
+                  onRemover={(alunoId) => { editarVolta((v) => removerAluno(v, alunoId)); setAberta(null); }}
+                  onEndereco={(alunoId, rotulo, ponto) => { editarVolta((v) => trocarEnderecoDoAluno(v, alunoId, rotulo, ponto)); setAberta(null); }} />
               ))}
             </Reorder.Group>
 
             <Card className="space-y-4">
               <PeriodoEscolar rota={volta} setRota={(r) => setVolta(r)} />
-              <SaidaEAntecipacao rota={volta} setRota={(r) => setVolta(r)} />
+              <SaidaEAntecipacao rota={volta} setRota={(r) => editarVolta(() => r)} />
             </Card>
 
             <button type="button" onClick={() => montar(voltam)} className="mx-auto flex min-h-[44px] items-center gap-2 text-sm font-semibold text-navy-500"><RotateCcw className="h-4 w-4" /> Voltar à sugestão</button>
@@ -155,8 +220,11 @@ export function MontarVoltaPage() {
             <div className="fixed inset-x-0 bottom-0 z-20 border-t border-navy-100 bg-white/95 p-3 backdrop-blur">
               <div className="vm-screen">
                 {!(volta.turno && volta.periodoConfirmado) && <p className="mb-2 text-center text-xs font-semibold text-amber-800">Confirme o período escolar desta volta para salvar.</p>}
+                {volta.turno && volta.periodoConfirmado && faltaParaConcluir.length > 0 && (
+                  <p className="mb-2 text-center text-xs font-semibold text-amber-800" data-testid="volta-rascunho">Será salva como rascunho (não aparece nas buscas). Falta: {listar(faltaParaConcluir)}.</p>
+                )}
                 <button type="button" className="btn btn-lg btn-primary w-full" disabled={salvando || !volta.passageiros.length || foraDeOrdem.length > 0 || !(volta.turno && volta.periodoConfirmado)} onClick={salvar}>
-                  {salvando ? <Loader2 className="h-5 w-5 animate-spin" /> : <Check className="h-5 w-5" />} Salvar rota de volta
+                  {salvando ? <Loader2 className="h-5 w-5 animate-spin" /> : <Check className="h-5 w-5" />} {faltaParaConcluir.length === 0 ? 'Salvar rota de volta' : 'Salvar rascunho da volta'}
                 </button>
               </div>
             </div>
