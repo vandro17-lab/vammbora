@@ -190,7 +190,8 @@ describe('Busca real com o motor do endpoint (§6.2/§9.1)', () => {
       origem: { lat: origem.lat, lng: origem.lng }, destinoId: esc.destinoId!,
       escolaPonto: { lat: esc.lat!, lng: esc.lng! }, sentido: 'ida', turno: null, contratacao: 'mensal',
     });
-    expect(r.vagas).toBe(0);
+// Vaga exibida = lugares livres NO TRECHO calculado; sem encaixe calculado, não há número (nunca "0" pelo pico).
+    expect(r.vagas === null ? r.status !== 'compativel' : r.vagas >= 1).toBe(true);
     const cap = capacidadeAlunos(lotada!.rota, lotada!.veiculo);
     const sim = simularEncaixeProgressivo(lotada!.rota, lotada!.veiculo, {
       alunoId: 'familia', nome: 'F', casa: { id: 'familia-casa', nome: 'Casa', lat: origem.lat, lng: origem.lng },

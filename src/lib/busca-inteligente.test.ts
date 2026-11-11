@@ -104,7 +104,8 @@ describe('vagas (1º filtro)', () => {
     const passageiros = Array.from({ length: 4 }, (_, i) => pax('p' + i, 'a', 'e', 'esc1'));
     const r = rota({ paradas: [pSaida(), pCasa('a', 1, C.casaA), pEscola('e', 2, 'esc1', C.escola1, 7 * 60)], passageiros });
     const res = avaliarRotaReal(r, veiculo(4), pedido(), M);
-    expect(res.vagas).toBe(0);
+// Vaga exibida = lugares livres NO TRECHO calculado; sem encaixe calculado, não há número (nunca "0" pelo pico).
+    expect(res.vagas === null ? res.status !== 'compativel' : res.vagas >= 1).toBe(true);
     const sim = simularEncaixeProgressivo(r, veiculo(4), { alunoId: 'familia', nome: 'F', casa: { id: 'familia-casa', nome: 'Casa', lat: pedido().origem!.lat, lng: pedido().origem!.lng }, escolaId: 'esc1' }, M, { horarioEscolaMin: 7 * 60 });
     expect(sim.elegivel).toBe(res.status === 'compativel');
     if (sim.opcao) expect(sim.opcao.eventos.every((e) => e.ocupacaoApos <= 4)).toBe(true);

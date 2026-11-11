@@ -53,13 +53,14 @@ export function CartaoRotaReal({ r }: { r: CartaoRotaRealDados }) {
       <div className="flex items-center justify-between border-t border-navy-50 pt-3 text-sm text-navy-600">
         <span className="inline-flex items-center gap-1.5">
           <Users className="h-4 w-4 text-navy-400" />
+          {/* Vaga = lugares livres no TRECHO calculado para a família (não o pico da rota). */}
           {r.vagas != null && r.vagas > 0
-            ? `${r.vagas} ${r.vagas === 1 ? 'vaga' : 'vagas'}${r.vanLugares != null ? ` de ${r.vanLugares}` : ''}`
-            : r.vanLugares != null ? `${r.vanLugares} lugares` : 'Van'}
+            ? `${r.vagas} ${r.vagas === 1 ? 'lugar livre' : 'lugares livres'} no seu trecho`
+            : r.vanLugares != null ? `Van de ${r.vanLugares} lugares` : 'Van'}
         </span>
         {r.minutosABordo != null && (
           <span className="inline-flex items-center gap-1.5">
-            <Clock className="h-4 w-4 text-navy-400" /> ~{r.minutosABordo} min a bordo
+            <Clock className="h-4 w-4 text-navy-400" /> ~{Math.round(r.minutosABordo)} min a bordo
           </span>
         )}
       </div>
@@ -75,6 +76,12 @@ export function CartaoRotaReal({ r }: { r: CartaoRotaRealDados }) {
         </span>
       </div>
 
+      {r.origemEscola === 'aceita' && (
+        <p className="text-xs leading-snug text-navy-500">Esta rota ainda não passa pela escola: o motorista informou que aceita incluí-la.</p>
+      )}
+      {r.temposEstimados && (
+        <p className="text-xs font-semibold leading-snug text-amber-700">Horários aproximados pela distância, sem consulta às ruas — não comprovam que cabe.</p>
+      )}
       <p className="text-xs leading-snug text-navy-400">{r.motivo}</p>
     </div>
   );

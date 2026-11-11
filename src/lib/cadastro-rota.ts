@@ -149,6 +149,7 @@ export function normalizarEscolasDisponiveis(rota: Rota): EscolaDisponivel[] {
       ...e, dias,
       portaoLat: temPortao ? e.portaoLat : null, portaoLng: temPortao ? e.portaoLng : null,
       limiteChegadaMin: minutoDoDia(e.limiteChegadaMin), liberacaoMin: minutoDoDia(e.liberacaoMin),
+      aberturaMin: minutoDoDia(e.aberturaMin),
       atendimentoGrupoMin: duracaoMin(e.atendimentoGrupoMin),
     });
   }

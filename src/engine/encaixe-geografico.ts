@@ -29,6 +29,12 @@ export interface Compromisso {
    *  atender — ex.: liberação dos alunos na escola, na volta. Nunca viola por
    *  chegar cedo; chegar tarde é limitado pelas janelas/limites de sempre. */
   naoAntesMin?: number;
+  /** PRAZO OBRIGATÓRIO de quem é atendido aqui (minuto do dia): o atendimento
+   *  (chegada + espera) não pode passar dele. É exigência exata — a margem de
+   *  segurança NÃO é descontada dele (ela já protege o `limiteEscolaMin`; somar
+   *  as duas seria aplicar a mesma margem duas vezes). Ex.: a família precisa
+   *  chegar até 6h50 numa escola cujo limite é 7h00. */
+  prazoMin?: number;
 }
 export interface Trecho { minutos: number; metros: number }
 export interface MatrizViaria {
@@ -61,8 +67,13 @@ export interface PedidoEncaixe {
   alunoId: string;
   casa: PontoGeo;
   escola: PontoGeo;
-  /** Horário máximo de chegada à escola (ida) ou mínimo de saída da escola (volta). */
+  /** Horário DA ESCOLA nesta rota: limite de chegada (ida) ou saída permitida
+   *  (volta). Na ida recebe a margem de segurança da rota. */
   horarioEscolaMin: number;
+  /** Exigência DA FAMÍLIA, separada do horário da escola. Ida: prazo
+   *  obrigatório de chegada (exato, sem margem extra). Volta: a partir de
+   *  quando o aluno está liberado (a van espera). Ausente = sem exigência própria. */
+  horarioFamiliaMin?: number;
   /** Atendimento do aluno na CASA (min). */
   atendimentoMin?: number;
   /** Tempo parado na escola quando ela é INSERIDA como parada nova (min). Com a
@@ -166,6 +177,8 @@ export function simularRota(rota: RotaOperacional, matriz: MatrizViaria, comprom
     }
     // "Não antes de" (liberação na escola): a van espera; nunca reprova por chegar cedo.
     if (p.naoAntesMin !== undefined && chegada + espera < p.naoAntesMin - EPS) espera = p.naoAntesMin - chegada;
+    // Prazo obrigatório: vale o instante do ATENDIMENTO (depois da espera), sem margem.
+    if (p.prazoMin !== undefined && (!inteiro(p.prazoMin) || chegada + espera > p.prazoMin + EPS)) motivos.push('Prazo de chegada do aluno ultrapassado: ' + p.ponto.nome);
     tempo += espera;
     if (p.tipo === 'embarque') {
       ocupacao++;
@@ -288,8 +301,12 @@ export type ClassificacaoEncaixe = 'compativel' | 'incompativel' | 'indeterminad
 export interface OpcoesEncaixeProgressivo {
   /** Inserir a escola do aluno como nova parada quando ausente do itinerário. Default true. */
   inserirEscolaNova?: boolean;
-  /** Horário-limite de chegada à escola nova (minuto). Default: `pedido.horarioEscolaMin`. */
-  limiteEscolaNovaMin?: number;
+  /** Horário-limite de chegada à escola nova (minuto). Default: `pedido.horarioEscolaMin`.
+   *  `null` = a escola nova não tem limite próprio conhecido (vale só o prazo da família). */
+  limiteEscolaNovaMin?: number | null;
+  /** Ida: a escola do novo aluno só abre a partir deste minuto. Chegando antes,
+   *  a van ESPERA — e a entrega só conta a partir da abertura. */
+  aberturaEscolaMin?: number;
   /** Testar reorganizações controladas quando a inserção simples falha. Default true. */
   reorganizar?: boolean;
   /** Orçamento máximo de candidatas simuladas. Default 20000. */
@@ -362,6 +379,7 @@ function tetoDe(rota: RotaOperacional, c: Compromisso, margem: number): number {
     c.limiteEscolaMin !== undefined ? c.limiteEscolaMin - margem : Infinity,
     c.janela ? c.janela.fimMin : Infinity,
     rota.limiteFimMin !== undefined ? rota.limiteFimMin : Infinity,
+    c.prazoMin !== undefined ? c.prazoMin : Infinity, // prazo exato: sem margem
   );
 }
 
@@ -578,8 +596,10 @@ function construirOpcaoProgressiva(
   return {
     opcao: {
       elegivel: true, sentido: rota.sentido,
-      horarioBuscaMin: eb.chegadaMin, horarioEntregaMin: ed.chegadaMin,
-      minutosABordo: ed.chegadaMin - eb.saidaMin,
+      // Busca e entrega = quando o aluno é de fato atendido: se ele ainda não
+      // foi liberado (volta) ou a escola ainda não abriu (ida), a van espera.
+      horarioBuscaMin: eb.chegadaMin + (eb.esperaMin ?? 0), horarioEntregaMin: ed.chegadaMin + (ed.esperaMin ?? 0),
+      minutosABordo: ed.chegadaMin + (ed.esperaMin ?? 0) - eb.saidaMin,
       distanciaABordoMetros,
       desvioMin: (cand.fimMin - partidaMin) - (base.fimMin - rota.partidaMin),
       desvioMetros: cand.metros - base.metros,
@@ -626,14 +646,19 @@ export function encontrarEncaixesProgressivo(
   const escolaNova = indiceEscolaEm(rota.compromissos, pedido.escola.id) < 0;
   if (escolaNova && opcoes.inserirEscolaNova === false) return vazio('indeterminado', { escolaInserida: false });
 
-  const limiteEscola = escolaNova ? (opcoes.limiteEscolaNovaMin ?? pedido.horarioEscolaMin) : pedido.horarioEscolaMin;
+  const limiteEscola: number | null = escolaNova
+    ? (opcoes.limiteEscolaNovaMin === null ? null : opcoes.limiteEscolaNovaMin ?? pedido.horarioEscolaMin)
+    : pedido.horarioEscolaMin;
+  const familia = pedido.horarioFamiliaMin !== undefined && inteiro(pedido.horarioFamiliaMin) ? pedido.horarioFamiliaMin : undefined;
   // Atendimento conta UMA vez, na casa. Na escola: zero quando ela já está no
   // itinerário (o marcador da escola traz o tempo do grupo); quando a escola é
   // inserida como parada nova, o tempo da parada escolar entra aqui.
   const atendCasa = pedido.atendimentoMin ?? 1;
   const atendEscola = escolaNova ? (pedido.atendimentoEscolaNovaMin ?? atendCasa) : 0;
   const ida = rota.sentido === 'ida';
-  const liberacao = !ida ? Math.max(limiteEscola, opcoes.liberacaoNovoAlunoMin ?? 0) : undefined;
+  // Volta: o aluno só embarca depois de liberado pela escola E pela família.
+  const liberacao = !ida ? Math.max(limiteEscola ?? 0, opcoes.liberacaoNovoAlunoMin ?? 0, familia ?? 0) : undefined;
+  const abertura = ida && opcoes.aberturaEscolaMin !== undefined && inteiro(opcoes.aberturaEscolaMin) ? opcoes.aberturaEscolaMin : undefined;
   const busca: Compromisso = {
     id: 'novo:embarque:' + pedido.alunoId, ponto: ida ? pedido.casa : pedido.escola,
     tipo: 'embarque', alunoId: pedido.alunoId, atendimentoMin: ida ? atendCasa : atendEscola,
@@ -644,7 +669,10 @@ export function encontrarEncaixesProgressivo(
   const entrega: Compromisso = {
     id: 'novo:desembarque:' + pedido.alunoId, ponto: ida ? pedido.escola : pedido.casa,
     tipo: 'desembarque', alunoId: pedido.alunoId, atendimentoMin: ida ? atendEscola : atendCasa,
-    ...(ida ? { limiteEscolaMin: limiteEscola } : {}),
+    // Ida: limite da ESCOLA (com a margem da rota) e, à parte, o prazo exato da família.
+    ...(ida && limiteEscola !== null ? { limiteEscolaMin: limiteEscola } : {}),
+    ...(ida && familia !== undefined ? { prazoMin: familia } : {}),
+    ...(abertura !== undefined ? { naoAntesMin: abertura } : {}),
     ...(!ida && pedido.janelaCasa ? { janela: pedido.janelaCasa } : {}),
   };
 
@@ -691,7 +719,7 @@ export function encontrarEncaixesProgressivo(
         // Antecipação: cada candidata usa a partida viável MAIS TARDIA, nunca
         // depois da habitual (corrige o defeito em que a "antecipação" atrasava).
         const { opcao, faltaDado, motivos } = construirOpcaoProgressiva(rota, base, matriz, paradas, busca.id, entrega.id,
-          { tolerancia, horarioEscolaMin: liberacao ?? limiteEscola, tmin, autorizadaMin, reorganizada: estado.reorganizada,
+          { tolerancia, horarioEscolaMin: liberacao ?? limiteEscola ?? 0, tmin, autorizadaMin, reorganizada: estado.reorganizada,
             escolaNovaExigeAprovacao: escolaNova && !!opcoes.escolaNovaExigeAprovacao });
         if (faltaDado) estado.faltaDado = true;
         for (const m of motivos) estado.motivos.add(m);

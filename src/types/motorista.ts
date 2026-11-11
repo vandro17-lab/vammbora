@@ -41,6 +41,9 @@ export interface ParadaRota {
   portaoEspecifico?: boolean;
   /** IDA: limite de chegada à escola (minuto do dia). */
   limiteChegadaMin?: number | null;
+  /** IDA: a partir de que horas a escola recebe os alunos (abertura do portão).
+   *  Chegando antes, a van espera. `null`/ausente = não informado. */
+  aberturaMin?: number | null;
   /** VOLTA: horário de liberação dos alunos (minuto do dia). */
   liberacaoMin?: number | null;
   /** Tempo de atendimento do GRUPO na escola, em minutos (aceita fração). */
@@ -64,6 +67,8 @@ export interface EscolaDisponivel {
   portaoLng?: number | null;
   /** Condições da visita, caso a escola entre na rota (todas opcionais). */
   limiteChegadaMin?: number | null;
+  /** Abertura do portão (ida), quando informada. */
+  aberturaMin?: number | null;
   liberacaoMin?: number | null;
   atendimentoGrupoMin?: number | null;
 }

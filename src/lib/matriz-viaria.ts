@@ -1,5 +1,6 @@
 import type { PontoGeo, MatrizViaria, Trecho } from '@/engine/encaixe-geografico';
 import { supabase } from '@/lib/supabase';
+import { LIMITE_PONTOS_AVALIACAO, LIMITE_PONTOS_MATRIZ, consultarTabelasEmBlocos, type TabelasViarias } from '@/lib/matriz-viaria-servidor';
 
 /**
  * Matriz viária REAL para o simulador: busca tempos/distâncias entre todos os
@@ -25,8 +26,6 @@ interface RespostaMatriz {
   erro?: string;
 }
 
-const LIMITE_PONTOS = 25;
-
 /** Constrói uma MatrizViaria a partir das tabelas de tempos/distâncias por índice. */
 export function matrizDeTabelas(
   pontos: PontoGeo[],
@@ -49,20 +48,16 @@ export function matrizDeTabelas(
   };
 }
 
-/** Busca a matriz viária real dos pontos informados. Lança FalhaMatriz em erro. */
-export async function obterMatrizViaria(pontos: PontoGeo[]): Promise<MatrizViaria> {
-  if (pontos.length < 2) throw new FalhaMatriz('mapas_indisponivel', 'São necessários pelo menos dois pontos.');
-  if (pontos.length > LIMITE_PONTOS) throw new FalhaMatriz('muitos_pontos', 'A rota tem pontos demais para o cálculo rodoviário.');
+type Coord = { lat: number; lng: number };
 
-  const sessao = (await supabase?.auth.getSession())?.data.session ?? null;
-  if (!sessao?.access_token) throw new FalhaMatriz('sem_sessao', 'Entre na sua conta de motorista para calcular trajetos reais.');
-
+/** Uma chamada ao proxy `/api/mapas`: tabela origens × destinos (até 25 de cada lado). */
+async function consultarBloco(token: string, origens: Coord[], destinos: Coord[] | null): Promise<TabelasViarias> {
   let resposta: Response;
   try {
     resposta = await fetch('/api/mapas', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + sessao.access_token },
-      body: JSON.stringify({ operacao: 'matriz', pontos: pontos.map((p) => ({ lat: p.lat, lng: p.lng })) }),
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ operacao: 'matriz', pontos: origens, ...(destinos ? { destinos } : {}) }),
       cache: 'no-store',
     });
   } catch {
@@ -72,5 +67,31 @@ export async function obterMatrizViaria(pontos: PontoGeo[]): Promise<MatrizViari
   if (!resposta.ok || !dados.tempos || !dados.distancias) {
     throw new FalhaMatriz('mapas_indisponivel', dados.erro ?? 'Serviço de mapas indisponível no momento.');
   }
-  return matrizDeTabelas(pontos, dados.tempos, dados.distancias);
+  return { tempos: dados.tempos, distancias: dados.distancias };
+}
+
+/**
+ * Busca a matriz viária real dos pontos informados. Lança FalhaMatriz em erro.
+ * Até 25 pontos: uma consulta. De 26 a `LIMITE_PONTOS_AVALIACAO`: em blocos
+ * (mesma regra da busca das famílias). Qualquer bloco que falhe invalida a
+ * matriz inteira — o simulador nunca calcula com parte dos trechos.
+ */
+export async function obterMatrizViaria(pontos: PontoGeo[]): Promise<MatrizViaria> {
+  if (pontos.length < 2) throw new FalhaMatriz('mapas_indisponivel', 'São necessários pelo menos dois pontos.');
+  if (pontos.length > LIMITE_PONTOS_AVALIACAO) throw new FalhaMatriz('muitos_pontos', 'A rota tem pontos demais para o cálculo rodoviário.');
+
+  const sessao = (await supabase?.auth.getSession())?.data.session ?? null;
+  if (!sessao?.access_token) throw new FalhaMatriz('sem_sessao', 'Entre na sua conta de motorista para calcular trajetos reais.');
+  const token = sessao.access_token;
+  const coords = pontos.map((p) => ({ lat: p.lat, lng: p.lng }));
+
+  if (pontos.length <= LIMITE_PONTOS_MATRIZ) {
+    const t = await consultarBloco(token, coords, null);
+    return matrizDeTabelas(pontos, t.tempos, t.distancias);
+  }
+  let falha: FalhaMatriz | null = null;
+  const t = await consultarTabelasEmBlocos(coords, (origens, destinos) =>
+    consultarBloco(token, origens, destinos).catch((e) => { falha = e instanceof FalhaMatriz ? e : falha; return null; }));
+  if (!t || t.blocosFalhos > 0) throw falha ?? new FalhaMatriz('mapas_indisponivel', 'Serviço de mapas indisponível no momento.');
+  return matrizDeTabelas(pontos, t.tempos, t.distancias);
 }

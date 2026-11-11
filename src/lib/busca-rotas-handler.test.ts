@@ -23,10 +23,12 @@ vi.mock('@supabase/supabase-js', () => ({
 
 import handler from '../../api/buscar-rotas';
 
+let seqIp = 0;
 function fakeReq(body: unknown) {
   const texto = JSON.stringify(body);
   return {
-    method: 'POST', headers: {},
+    // IP distinto por requisição: o limite por IP do endpoint não é o que está em teste.
+    method: 'POST', headers: { 'x-forwarded-for': `10.0.${Math.floor(++seqIp / 250)}.${seqIp % 250}` },
     async *[Symbol.asyncIterator]() { yield Buffer.from(texto); },
   } as never;
 }
@@ -116,7 +118,7 @@ describe('api/buscar-rotas (handler, mock Supabase)', () => {
     expect(res.body).not.toContain('identificacao');
   });
 
-  it('sem chave do provedor viário => tempos estimados NUNCA confirmam (sob confirmação)', async () => {
+  it('sem chave do provedor viário => nada é confirmado NEM recusado por estimativa: avaliação incompleta', async () => {
     delete process.env.GEOAPIFY_API_KEY;
     const provedor = mockProvedorViario();
     estado.canned = { routes: [rotaRealCanon()], vehicles: [{ id: 'veic-1', seats_passenger: 6 }] };
@@ -125,19 +127,22 @@ describe('api/buscar-rotas (handler, mock Supabase)', () => {
     const out = JSON.parse(res.body);
     expect(provedor).not.toHaveBeenCalled();
     expect(out.resultados).toHaveLength(1);
-    expect(out.resultados[0].status).toBe('sob_confirmacao');
-    expect(out.resultados[0].temposEstimados).toBe(true);
+    // Estimativa não é prova de viabilidade: sem consulta às ruas não há cartão com horário.
+    expect(out.resultados[0]).toMatchObject({ status: 'indeterminado', pendencia: 'avaliacao_incompleta', passagemCasaMin: null, horarioEscolaMin: null, vagas: null });
+    expect(out.semProvedor).toBe(true);
+    expect(out.continuacao).toBeNull();
+    expect(out.resumo).toMatchObject({ candidatas: 1, avaliacaoIncompleta: 1, incompativeis: 0 });
   });
 
-  it('provedor viário fora do ar => idem: sob confirmação, nunca compatível', async () => {
+  it('provedor viário fora do ar => avaliação incompleta (com continuação para tentar de novo), nunca compatível nem incompatível', async () => {
     mockProvedorViario(false);
     estado.canned = { routes: [rotaRealCanon()], vehicles: [{ id: 'veic-1', seats_passenger: 6 }] };
     const res = fakeRes();
     await handler(fakeReq(pedido), res as never);
     const out = JSON.parse(res.body);
     expect(res.statusCode).toBe(200);
-    expect(out.resultados[0].status).toBe('sob_confirmacao');
-    expect(out.resultados[0].temposEstimados).toBe(true);
+    expect(out.resultados[0]).toMatchObject({ status: 'indeterminado', pendencia: 'avaliacao_incompleta', horarioEscolaMin: null });
+    expect(out.continuacao).toEqual({ inicio: 1, repetir: ['rota-1'] });
   });
 
   it('rota de outro turno (ida) não é avaliada', async () => {
@@ -197,10 +202,20 @@ describe('api/buscar-rotas (handler, mock Supabase)', () => {
     await handler(fakeReq({ ...pedido, origem: { lat: -21.7, lng: -50.95 } }), res as never);
     const out = JSON.parse(res.body);
     expect(out.totalRotasAvaliadas).toBe(2);
-    const semMatriz = out.resultados.find((r: { temposEstimados: boolean }) => r.temposEstimados);
-    expect(semMatriz).toBeTruthy();
-    expect(semMatriz.status).toBe('indeterminado');
+    // Só uma coube no orçamento desta chamada; a outra AGUARDA (não vira recusa nem some).
+    expect(out.resultados).toHaveLength(1);
+    expect(out.aguardando).toBe(1);
+    expect(out.continuacao).toEqual({ inicio: 1, repetir: [] });
     expect(out.inconclusivas).toBeGreaterThanOrEqual(1);
+    expect(out.resultados.some((r: { status: string; temposEstimados: boolean }) => r.status === 'incompativel' && r.temposEstimados)).toBe(false);
+    // Continuar calcula a que ficou de fora — e a fila acaba.
+    const res2 = fakeRes();
+    await handler(fakeReq({ ...pedido, origem: { lat: -21.7, lng: -50.95 }, continuacao: out.continuacao }), res2 as never);
+    const out2 = JSON.parse(res2.body);
+    expect(out2.resultados).toHaveLength(1);
+    expect(out2.resultados[0].rotaId).not.toBe(out.resultados[0].rotaId);
+    expect(out2.aguardando).toBe(0);
+    expect(out2.continuacao).toBeNull();
   });
 
   it('F02: provedor viário fora do ar + estimativa negativa => inconclusivo, não recusa', async () => {
@@ -211,6 +226,53 @@ describe('api/buscar-rotas (handler, mock Supabase)', () => {
     const out = JSON.parse(res.body);
     expect(out.resultados[0].status).toBe('indeterminado');
     expect(out.inconclusivas).toBe(1);
+  });
+
+  it('NENHUM dado de quem já está na rota sai na resposta — em qualquer situação (cabe, não cabe, incompleta, dados insuficientes)', async () => {
+    const privados = ['Segredo', 'Secreta', 'identificacao', 'board_stop_id', 'route_passengers', 'route_stops', 'owner', 'codigos', 'aprovacoes', 'alteracoes', 'eventos', 'trechos',
+      String(C.casaA.lat), String(C.casaA.lng), String(C.casaB.lat), String(C.casaB.lng), String(C.garagem.lat)];
+    const conferir = (corpo: string) => { for (const p of privados) expect(corpo, `vazou "${p}"`).not.toContain(p); };
+    const campos = ['rotaId', 'rotaNome', 'demo', 'precoMensal', 'precoTipo', 'vanLugares', 'vagas', 'atendeEscola', 'origemEscola', 'sentido', 'status', 'pendencia',
+      'passagemCasaMin', 'horarioEscolaMin', 'minutosABordo', 'fonteHorario', 'temposEstimados', 'motivo'].sort();
+    const rodar = async (corpo: unknown) => { const res = fakeRes(); await handler(fakeReq(corpo), res as never); conferir(res.body); return JSON.parse(res.body); };
+
+    estado.canned = { routes: [rotaRealCanon()], vehicles: [{ id: 'veic-1', seats_passenger: 6 }] };
+    mockProvedorViario();
+    const cabe = await rodar(pedido);
+    expect(cabe.resultados[0].status).toBe('compativel');
+    expect(Object.keys(cabe.resultados[0]).sort()).toEqual(campos); // lista fechada de campos públicos
+    // Precisa chegar até 4h00: exigiria sair mais de 1 h antes do habitual → não cabe (calculado).
+    const naoCabe = await rodar({ ...pedido, horarioMin: 4 * 60 });
+    expect(naoCabe.resultados[0].status).toBe('incompativel');
+    mockProvedorViario(false);
+    expect((await rodar(pedido)).resultados[0].pendencia).toBe('avaliacao_incompleta');
+    estado.canned = { routes: [rotaRealCanon()], vehicles: [] };
+    expect((await rodar(pedido)).resultados[0].pendencia).toBe('dados_insuficientes');
+  });
+
+  it('vaga exibida é a do TRECHO calculado: van lotada no pico não devolve "0 vagas"', async () => {
+    mockProvedorViario();
+    // 1 aluno a bordo; van de 2 lugares → pico não lotado; van de 1 lugar → lotada no pico.
+    for (const lugares of [2, 1]) {
+      estado.canned = { routes: [rotaRealCanon()], vehicles: [{ id: 'veic-1', seats_passenger: lugares }] };
+      const res = fakeRes();
+      await handler(fakeReq(pedido), res as never);
+      const r = JSON.parse(res.body).resultados[0];
+      expect(r.vagas).not.toBe(0);
+      if (r.status === 'compativel' || r.status === 'sob_confirmacao') expect(r.vagas).toBeGreaterThanOrEqual(1);
+      else expect(r.vagas).toBeNull();
+    }
+  });
+
+  it('continuação malformada vinda do navegador é ignorada (não amplia nem derruba a busca)', async () => {
+    mockProvedorViario();
+    estado.canned = { routes: [rotaRealCanon()], vehicles: [{ id: 'veic-1', seats_passenger: 6 }] };
+    for (const continuacao of ['x', { inicio: -5, repetir: 'rota-1' }, { inicio: 1e9, repetir: [1, null, 'a'.repeat(500)] }, null]) {
+      const res = fakeRes();
+      await handler(fakeReq({ ...pedido, continuacao }), res as never);
+      expect(res.statusCode).toBe(200);
+      expect(JSON.parse(res.body).resultados[0].status).toBe('compativel');
+    }
   });
 
   it('F10: erro ao consultar as vans é ERRO (500), não "nenhuma rota"', async () => {

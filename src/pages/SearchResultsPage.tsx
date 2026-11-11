@@ -8,9 +8,8 @@ import { FamilyDemoResults } from '@/features/family-search-demo/FamilyDemoResul
 import { buscaOverlay } from '@/lib/busca-overlay';
 import { BUSCA_LIMITE_MS, esperaRestanteDaBusca } from '@/lib/animacoes';
 import { DEMO_BUSCA } from '@/lib/supabase';
-import { buscarRotasReais, type CartaoRotaRealDados } from '@/lib/busca-rotas-reais-cliente';
-import { CartaoRotaReal } from '@/components/results/CartaoRotaReal';
-import { WaitlistForm } from '@/components/results/WaitlistForm';
+import { buscarRotasReais, continuarBuscaReal, type RespostaBuscaReal } from '@/lib/busca-rotas-reais-cliente';
+import { ResultadosRotasReais } from '@/components/results/ResultadosRotasReais';
 
 export function SearchResultsPage(){
  const [sp]=useSearchParams();
@@ -20,9 +19,10 @@ export function SearchResultsPage(){
  // Fluxo real (padrão): rotas cadastradas, via /api/buscar-rotas. As ofertas de
  // exemplo só aparecem no modo demonstração EXPLÍCITO (ou sem Supabase).
  const buscaDemo=DEMO_BUSCA||modoDemo;
- const [reais,setReais]=useState<CartaoRotaRealDados[]>([]);
- // Rotas candidatas que não puderam ser avaliadas (não é "sem vaga").
- const [inconclusivas,setInconclusivas]=useState(0);
+ // Resposta por sentido: cartões + o que ficou sem veredito (e por quê).
+ const [real,setReal]=useState<RespostaBuscaReal|null>(null);
+ // "Continuar avaliação": pede o PRÓXIMO lote, preservando o que já foi calculado.
+ const [continuando,setContinuando]=useState(false);
  const destino=criterios.destinoId?destinosPorId[criterios.destinoId]??null:null;
  const horario=sp.get('horario')||horarioPadrao(criterios.turno,criterios.modalidade);
  const [ofertas,setOfertas]=useState<OfertaDemo[]>([]);
@@ -37,7 +37,7 @@ export function SearchResultsPage(){
   // Uma consulta por vez: trocar os critérios (ou sair da página) aborta a
   // anterior, e respostas de consultas abortadas são descartadas.
   const ctrl=new AbortController();
-  setCarregando(true);setErro('');setOfertas([]);setReais([]);setInconclusivas(0);setImagensProntas(false);setCancelada(false);
+  setCarregando(true);setErro('');setOfertas([]);setReal(null);setContinuando(false);setImagensProntas(false);setCancelada(false);
   const limite=window.setTimeout(()=>{
    ctrl.abort();
    setErro('A busca demorou mais do que o esperado. Verifique a conexão e tente novamente.');
@@ -64,7 +64,7 @@ export function SearchResultsPage(){
     .then(r=>{
      if(ctrl.signal.aborted)return;
      clearTimeout(limite);
-     if(r.estado==='ok'){setReais(r.resultados);setInconclusivas(r.inconclusivas);}
+     if(r.estado==='ok')setReal(r);
      else setErro(r.estado==='nao_configurado'
       ?'A busca por rotas ainda não está disponível neste ambiente. Tente novamente mais tarde.'
       :'Não foi possível consultar as rotas agora. Verifique a conexão e tente novamente.');
@@ -114,20 +114,17 @@ export function SearchResultsPage(){
    : <section className="mt-6" aria-busy={carregando}>
       {carregando&&<p className="text-sm text-navy-500">Avaliando as rotas cadastradas…</p>}
       {erro&&<p role="alert" className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900 ring-1 ring-amber-200">{erro}</p>}
-      {!carregando&&!erro&&reais.length>0&&<>
-       <p className="text-sm text-navy-600">{reais.length} {reais.length===1?'rota compatível encontrada':'rotas compatíveis encontradas'}. Horários estimados — a vaga é confirmada pelo motorista.</p>
-       <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{reais.map(r=><CartaoRotaReal key={r.rotaId+r.sentido} r={r}/>)}</div>
-       {inconclusivas>0&&<p role="status" className="mt-4 rounded-xl bg-navy-50 p-3 text-xs text-navy-600">{inconclusivas===1?'1 outra rota não pôde ser avaliada agora':`${inconclusivas} outras rotas não puderam ser avaliadas agora`} (falta de dados de trajeto). <button type="button" className="font-semibold text-mint-700 underline" onClick={()=>setTentativa(n=>n+1)}>Tentar de novo</button></p>}
-      </>}
-      {!carregando&&!erro&&reais.length===0&&inconclusivas>0&&<>
-       <p role="status" data-testid="aviso-inconclusivo" className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900 ring-1 ring-amber-200">{inconclusivas===1?'Encontramos 1 rota que passa pela sua escola, mas ela não pôde ser avaliada agora':`Encontramos ${inconclusivas} rotas que passam pela sua escola, mas elas não puderam ser avaliadas agora`} (faltou calcular o trajeto pelas ruas). Isso não significa que não há vaga.</p>
-       <button type="button" className="btn btn-primary mt-4" onClick={()=>setTentativa(n=>n+1)}>Tentar de novo</button>
-       <div className="mt-6"><WaitlistForm criterios={criterios}/></div>
-      </>}
-      {!carregando&&!erro&&reais.length===0&&inconclusivas===0&&<>
-       <p className="rounded-xl bg-navy-50 p-4 text-sm text-navy-700">Nenhuma rota cadastrada encaixa neste endereço e escola no momento. Deixe seu contato para ser avisado quando surgir uma vaga.</p>
-       <div className="mt-4"><WaitlistForm criterios={criterios}/></div>
-      </>}
+      {!carregando&&!erro&&real&&<ResultadosRotasReais resposta={real} criterios={criterios} continuando={continuando}
+       onTentar={()=>setTentativa(n=>n+1)}
+       onContinuar={()=>{
+        if(!destino||destino.lat==null||destino.lng==null||continuando)return;
+        const base=real;
+        setContinuando(true);
+        continuarBuscaReal(criterios,{lat:destino.lat,lng:destino.lng},base)
+         // Só aplica se ainda é a mesma busca (critérios não mudaram no meio).
+         .then(r=>setReal(atual=>atual===base?r:atual))
+         .finally(()=>setContinuando(false));
+       }}/>}
      </section>}
  </main>;
 }

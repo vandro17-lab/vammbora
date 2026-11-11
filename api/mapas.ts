@@ -68,7 +68,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       raw += chunk.toString();
       if (raw.length > 12000) return reply(res, 413, { erro: 'Solicitação muito grande.' });
     }
-    const data = JSON.parse(raw) as { operacao?: string; texto?: string; numero?: string; pontos?: Point[]; ponto?: Point };
+    const data = JSON.parse(raw) as { operacao?: string; texto?: string; numero?: string; pontos?: Point[]; destinos?: Point[]; ponto?: Point };
     const op = data.operacao;
 
     // Roteamento e matriz são mais caros: exigem sessão Supabase (motorista logado).
@@ -83,9 +83,14 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     }
 
     // Matriz viária (sources x targets): usada pelo simulador de encaixe.
+    // Sem `destinos`: matriz quadrada dos `pontos`. Com `destinos`: um BLOCO
+    // (pontos = origens) — é como rotas com mais de 25 pontos são calculadas.
     if (op === 'matriz') {
       const pontos = data.pontos;
-      if (!Array.isArray(pontos) || pontos.length < 2 || pontos.length > 25 || !pontos.every(valid)) {
+      const emBloco = Array.isArray(data.destinos);
+      const destinos = emBloco ? (data.destinos as Point[]) : pontos;
+      if (!Array.isArray(pontos) || pontos.length < (emBloco ? 1 : 2) || pontos.length > 25 || !pontos.every(valid)
+        || !Array.isArray(destinos) || destinos.length < 1 || destinos.length > 25 || !destinos.every(valid)) {
         return reply(res, 400, { erro: 'Informe de 2 a 25 pontos geográficos válidos.' });
       }
       const matrizUrl = new URL('https://api.geoapify.com/v1/routematrix');
@@ -93,7 +98,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       const corpo = {
         mode: 'drive',
         sources: pontos.map((p) => ({ location: [p.lng, p.lat] })),
-        targets: pontos.map((p) => ({ location: [p.lng, p.lat] })),
+        targets: destinos.map((p) => ({ location: [p.lng, p.lat] })),
       };
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), 15000);
@@ -116,14 +121,14 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       if (!Array.isArray(linhas) || linhas.length !== pontos.length) {
         return reply(res, 422, { erro: 'Não foi possível calcular a matriz de trajetos pelas ruas.' });
       }
-      const n = pontos.length;
-      const tempos: (number | null)[][] = Array.from({ length: n }, () => Array<number | null>(n).fill(null));
-      const distancias: (number | null)[][] = Array.from({ length: n }, () => Array<number | null>(n).fill(null));
+      const n = pontos.length, m = destinos.length;
+      const tempos: (number | null)[][] = Array.from({ length: n }, () => Array<number | null>(m).fill(null));
+      const distancias: (number | null)[][] = Array.from({ length: n }, () => Array<number | null>(m).fill(null));
       for (const linha of linhas) {
         for (const celula of linha) {
           const i = celula.source_index;
           const j = celula.target_index;
-          if (typeof i !== 'number' || typeof j !== 'number' || i < 0 || j < 0 || i >= n || j >= n) continue;
+          if (typeof i !== 'number' || typeof j !== 'number' || i < 0 || j < 0 || i >= n || j >= m) continue;
           if (typeof celula.time === 'number' && Number.isFinite(celula.time)) tempos[i][j] = Math.max(0, Math.round((celula.time / 60) * 100) / 100); // fração de minuto: trecho curto não vira 1 min
           if (typeof celula.distance === 'number' && Number.isFinite(celula.distance)) distancias[i][j] = Math.max(0, Math.round(celula.distance));
         }
