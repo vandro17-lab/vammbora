@@ -4,7 +4,22 @@ import type { ParadaRota } from '@/types/motorista';
 import { ARACATUBA, trajetoOSRM } from '@/lib/geocode';
 
 /* Tipos mínimos do Leaflet (carregado dinamicamente). */
-type LeafletMap = { setView: (c: [number, number], z: number) => LeafletMap; remove: () => void; fitBounds: (b: unknown, o?: unknown) => void };
+type LeafletMap = {
+  setView: (c: [number, number], z: number) => LeafletMap; remove: () => void; fitBounds: (b: unknown, o?: unknown) => void;
+  getZoom: () => number; invalidateSize: () => void; on: (e: string, f: (ev: { latlng: { lat: number; lng: number } }) => void) => void;
+};
+type MarcadorRascunho = { setLatLng: (c: [number, number]) => void; getLatLng: () => { lat: number; lng: number }; setIcon: (i: unknown) => void; remove: () => void; on: (e: string, f: () => void) => void; addTo: (m: unknown) => MarcadorRascunho };
+
+/** Ponto da parada que está sendo cadastrada/corrigida agora (ainda não confirmada). */
+export interface RascunhoNoMapa { lat: number; lng: number; tipo: 'saida' | 'casa' | 'escola' }
+
+/* Identidade VanBora nos marcadores: aluno em amarelo, escola e saída em preto. */
+const AMARELO = '#FFC700', PRETO = '#111111';
+const GLIFO = {
+  saida: '<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>',
+  escola: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11.5V16c2 2 10 2 12 0v-4.500"/></svg>',
+};
+const escapar = (t: string) => t.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string);
 type LeafletNS = typeof import('leaflet');
 type TrechoMapa = { minutos: number; metros: number };
 
@@ -15,12 +30,22 @@ type TrechoMapa = { minutos: number; metros: number };
  * e desenha o TRAJETO pelas ruas (OSRM público). Quando todas as paradas estão
  * localizadas, devolve os minutos de cada trecho via `onTempos`.
  */
-export function MapaInterativoRota({ paradas, onTempos, onTrechos, bare = false }: {
+export function MapaInterativoRota({ paradas, onTempos, onTrechos, bare = false, rotulos, rascunho = null, onMoverRascunho, ocultarId = null, onTocarParada }: {
   paradas: ParadaRota[];
   onTempos?: (temposMin: number[]) => void;
   onTrechos?: (trechos: TrechoMapa[]) => void;
   /** Quando true, renderiza SÓ o mapa (sem card/título/notas), para encaixar em um container próprio. */
   bare?: boolean;
+  /** Nome curto mostrado ao lado do marcador (id da parada -> texto). PRIVADO: só no app do motorista. */
+  rotulos?: Record<string, string>;
+  /** Alfinete da parada em cadastro: aparece em destaque e pode ser arrastado. */
+  rascunho?: RascunhoNoMapa | null;
+  /** Arrastar o alfinete (ou tocar no mapa) informa o ponto corrigido. */
+  onMoverRascunho?: (lat: number, lng: number) => void;
+  /** Parada em edição: o marcador fixo dela some, para o alfinete ocupar o lugar. */
+  ocultarId?: string | null;
+  /** Tocar num marcador confirmado. */
+  onTocarParada?: (paradaId: string) => void;
 }) {
   const elRef = useRef<HTMLDivElement | null>(null);
   const LRef = useRef<LeafletNS | null>(null);
@@ -32,13 +57,33 @@ export function MapaInterativoRota({ paradas, onTempos, onTrechos, bare = false 
   onTemposRef.current = onTempos;
   const onTrechosRef = useRef(onTrechos);
   onTrechosRef.current = onTrechos;
+  const onMoverRef = useRef(onMoverRascunho);
+  onMoverRef.current = onMoverRascunho;
+  const onTocarRef = useRef(onTocarParada);
+  onTocarRef.current = onTocarParada;
+  const rascunhoRef = useRef(rascunho);
+  rascunhoRef.current = rascunho;
+  const pinoRef = useRef<MarcadorRascunho | null>(null);
+  const ptsRef = useRef<[number, number][]>([]);
+  // Sem ponto ainda, mas com cadastro aberto: tocar no mapa marca o ponto.
+  const marcandoRef = useRef(false);
+  marcandoRef.current = !!onMoverRascunho;
 
   // Paradas localizadas, em ordem, e uma assinatura das coordenadas (evita redesenhos à toa).
   const loc = [...paradas]
     .sort((a, b) => a.ordem - b.ordem)
     .filter((p): p is ParadaRota & { lat: number; lng: number } =>
       Number.isFinite(p.lat) && Number.isFinite(p.lng));
-  const assinatura = loc.map((p) => `${p.id}:${p.lat.toFixed(5)},${p.lng.toFixed(5)}`).join('|');
+  const assinatura = loc.map((p) => `${p.id}:${p.lat.toFixed(5)},${p.lng.toFixed(5)}:${rotulos?.[p.id] ?? ''}`).join('|') + `#${ocultarId ?? ''}`;
+
+  /** Enquadra o percurso inteiro (ou a cidade, se ainda não há paradas). */
+  function enquadrar() {
+    const L = LRef.current, map = mapRef.current, pts = ptsRef.current;
+    if (!L || !map) return;
+    if (!pts.length) map.setView([ARACATUBA.lat, ARACATUBA.lng], 13);
+    else if (pts.length === 1) map.setView(pts[0], 15);
+    else map.fitBounds(L.latLngBounds(pts).pad(0.25), { maxZoom: 16 });
+  }
 
   async function desenhar() {
     const desenhoAtual = ++desenhoRef.current;
@@ -47,19 +92,28 @@ export function MapaInterativoRota({ paradas, onTempos, onTrechos, bare = false 
     const layer = layerRef.current;
     if (!L || !map || !layer) return;
     layer.clearLayers();
-    if (!loc.length) { map.setView([ARACATUBA.lat, ARACATUBA.lng], 13); return; }
+    ptsRef.current = loc.map((p) => [p.lat, p.lng]);
+    if (!loc.length) { if (!rascunhoRef.current) enquadrar(); return; }
 
     const pts: [number, number][] = [];
-    loc.forEach((p, i) => {
-      const cor = p.tipo === 'escola' ? '#0b1f3a' : p.tipo === 'saida' ? '#f59e0b' : '#10b981';
+    // A saída não conta como parada: as paradas são numeradas a partir de 1.
+    let numero = 0;
+    loc.forEach((p) => {
+      const n = p.tipo === 'saida' ? 0 : ++numero;
+      pts.push([p.lat, p.lng]);
+      if (p.id === ocultarId) return; // em edição: o alfinete arrastável ocupa o lugar
+      const escola = p.tipo === 'escola', saida = p.tipo === 'saida';
+      const conteudo = saida ? GLIFO.saida : escola ? GLIFO.escola : String(n);
       const icon = L.divIcon({
         className: '',
-        html: `<span style="display:flex;width:26px;height:26px;align-items:center;justify-content:center;border-radius:9999px;background:${cor};color:#fff;font:700 12px sans-serif;box-shadow:0 1px 4px rgba(0,0,0,.4);border:2px solid #fff">${i + 1}</span>`,
-        iconSize: [26, 26], iconAnchor: [13, 13],
+        html: `<span style="display:flex;width:30px;height:30px;align-items:center;justify-content:center;border-radius:${escola ? '9px' : '9999px'};background:${escola || saida ? PRETO : AMARELO};color:${escola || saida ? AMARELO : PRETO};font:800 13px Inter,sans-serif;box-shadow:0 2px 6px rgba(0,0,0,.4);border:2.5px solid #fff">${conteudo}</span>`,
+        iconSize: [30, 30], iconAnchor: [15, 15],
       });
-      const titulo = p.tipo === 'escola' ? (p.destinoNome || 'Escola') : p.tipo === 'saida' ? 'Saída' : (p.rotulo || 'Casa');
-      L.marker([p.lat, p.lng], { icon }).addTo(layer).bindPopup(`${i + 1}. ${titulo}`);
-      pts.push([p.lat, p.lng]);
+      const titulo = escola ? (p.destinoNome || 'Escola') : saida ? 'Saída da van' : (p.rotulo || 'Casa');
+      const nome = rotulos?.[p.id];
+      const m = L.marker([p.lat, p.lng], { icon }).addTo(layer).bindPopup(`${n ? `${n}. ` : ''}${escapar(nome ? `${nome} — ${titulo}` : titulo)}`);
+      if (nome) m.bindTooltip(escapar(nome), { permanent: true, direction: 'right', offset: [14, 0], className: 'vambora-stop-name' });
+      if (onTocarRef.current) m.on('click', () => onTocarRef.current?.(p.id));
     });
 
     let linha: [number, number][] = pts;
@@ -98,16 +152,46 @@ export function MapaInterativoRota({ paradas, onTempos, onTrechos, bare = false 
     const ultima = pts[pts.length - 1];
     if (ultima) {
       const vanIcon = L.divIcon({ className: 'vambora-van-icon-wrap', html: '<span class="vambora-van-icon"><i></i><b></b><b></b></span>', iconSize: [42, 42], iconAnchor: [21, 21] });
-      L.marker(ultima, { icon: vanIcon, zIndexOffset: 900 }).addTo(layer as never).bindTooltip('Van neste ponto', { direction: 'top' });
+      // Só ilustra onde a van está: não captura toques (tocar ali marca/abre a parada).
+      L.marker(ultima, { icon: vanIcon, zIndexOffset: 900, interactive: false }).addTo(layer as never);
     }
 
-    if (pts.length === 1) map.setView(pts[0], 15);
-    else map.fitBounds(L.latLngBounds(pts).pad(0.25), { maxZoom: 16 });
+    // Com uma parada em cadastro, o foco fica nela; senão, no percurso inteiro.
+    if (!rascunhoRef.current) enquadrar();
+  }
+
+  /** Alfinete arrastável da parada em cadastro (fora da camada que é redesenhada). */
+  function atualizarPino() {
+    const L = LRef.current, map = mapRef.current, r = rascunhoRef.current;
+    if (!L || !map) return;
+    if (!r) {
+      if (pinoRef.current) { pinoRef.current.remove(); pinoRef.current = null; enquadrar(); }
+      return;
+    }
+    const cor = r.tipo === 'casa' ? AMARELO : PRETO, miolo = r.tipo === 'casa' ? PRETO : AMARELO;
+    const icon = L.divIcon({
+      className: '',
+      html: `<svg width="40" height="52" viewBox="0 0 34 44" style="display:block;overflow:visible;filter:drop-shadow(0 3px 5px rgba(0,0,0,.45))" aria-hidden="true"><path d="M17 1.5C8.4 1.5 1.5 8.3 1.5 16.8c0 10.9 13 23.600 14.600 25.100a1.300 1.300 0 0 0 1.800 0c1.600-1.500 14.600-14.200 14.600-25.100C32.500 8.300 25.600 1.500 17 1.500z" fill="${cor}" stroke="#fff" stroke-width="2.5"/><circle cx="17" cy="16.500" r="5.500" fill="${miolo}"/></svg>`,
+      iconSize: [40, 52], iconAnchor: [20, 51],
+    });
+    const p = pinoRef.current;
+    const jaNoLugar = !!p && Math.abs(p.getLatLng().lat - r.lat) < 1e-6 && Math.abs(p.getLatLng().lng - r.lng) < 1e-6;
+    if (!p) {
+      const m = L.marker([r.lat, r.lng], { draggable: !!onMoverRef.current, icon, autoPan: true, zIndexOffset: 1200, title: 'Arraste para ajustar o ponto' }) as unknown as MarcadorRascunho;
+      m.on('dragend', () => { const ll = m.getLatLng(); onMoverRef.current?.(ll.lat, ll.lng); });
+      m.addTo(map);
+      pinoRef.current = m;
+    } else {
+      p.setLatLng([r.lat, r.lng]);
+      p.setIcon(icon);
+    }
+    if (!jaNoLugar) map.setView([r.lat, r.lng], Math.max(map.getZoom(), 16));
   }
 
   // Inicializa o mapa uma vez (import dinâmico do Leaflet + CSS).
   useEffect(() => {
     let cancelado = false;
+    let observador: ResizeObserver | null = null;
     (async () => {
       const mod = await import('leaflet');
       await import('leaflet/dist/leaflet.css');
@@ -120,11 +204,21 @@ export function MapaInterativoRota({ paradas, onTempos, onTrechos, bare = false 
       }).addTo(map);
       layerRef.current = L.layerGroup().addTo(map);
       mapRef.current = map as unknown as LeafletMap;
+      // Tocar no mapa marca/corrige o ponto da parada em cadastro.
+      mapRef.current.on('click', (e) => { if (rascunhoRef.current || marcandoRef.current) onMoverRef.current?.(e.latlng.lat, e.latlng.lng); });
+      // O mapa muda de tamanho (teclado do celular, painéis): mantém os blocos certos.
+      if (typeof ResizeObserver !== 'undefined') {
+        observador = new ResizeObserver(() => mapRef.current?.invalidateSize());
+        observador.observe(elRef.current);
+      }
       prontoRef.current = true;
       void desenhar();
+      atualizarPino();
     })();
     return () => {
       cancelado = true;
+      observador?.disconnect();
+      pinoRef.current = null;
       if (mapRef.current) { mapRef.current.remove(); mapRef.current = null; }
       prontoRef.current = false;
     };
@@ -136,6 +230,12 @@ export function MapaInterativoRota({ paradas, onTempos, onTrechos, bare = false 
     if (prontoRef.current) void desenhar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [assinatura]);
+
+  // Alfinete da parada em cadastro: acompanha o ponto e o tipo.
+  useEffect(() => {
+    if (prontoRef.current) atualizarPino();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rascunho?.lat, rascunho?.lng, rascunho?.tipo, !rascunho]);
 
   // Modo "bare": só o mapa (o container pai define moldura, cantos e altura).
   if (bare) {

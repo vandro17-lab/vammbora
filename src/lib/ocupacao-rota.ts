@@ -88,6 +88,9 @@ export interface ProblemaRota {
     | 'sem_passageiros'
     | 'a_bordo';
   mensagem: string;
+  /** Onde corrigir, quando o problema é de uma parada ou de um aluno. */
+  paradaId?: string;
+  alunoId?: string;
 }
 
 /** Valida a consistência da rota e lista problemas concretos. */
@@ -111,12 +114,14 @@ export function validarRota(rota: Rota, veiculo: Veiculo | null): ProblemaRota[]
       problemas.push({
         tipo: 'desembarque_antes',
         mensagem: `${pax.identificacao} desce antes (ou no mesmo ponto) de embarcar.`,
+        alunoId: pax.id,
       });
     }
     if (des === null) {
       problemas.push({
         tipo: 'a_bordo',
         mensagem: `Ainda falta deixar ${pax.identificacao}.`,
+        alunoId: pax.id,
       });
     }
   }
@@ -124,10 +129,10 @@ export function validarRota(rota: Rota, veiculo: Veiculo | null): ProblemaRota[]
   // Paradas escola sem destino / não confirmadas
   for (const p of rota.paradas) {
     if (p.tipo === 'escola' && !p.destinoId) {
-      problemas.push({ tipo: 'sem_destino', mensagem: `Uma parada de escola está sem escola escolhida.` });
+      problemas.push({ tipo: 'sem_destino', mensagem: `Uma parada de escola está sem escola escolhida.`, paradaId: p.id });
     }
     if (!p.confirmado) {
-      problemas.push({ tipo: 'nao_confirmada', mensagem: `A parada "${p.rotulo || 'sem nome'}" não foi confirmada.` });
+      problemas.push({ tipo: 'nao_confirmada', mensagem: `A parada "${p.rotulo || 'sem nome'}" não foi confirmada.`, paradaId: p.id });
     }
   }
 

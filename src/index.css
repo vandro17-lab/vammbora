@@ -200,8 +200,8 @@
 .search-panel { border: 1px solid rgb(255 255 255 / 30%); box-shadow: 0 24px 70px rgb(0 0 0 / 16%); }
 .card { border-radius: 1.5rem; box-shadow: 0 4px 24px rgb(11 31 58 / 3%); }
 .card-interactive:hover { transform: translateY(-4px); box-shadow: 0 16px 32px rgb(11 31 58 / 8%); }
-.btn-primary { background: #facc15; color: #171717; }
-.btn-primary:hover { background: #eab308; }
+.btn-primary { background: #ffc700; color: #171717; }
+.btn-primary:hover { background: #e6b300; }
 .btn-whatsapp { background: #128c7e; }
 .btn-sheen::after { display: none; }
 .field-input { border-color: #d9e1e8; border-radius: 0.8rem; }
@@ -221,9 +221,9 @@ section[id] { scroll-margin-top: 90px; }
 /* ===================== Vambora Motoristas (app) ===================== */
 /* Identidade verde/teal unificada (um só "verde" em todo o app). */
 :root {
-  --vm-green: #facc15;        /* verde principal (meio do gradiente) */
+  --vm-green: #ffc700;        /* verde principal (meio do gradiente) */
   --vm-green-strong: #a16207; /* hover / contraste em branco */
-  --vm-teal: #eab308;         /* teal de apoio */
+  --vm-teal: #e6b300;         /* teal de apoio */
   --vm-surface: #fafaf9;      /* fundo do app */
   --vm-hairline: rgb(212 212 212 / 55%); /* contorno sutil dos cartões */
 }
@@ -246,7 +246,7 @@ section[id] { scroll-margin-top: 90px; }
 .vm-accent { color: var(--vm-green-strong); }
 .vm-bg-accent { background: var(--vm-green); }
 .vm-btn { background: var(--vm-green); color:#171717; border-radius: 9999px; }
-.vm-btn:hover { background: #eab308; }
+.vm-btn:hover { background: #e6b300; }
 /* Barra de navegação inferior */
 .vm-nav { position: fixed; inset-inline: 0; bottom: 0; z-index: 40; }
 .vm-nav-inner { max-width: 30rem; margin: 0 auto; }
@@ -265,9 +265,9 @@ section[id] { scroll-margin-top: 90px; }
    e não um emoji que muda de aparência entre plataformas. */
 .vambora-van-icon-wrap,
 .vambora-stop-icon-wrap { background: transparent; border: 0; }
-.vambora-van-icon { position: relative; display: block; width: 36px; height: 23px; margin: 9px 3px; border: 2px solid #0b1f3a; border-radius: 7px 9px 5px 5px; background: #facc15; box-shadow: 0 3px 8px rgb(11 31 58 / 35%); }
+.vambora-van-icon { position: relative; display: block; width: 36px; height: 23px; margin: 9px 3px; border: 2px solid #0b1f3a; border-radius: 7px 9px 5px 5px; background: #ffc700; box-shadow: 0 3px 8px rgb(11 31 58 / 35%); }
 .vambora-van-icon::before { content: ''; position: absolute; left: 8px; top: 3px; width: 14px; height: 7px; border-radius: 2px; background: #dbeafe; border: 1px solid #0b1f3a; }
-.vambora-van-icon::after { content: ''; position: absolute; right: -5px; top: 5px; width: 5px; height: 7px; border-radius: 0 3px 3px 0; background: #facc15; border: 2px solid #0b1f3a; border-left: 0; }
+.vambora-van-icon::after { content: ''; position: absolute; right: -5px; top: 5px; width: 5px; height: 7px; border-radius: 0 3px 3px 0; background: #ffc700; border: 2px solid #0b1f3a; border-left: 0; }
 .vambora-van-icon i,
 .vambora-van-icon b { position: absolute; bottom: -5px; width: 8px; height: 8px; border: 2px solid #0b1f3a; border-radius: 999px; background: #fff; }
 .vambora-van-icon i { left: 5px; }
@@ -289,7 +289,7 @@ section[id] { scroll-margin-top: 90px; }
 .vb-van-desenho { display: block; filter: drop-shadow(0 3px 5px rgb(11 31 58 / 35%)); }
 .vb-van-desenho--oeste { transform: scaleX(-1); }
 .vb-van-nomes { position: absolute; left: 50%; bottom: calc(100% + 6px); transform: translateX(-50%); max-width: 190px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-radius: 999px; background: #0b1f3a; padding: 5px 10px; color: #fff; font: 600 11px/1.1 Inter, sans-serif; box-shadow: 0 3px 10px rgb(11 31 58 / 40%); }
-.vb-van-nomes b { color: #facc15; font-weight: 800; }
+.vb-van-nomes b { color: #ffc700; font-weight: 800; }
 .vb-van-nomes::after { content: ''; position: absolute; left: 50%; top: 100%; margin-left: -5px; border: 5px solid transparent; border-top-color: #0b1f3a; }
 /* Botão "Cheguei" chamando a atenção quando a van está na parada. */
 .vb-chamar { animation: vb-chamar 1.1s ease-in-out infinite; }
@@ -298,3 +298,7 @@ section[id] { scroll-margin-top: 90px; }
 .vb-cena-aluno { animation: vb-cena-andar 1.25s cubic-bezier(.45, 0, .3, 1) both; }
 @keyframes vb-cena-andar { 0% { transform: translateX(0) scale(.6); opacity: 0; } 18% { transform: translateX(0) scale(1); opacity: 1; } 82% { transform: translateX(var(--vb-cena-x)) scale(1); opacity: 1; } 100% { transform: translateX(var(--vb-cena-x)) scale(.5); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .vb-chamar, .vb-parada--proxima, .vb-cena-aluno { animation-duration: .01s; animation-iteration-count: 1; } }
+
+/* Nome do aluno/escola ao lado do marcador, no mapa do construtor de rotas. */
+.leaflet-tooltip.vambora-stop-name { border: 0; border-radius: 999px; background: #111; color: #fff; padding: 2px 8px; font: 700 11px/1.4 Inter, sans-serif; box-shadow: 0 2px 6px rgb(0 0 0 / 30%); max-width: 9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.leaflet-tooltip.vambora-stop-name::before { display: none; }

@@ -20,7 +20,7 @@ const COR_AVISO = { neutro: 'bg-navy-50 text-navy-700', ok: 'bg-mint-50 text-min
  *    do mapa — e é descartado/refeito quando o texto muda.
  */
 export function CampoEndereco({
-  id, valor, onChange, locais = [], placeholder,
+  id, valor, onChange, locais = [], placeholder, mapaExterno = false,
 }: {
   id?: string;
   /** Estado atual (controlado por quem usa o campo). */
@@ -28,6 +28,10 @@ export function CampoEndereco({
   onChange: (e: EnderecoCampo) => void;
   locais?: SugestaoEndereco[];
   placeholder?: string;
+  /** A tela já tem um mapa próprio mostrando (e deixando arrastar) este ponto:
+   *  o campo não abre o seu. Quem usa grava o ponto arrastado com
+   *  `precisao: 'ajustado'` — ele passa a valer mais que a busca pelo texto. */
+  mapaExterno?: boolean;
 }) {
   const [enderecoNoMapa, setEnderecoNoMapa] = useState<string | null>(null);
   // Depois de aparecer, o mapa fica (não some e volta a cada tecla).
@@ -42,6 +46,8 @@ export function CampoEndereco({
   const ajustadoAMao = useRef(valor.precisao === 'ajustado');
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
+  // Ponto marcado no mapa de fora: mesma regra do ponto marcado no mapa do campo.
+  if (valor.precisao === 'ajustado') ajustadoAMao.current = true;
 
   const texto = valor.texto;
 
@@ -123,7 +129,7 @@ export function CampoEndereco({
         onChange={aoDigitarOuEscolher} onEscolher={aoEscolher}
       />
       {aviso && <p role="status" data-testid="aviso-endereco" data-tom={aviso.tom} className={cn('mt-2 rounded-xl p-2.5 text-sm', COR_AVISO[aviso.tom])}>{aviso.texto}</p>}
-      {mostrarMapa && (
+      {mostrarMapa && !mapaExterno && (
         <div className="mt-3">
           <SeletorPontoMapa ponto={valor.coord} precisao={precisao} onMover={aoMarcar} legenda={enderecoNoMapa} buscando={valor.validando || !!valor.refinando} />
         </div>

@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Route as RouteIcon, Users, Calculator, Check, ArrowRight } from 'lucide-react';
+import { Route as RouteIcon, Users, Calculator, ArrowRight } from 'lucide-react';
 import { VanEscolar } from '@/components/vm/VanEscolar';
 import { LINKS_ENTRADA_MOTORISTA } from '@/app/navegacao-motorista';
 
@@ -8,6 +8,8 @@ import { LINKS_ENTRADA_MOTORISTA } from '@/app/navegacao-motorista';
  * Entrada única "Sou motorista": Marketplace → aqui → autenticação existente
  * (`/motorista/conta`) → app real (`/app`). Preserva o login Google/e-mail.
  */
+import { Logo } from '@/components/brand/Logo';
+
 export function DriverLandingPage() {
   const beneficios = [
     { Icone: RouteIcon, texto: 'Organize suas rotas' },
@@ -19,10 +21,8 @@ export function DriverLandingPage() {
       <div className="vm-screen flex flex-1 flex-col px-6 pb-8 pt-[calc(env(safe-area-inset-top)+2.5rem)]">
         {/* Logo */}
         <div className="flex items-center gap-2.5">
-          <span className="grid h-10 w-10 place-items-center rounded-2xl bg-white/15 ring-1 ring-white/25">
-            <Check className="h-5 w-5 text-white" strokeWidth={3} />
-          </span>
-          <span className="font-display text-2xl font-extrabold tracking-tight">Vambora <span className="text-mint-200">Motoristas</span></span>
+          <Logo altura="h-10" />
+          <span className="rounded-full bg-mint-400 px-2.5 py-0.5 text-xs font-extrabold uppercase tracking-wide text-black">Motoristas</span>
         </div>
 
         <p className="mt-4 max-w-xs text-lg font-medium text-mint-50/90">

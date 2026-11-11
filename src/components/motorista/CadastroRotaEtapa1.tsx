@@ -1,13 +1,13 @@
 import { useEffect, useState } from 'react';
-import { AlertCircle, Check, CheckCircle2, ChevronDown, MapPin, Plus, School, Trash2 } from 'lucide-react';
+import { AlertCircle, Check, CheckCircle2, Plus, School, Trash2 } from 'lucide-react';
 import type { Turno } from '@/types';
-import type { EscolaDisponivel, ParadaRota, PassageiroRota, Rota } from '@/types/motorista';
+import type { EscolaDisponivel, ParadaRota, Rota } from '@/types/motorista';
 import { novoId } from '@/data/motorista-store';
 import { SeletorPontoMapa } from '@/components/motorista/SeletorPontoMapa';
 import {
-  DIA_LABEL, diasDaDisponibilidade, duracaoDasPartes, escolaDoAluno, escolasNoPercurso, horaDoCampo,
+  DIA_LABEL, diasDaDisponibilidade, duracaoDasPartes, escolasNoPercurso, horaDoCampo,
   horarioReferenciaDoPeriodo, inteiroInformado, minutosDoCampo, partesDaDuracao, pendenciasDeRevisao,
-  sugerirPeriodo, textoDuracao, totalDePendencias,
+  sugerirPeriodo, totalDePendencias,
 } from '@/lib/cadastro-rota';
 import { TURNO_LABEL, cn, nomeDestinoParaExibicao } from '@/lib/utils';
 
@@ -147,58 +147,6 @@ export function SaidaEAntecipacao({ rota, setRota }: { rota: Rota; setRota: (r: 
   );
 }
 
-/* ---------------------------------- aluno ---------------------------------- */
-
-/** Horário habitual, flexibilidade antes/depois e tempo de atendimento de UM aluno. */
-export function CamposDoAluno({ aluno, onChange }: { aluno: Pick<PassageiroRota, 'horarioHabitualMin' | 'ajusteAntesMin' | 'ajusteDepoisMin' | 'atendimentoMin'>; onChange: (mudanca: Partial<PassageiroRota>) => void }) {
-  return (
-    <div className="grid grid-cols-2 gap-3">
-      <CampoHora rotulo="Horário habitual" valor={aluno.horarioHabitualMin} onChange={(m) => onChange({ horarioHabitualMin: m })} />
-      <CampoDuracao rotulo="Tempo de atendimento" valor={aluno.atendimentoMin}
-        onChange={(m) => onChange({ atendimentoMin: m, atendimentoOrigem: m == null ? null : 'informado' })} dica="Pode ser menos de 1 min." />
-      <CampoMinutos rotulo="Pode ser antes" valor={aluno.ajusteAntesMin} onChange={(m) => onChange({ ajusteAntesMin: m })} dica="0 = não pode." />
-      <CampoMinutos rotulo="Pode ser depois" valor={aluno.ajusteDepoisMin} onChange={(m) => onChange({ ajusteDepoisMin: m })} dica="0 = não pode." />
-    </div>
-  );
-}
-
-function resumoAluno(x: PassageiroRota): string {
-  const flex = x.ajusteAntesMin == null && x.ajusteDepoisMin == null ? 'flexibilidade não informada'
-    : `−${x.ajusteAntesMin ?? '?'} / +${x.ajusteDepoisMin ?? '?'} min`;
-  return `${x.horarioHabitualMin == null ? 'sem horário' : horaDoCampo(x.horarioHabitualMin)} · ${flex} · atendimento ${textoDuracao(x.atendimentoMin)}`;
-}
-
-/** Editor recolhível de um aluno da rota: endereço e escola (lidos da rota) + compromisso. */
-export function EditorAluno({ rota, setRota, aluno, nomeDaEscola }: {
-  rota: Rota; setRota: (r: Rota) => void; aluno: PassageiroRota; nomeDaEscola: (destinoId: string) => string | undefined;
-}) {
-  const [aberto, setAberto] = useState(false);
-  const casa = rota.paradas.find((p) => p.id === (rota.sentido === 'ida' ? aluno.embarqueParadaId : aluno.desembarqueParadaId));
-  const escolaId = escolaDoAluno(rota, aluno);
-  const mudar = (m: Partial<PassageiroRota>) => setRota({ ...rota, passageiros: rota.passageiros.map((x) => (x.id === aluno.id ? { ...x, ...m } : x)) });
-  return (
-    <div className="rounded-xl bg-white p-2.5 ring-1 ring-navy-100">
-      <button type="button" className="flex w-full items-center gap-2 text-left" onClick={() => setAberto((v) => !v)} aria-expanded={aberto}>
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-semibold text-navy-900">{aluno.identificacao || 'Aluno'}</span>
-          <span className="block truncate text-[11px] text-navy-500">{resumoAluno(aluno)}</span>
-        </span>
-        <ChevronDown className={cn('h-4 w-4 shrink-0 text-navy-400 transition', aberto && 'rotate-180')} />
-      </button>
-      {aberto && (
-        <div className="mt-2.5 space-y-2.5 border-t border-navy-50 pt-2.5">
-          <p className="text-[11px] text-navy-500">
-            <MapPin className="mr-1 inline h-3 w-3" />{casa?.rotulo || 'Endereço não informado'}
-            <span className="mx-1.5">·</span>
-            <School className="mr-1 inline h-3 w-3" />{escolaId ? nomeDestinoParaExibicao(nomeDaEscola(escolaId) ?? 'Escola do catálogo') : 'Escola ainda não definida'}
-          </p>
-          <CamposDoAluno aluno={aluno} onChange={mudar} />
-        </div>
-      )}
-    </div>
-  );
-}
-
 /* ------------------------------ visita à escola ------------------------------ */
 
 /** Limite de chegada (ida) ou liberação (volta) e tempo de atendimento do grupo. */
@@ -234,27 +182,6 @@ export function CampoPortao({ ponto, especifico, pontoDoCatalogo, onMover, onUsa
         base
           ? <div className="mt-2"><SeletorPontoMapa ponto={base} precisao={especifico ? 'ajustado' : 'exato'} onMover={onMover} altura="h-48" legenda="Arraste o alfinete até o portão usado pela van." /></div>
           : <p className="mt-2 rounded-xl bg-amber-50 p-2.5 text-xs text-amber-800">Esta escola ainda não tem ponto no mapa do catálogo.</p>
-      )}
-    </div>
-  );
-}
-
-/** Editor da visita de uma parada de escola já presente no percurso. */
-export function EditorVisitaEscola({ rota, setRota, parada, destino }: {
-  rota: Rota; setRota: (r: Rota) => void; parada: ParadaRota; destino: DestinoCatalogo | undefined;
-}) {
-  const mudar = (m: Partial<ParadaRota>) => setRota({ ...rota, paradas: rota.paradas.map((p) => (p.id === parada.id ? { ...p, ...m } : p)) });
-  const doCatalogo = destino && typeof destino.lat === 'number' && typeof destino.lng === 'number' ? { lat: destino.lat, lng: destino.lng } : null;
-  const ponto = typeof parada.lat === 'number' && typeof parada.lng === 'number' ? { lat: parada.lat, lng: parada.lng } : null;
-  return (
-    <div className="mt-2 space-y-2.5 rounded-xl bg-white p-2.5 ring-1 ring-navy-100">
-      {!parada.destinoId && <p className="text-xs font-semibold text-red-700">Esta parada não está ligada a uma escola do catálogo. Exclua-a e adicione a escola pela lista.</p>}
-      <CamposDaVisita sentido={rota.sentido} visita={parada} onChange={mudar} />
-      {parada.destinoId && (
-        <CampoPortao ponto={ponto} especifico={!!parada.portaoEspecifico} pontoDoCatalogo={doCatalogo}
-          // Mudar o ponto muda os trechos: os tempos até/desde a escola são recalculados pelo mapa.
-          onMover={(lat, lng) => mudar({ lat, lng, portaoEspecifico: true })}
-          onUsarCatalogo={() => doCatalogo && mudar({ ...doCatalogo, portaoEspecifico: false })} />
       )}
     </div>
   );

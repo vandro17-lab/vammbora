@@ -38,9 +38,9 @@ export default {
           50: '#fffef0',
           100: '#fef9c3',
           200: '#fef08a',
-          300: '#fde047',
-          400: '#facc15',
-          500: '#eab308',
+          300: '#ffdb4d',
+          400: '#ffc700', // amarelo oficial VanBora
+          500: '#e6b300',
           600: '#ca8a04',
           700: '#a16207',
           800: '#854d0e',
