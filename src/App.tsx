@@ -22,7 +22,6 @@ import { ScrollManager } from '@/components/ScrollManager';
 import { PageTransition } from '@/components/motion/PageTransition';
 import { VitrineProvider } from '@/data/VitrineProvider';
 import { AuthProvider } from '@/lib/auth';
-import { HomePage } from '@/pages/HomePage';
 import { SearchResultsPage } from '@/pages/SearchResultsPage';
 import { DriverProfilePage } from '@/pages/DriverProfilePage';
 import { DriverLandingPage } from '@/pages/DriverLandingPage';
