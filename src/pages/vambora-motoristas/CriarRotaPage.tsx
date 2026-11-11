@@ -10,7 +10,8 @@ import { VanEscolar } from '@/components/vm/VanEscolar';
 import { SlotIlustracao } from '@/components/vm/SlotImagem';
 import { MapaInterativoRota } from '@/components/motorista/MapaInterativoRota';
 import { AcaoParada, Horarios, rotaNova } from '@/pages/motorista/RotaBuilderPage';
-import { listarVeiculos, salvarRota } from '@/data/motorista-store';
+import { listarVeiculos, salvarRota, listarEscolasGeraisDoMotorista } from '@/data/motorista-store';
+import { EscolasDisponiveis, PendenciasRevisao, type DestinoCatalogo } from '@/components/motorista/CadastroRotaEtapa1';
 import { USE_SUPABASE } from '@/lib/supabase';
 import { VEICULO_CENARIO } from '@/lib/vm/cenario';
 import { useVitrine } from '@/data/VitrineProvider';
@@ -36,6 +37,14 @@ export function CriarRotaPage() {
   const [etapa, setEtapa] = useState<Etapa>('van');
   const [salvando, setSalvando] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
+  const [listaGeral, setListaGeral] = useState<string[]>([]);
+
+  // Lista geral de escolas do motorista: só SUGERE o preenchimento por rota.
+  useEffect(() => {
+    let vivo = true;
+    listarEscolasGeraisDoMotorista().then((ids) => { if (vivo) setListaGeral(ids); });
+    return () => { vivo = false; };
+  }, []);
 
   useEffect(() => {
     let vivo = true;
@@ -121,7 +130,7 @@ export function CriarRotaPage() {
           <CadastroParadasPremium rota={rota} setRota={setRota} destinos={destinos} locais={locaisBusca} aBordo={aBordoFinal} capacidade={capacidade} veiculo={veiculo} aplicarTempos={aplicarTempos} problemas={problemas} onFinalizar={() => setEtapa('confirmacao')} />
         ) : (
           <ConfirmacaoRota rota={rota} setRota={setRota} veiculo={veiculo} capacidade={capacidade}
-            aBordo={aBordoFinal.length} onConcluir={concluir} salvando={salvando} />
+            aBordo={aBordoFinal.length} onConcluir={concluir} salvando={salvando} destinos={destinos} listaGeral={listaGeral} />
         )}
       </div>
     </VMShell>
@@ -265,9 +274,10 @@ function MiniRecurso({ icon: Icon, label }: { icon: typeof Snowflake; label: str
 }
 
 /* ------------------------- Passo 3: confirmação ------------------------- */
-function ConfirmacaoRota({ rota, setRota, veiculo, capacidade, aBordo, onConcluir, salvando }: {
+function ConfirmacaoRota({ rota, setRota, veiculo, capacidade, aBordo, onConcluir, salvando, destinos, listaGeral }: {
   rota: Rota; setRota: (r: Rota) => void; veiculo: Veiculo | null; capacidade: number;
   aBordo: number; onConcluir: (rotaAtualizada: Rota) => void; salvando: boolean;
+  destinos: DestinoCatalogo[]; listaGeral: string[];
 }) {
   const alunos = rota.passageiros.length;
   const ocupacaoPct = capacidade > 0 ? Math.round((aBordo / capacidade) * 100) : 0;
@@ -291,6 +301,13 @@ function ConfirmacaoRota({ rota, setRota, veiculo, capacidade, aBordo, onConclui
         <input className="field-input" placeholder={`Rota ${rota.sentido === 'ida' ? 'de ida' : 'de volta'}`}
           value={rota.nome} onChange={(e) => setRota({ ...rota, nome: e.target.value })} />
       </Card>
+
+      {/* Escolas que aceita incluir NESTA rota (não viram parada). */}
+      <EscolasDisponiveis rota={rota} setRota={setRota} destinos={destinos} listaGeral={listaGeral} />
+
+      {/* O que ainda falta informar (nada é preenchido automaticamente). */}
+      <PendenciasRevisao rota={rota} destinos={destinos} compacto />
+      <p className="px-1 text-[11px] text-navy-400">Horário, flexibilidade e tempo de atendimento de cada aluno podem ser completados depois, em “Editar rota”.</p>
 
       {/* Horários (motor real) — o botão "Concluir rota" salva via salvarRota. */}
           <Horarios rota={rota} setRota={setRota} veiculo={veiculo} onConfirmar={onConcluir} salvando={salvando} />

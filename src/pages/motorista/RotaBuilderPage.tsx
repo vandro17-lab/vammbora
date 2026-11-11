@@ -4,9 +4,12 @@ import {
   Loader2, MapPin, Home, School, Plus, Check, X, ArrowUp, ArrowDown, Trash2, Users, Flag, CheckCircle2, AlertCircle,
 } from 'lucide-react';
 import { MotoristaShell, ExigirMotorista } from './MotoristaShell';
-import { listarVeiculos, obterRota, salvarRota, novoId } from '@/data/motorista-store';
+import { listarVeiculos, obterRota, salvarRota, novoId, listarEscolasGeraisDoMotorista } from '@/data/motorista-store';
+import {
+  CamposDaVisita, CamposDoAluno, CampoPortao, EditorAluno, EditorVisitaEscola, EscolasDisponiveis, PendenciasRevisao,
+  PeriodoEscolar, type DestinoCatalogo,
+} from '@/components/motorista/CadastroRotaEtapa1';
 import type { Rota, Veiculo, ParadaRota, TipoParada } from '@/types/motorista';
-import type { Turno } from '@/types';
 import { useVitrine } from '@/data/VitrineProvider';
 import { capacidadeAlunos, aBordoEm, validarRota, podeFinalizar } from '@/lib/ocupacao-rota';
 import { PlanoMotor } from '@/components/motorista/PlanoMotor';
@@ -15,17 +18,18 @@ import { MapaInterativoRota } from '@/components/motorista/MapaInterativoRota';
 import { CampoEndereco } from '@/components/search/CampoEndereco';
 import { ENDERECO_VAZIO, type EnderecoCampo } from '@/lib/endereco';
 import { locaisDeDestinos, type SugestaoEndereco } from '@/lib/geocode';
-import { TURNO_LABEL, cn, minutosParaTextoHora, horaParaMinutos, nomeDestinoParaExibicao } from '@/lib/utils';
+import { cn, minutosParaTextoHora, horaParaMinutos, nomeDestinoParaExibicao } from '@/lib/utils';
 
 const DIAS = [['seg', 'Seg'], ['ter', 'Ter'], ['qua', 'Qua'], ['qui', 'Qui'], ['sex', 'Sex']] as const;
-const TURNOS: Turno[] = ['manha', 'tarde', 'noite', 'integral'];
 
 export function rotaNova(): Rota {
   return {
-    id: '', nome: '', sentido: 'ida', turno: 'manha', dias: ['seg', 'ter', 'qua', 'qui', 'sex'],
+    // Período escolar, horários e autorizações nascem "não informados": o
+    // motorista confirma (o app só sugere), nada é presumido.
+    id: '', nome: '', sentido: 'ida', turno: null, periodoConfirmado: false, dias: ['seg', 'ter', 'qua', 'qui', 'sex'],
     veiculoId: null, monitor: false, monitorOcupaLugar: false, lugaresReservados: 0,
-    ultimoDesembarqueMin: null, limiteAntecipacaoMin: null, status: 'rascunho',
-    paradas: [], passageiros: [], atualizadoEm: new Date().toISOString(),
+    ultimoDesembarqueMin: null, saidaHabitualMin: null, limiteAntecipacaoMin: null, status: 'rascunho',
+    paradas: [], passageiros: [], escolasDisponiveis: [], disponibilidadeRevisada: false, atualizadoEm: new Date().toISOString(),
   };
 }
 
@@ -50,6 +54,14 @@ function Builder() {
   const [aviso, setAviso] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [erroCarga, setErroCarga] = useState<string | null>(null);
+  const [listaGeral, setListaGeral] = useState<string[]>([]);
+
+  // Lista geral de escolas do motorista: só SUGERE o preenchimento por rota.
+  useEffect(() => {
+    let vivo = true;
+    listarEscolasGeraisDoMotorista().then((ids) => { if (vivo) setListaGeral(ids); });
+    return () => { vivo = false; };
+  }, []);
 
   useEffect(() => {
     let vivo = true;
@@ -169,7 +181,7 @@ function Builder() {
           <VanViz capacidade={capacidade} aBordo={aBordoFinal.length} rota={rota} veiculo={veiculo} />
 
           {/* Linha do percurso */}
-          <LinhaPercurso rota={rota} setRota={setRota} />
+          <LinhaPercurso rota={rota} setRota={setRota} destinos={destinos} />
 
           {/* Mapa interativo: carrega sozinho e desenha o trajeto pelas ruas. */}
           {rota.paradas.length > 0 && <MapaInterativoRota paradas={rota.paradas} onTempos={aplicarTempos} />}
@@ -181,6 +193,12 @@ function Builder() {
           {etapa === 'construindo' && (
             <AcaoParada rota={rota} setRota={setRota} destinos={destinos} locais={locaisBusca} aBordo={aBordoFinal} capacidade={capacidade} />
           )}
+
+          {etapa === 'construindo' && rota.paradas.some((p) => p.tipo === 'saida') && (
+            <EscolasDisponiveis rota={rota} setRota={setRota} destinos={destinos} listaGeral={listaGeral} />
+          )}
+
+          {etapa === 'construindo' && rota.paradas.length > 1 && <PendenciasRevisao rota={rota} destinos={destinos} />}
 
           {etapa === 'horarios' && (
             <Horarios rota={rota} setRota={setRota} onConfirmar={(atualizada) => salvar('concluida', atualizada)} salvando={salvando} />
@@ -268,10 +286,7 @@ function Preparacao({ rota, setRota, veiculos, veiculo, capacidade, onComecar }:
           <Chip ativo={rota.sentido === 'ida'} onClick={() => setRota({ ...rota, sentido: 'ida' })}>Ida (leva à escola)</Chip>
           <Chip ativo={rota.sentido === 'volta'} onClick={() => setRota({ ...rota, sentido: 'volta' })}>Volta (traz da escola)</Chip>
         </div>
-        <p className="field-label mt-4">Período</p>
-        <div className="flex flex-wrap gap-2">
-          {TURNOS.map((t) => <Chip key={t} ativo={rota.turno === t} onClick={() => setRota({ ...rota, turno: t })}>{TURNO_LABEL[t]}</Chip>)}
-        </div>
+        <div className="mt-4"><PeriodoEscolar rota={rota} setRota={setRota} /></div>
         <p className="field-label mt-4">Dias</p>
         <div className="flex flex-wrap gap-2">
           {DIAS.map(([k, label]) => (
@@ -322,8 +337,10 @@ export function VanViz({ capacidade, aBordo, rota, veiculo }: { capacidade: numb
 }
 
 /* ----------------------------- Linha do percurso ----------------------------- */
-export function LinhaPercurso({ rota, setRota, mostrarHorarios = true }: { rota: Rota; setRota: (r: Rota) => void; mostrarHorarios?: boolean }) {
+export function LinhaPercurso({ rota, setRota, mostrarHorarios = true, destinos = [] }: { rota: Rota; setRota: (r: Rota) => void; mostrarHorarios?: boolean; destinos?: DestinoCatalogo[] }) {
+  const [aberta, setAberta] = useState<string | null>(null);
   if (rota.paradas.length === 0) return null;
+  const destinoPorId = new Map(destinos.map((d) => [d.id, d]));
   const paradas = [...rota.paradas].sort((a, b) => a.ordem - b.ordem);
 
   function mover(ordem: number, delta: number) {
@@ -347,8 +364,12 @@ export function LinhaPercurso({ rota, setRota, mostrarHorarios = true }: { rota:
         {paradas.map((p, idx) => {
           const embarcam = rota.passageiros.filter((x) => x.embarqueParadaId === p.id);
           const descem = rota.passageiros.filter((x) => x.desembarqueParadaId === p.id);
+          // Alunos atendidos NESTA casa (ida: embarcam; volta: desembarcam).
+          const daCasa = p.tipo === 'casa' ? (rota.sentido === 'ida' ? embarcam : descem) : [];
+          const temDetalhes = p.tipo === 'escola' || daCasa.length > 0;
           return (
-            <li key={p.id} className="flex items-center gap-3 rounded-xl bg-navy-50 p-3">
+            <li key={p.id} className="rounded-xl bg-navy-50 p-3">
+            <div className="flex items-center gap-3">
               <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-navy-900 text-xs font-bold text-white">{idx}</span>
               <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-navy-700 ring-1 ring-navy-100">
                 {p.tipo === 'saida' ? <MapPin className="h-4 w-4" /> : p.tipo === 'escola' ? <School className="h-4 w-4" /> : <Home className="h-4 w-4" />}
@@ -373,8 +394,11 @@ export function LinhaPercurso({ rota, setRota, mostrarHorarios = true }: { rota:
                       const minutos = /^([01]\d|2[0-3]):[0-5]\d$/.test(valor) ? horaParaMinutos(valor) : null;
                       setRota({ ...rota,
                         paradas: rota.paradas.map((s) => s.id === p.id ? { ...s, horarioChegadaMin: minutos } : s),
+                        // O horário da casa acompanha os alunos dela — menos quem já
+                        // tem um horário PRÓPRIO combinado (diferente do da parada).
                         passageiros: rota.passageiros.map((aluno) =>
                           p.tipo === 'casa' && (rota.sentido === 'ida' ? aluno.embarqueParadaId === p.id : aluno.desembarqueParadaId === p.id)
+                            && (aluno.horarioHabitualMin == null || aluno.horarioHabitualMin === (p.horarioChegadaMin ?? null))
                             ? { ...aluno, horarioHabitualMin: minutos } : aluno),
                       });
                     }} />
@@ -387,6 +411,20 @@ export function LinhaPercurso({ rota, setRota, mostrarHorarios = true }: { rota:
                   <button className="btn btn-sm btn-ghost !px-2 text-red-600" aria-label="Excluir" onClick={() => excluir(p.id)}><Trash2 className="h-4 w-4" /></button>
                 </div>
               )}
+            </div>
+            {temDetalhes && (
+              <button type="button" className="mt-2 text-xs font-bold text-mint-700" aria-expanded={aberta === p.id} onClick={() => setAberta((a) => (a === p.id ? null : p.id))}>
+                {aberta === p.id ? 'Fechar' : p.tipo === 'escola' ? (rota.sentido === 'ida' ? 'Limite de chegada, tempo do grupo e portão' : 'Liberação, tempo do grupo e portão') : 'Horário, flexibilidade e atendimento dos alunos'}
+              </button>
+            )}
+            {aberta === p.id && p.tipo === 'escola' && (
+              <EditorVisitaEscola rota={rota} setRota={setRota} parada={p} destino={p.destinoId ? destinoPorId.get(p.destinoId) : undefined} />
+            )}
+            {aberta === p.id && p.tipo === 'casa' && (
+              <div className="mt-2 space-y-2">
+                {daCasa.map((x) => <EditorAluno key={x.id} rota={rota} setRota={setRota} aluno={x} nomeDaEscola={(id) => destinoPorId.get(id)?.nome} />)}
+              </div>
+            )}
             </li>
           );
         })}
@@ -497,6 +535,9 @@ function FormCasa({ rota, setRota, locais, proxOrdem, capacidade, aBordo, onFech
   const [etapa, setEtapa] = useState<'endereco' | 'aluno'>('endereco');
   const [paradaId, setParadaId] = useState<string | null>(null);
   const [nome, setNome] = useState('');
+  // Compromisso do aluno: tudo começa "não informado" (vazio), nunca um padrão.
+  const COMPROMISSO_VAZIO = { horarioHabitualMin: null, ajusteAntesMin: null, ajusteDepoisMin: null, atendimentoMin: null, atendimentoOrigem: null } as const;
+  const [compromisso, setCompromisso] = useState<Pick<Rota['passageiros'][number], 'horarioHabitualMin' | 'ajusteAntesMin' | 'ajusteDepoisMin' | 'atendimentoMin' | 'atendimentoOrigem'>>(COMPROMISSO_VAZIO);
 
   function confirmarEndereco(rotulo: string, coord?: { lat: number; lng: number }) {
     const pid = novoId();
@@ -509,9 +550,13 @@ function FormCasa({ rota, setRota, locais, proxOrdem, capacidade, aBordo, onFech
     const lotado = aBordo.length + 1 > capacidade;
     setRota({
       ...rota,
-      passageiros: [...rota.passageiros, { id: novoId(), identificacao: nome.trim(), embarqueParadaId: paradaId, desembarqueParadaId: null, horarioHabitualMin: rota.paradas.find((p) => p.id === paradaId)?.horarioChegadaMin ?? null }],
+      passageiros: [...rota.passageiros, {
+        id: novoId(), identificacao: nome.trim(), embarqueParadaId: paradaId, desembarqueParadaId: null, ...compromisso,
+        horarioHabitualMin: compromisso.horarioHabitualMin ?? rota.paradas.find((p) => p.id === paradaId)?.horarioChegadaMin ?? null,
+      }],
     });
     setNome('');
+    setCompromisso(COMPROMISSO_VAZIO);
     if (!outroAqui && !lotado) onFechar();
   }
 
@@ -523,6 +568,11 @@ function FormCasa({ rota, setRota, locais, proxOrdem, capacidade, aBordo, onFech
       <h2 className="font-display font-bold">Como podemos identificar esse aluno?</h2>
       <p className="mt-1 text-sm text-navy-500">Primeiro nome ou apelido curto. Não precisa nome completo nem documento.</p>
       <input className="field-input mt-3" placeholder="Ex.: João, Duda, Pedro…" value={nome} onChange={(e) => setNome(e.target.value)} />
+      <details className="mt-3 rounded-xl bg-navy-50 p-3">
+        <summary className="cursor-pointer text-xs font-bold text-navy-700">Horário combinado, flexibilidade e tempo de atendimento (pode informar depois)</summary>
+        <div className="mt-2.5"><CamposDoAluno aluno={compromisso} onChange={(m) => setCompromisso((c) => ({ ...c, ...m }))} /></div>
+        <p className="mt-2 text-[11px] text-navy-400">Vazio = ainda não informado. Zero = sem flexibilidade.</p>
+      </details>
       <div className="mt-3 flex flex-wrap gap-2">
         <button className="btn btn-md btn-primary flex-1" disabled={!nome.trim()} onClick={() => addAluno(false)}>
           <Plus className="h-5 w-5" /> Adicionar aluno
@@ -541,33 +591,50 @@ function FormEscola({ rota, setRota, destinos, proxOrdem, aBordo, onFechar, comp
 }) {
   const [destinoId, setDestinoId] = useState('');
   const [selec, setSelec] = useState<string[]>(aBordo.map((p) => p.id)); // por padrão todos descem
+  const [visita, setVisita] = useState<Pick<ParadaRota, 'limiteChegadaMin' | 'liberacaoMin' | 'atendimentoGrupoMin'>>({ limiteChegadaMin: null, liberacaoMin: null, atendimentoGrupoMin: null });
+  const [portao, setPortao] = useState<{ lat: number; lng: number } | null>(null);
   const destino = destinos.find((d) => d.id === destinoId) ?? null;
+  const pontoDoCatalogo = destino && typeof destino.lat === 'number' && typeof destino.lng === 'number' ? { lat: destino.lat, lng: destino.lng } : null;
 
   function confirmar() {
     if (!destinoId) return;
     const pid = novoId();
-    // A escola já tem geolocalização no catálogo: aproveita para o mapa.
-    const lat = destino?.lat ?? undefined;
-    const lng = destino?.lng ?? undefined;
+    // A escola é SEMPRE a unidade do catálogo (destinoId). O ponto no mapa é o
+    // do catálogo ou, se o motorista marcou, o portão que a van usa.
+    const lat = portao?.lat ?? destino?.lat ?? undefined;
+    const lng = portao?.lng ?? destino?.lng ?? undefined;
     const parada: ParadaRota = {
       id: pid, ordem: proxOrdem, tipo: 'escola', rotulo: destino?.nome ?? 'Escola', confirmado: true,
       destinoId, destinoNome: destino?.nome ?? null,
       lat: lat == null ? undefined : lat, lng: lng == null ? undefined : lng,
+      portaoEspecifico: !!portao, ...visita,
     };
     const passageiros = rota.passageiros.map((p) => (selec.includes(p.id) ? { ...p, desembarqueParadaId: pid, destinoId } : p));
-    setRota({ ...rota, paradas: [...rota.paradas, parada], passageiros });
+    // A escola passou a fazer parte do percurso: sai da lista de "aceito incluir".
+    const escolasDisponiveis = (rota.escolasDisponiveis ?? []).filter((e) => e.destinoId !== destinoId);
+    setRota({ ...rota, paradas: [...rota.paradas, parada], passageiros, escolasDisponiveis });
     onFechar();
   }
 
   return (
     <div className={cn('card mt-0', compacto ? 'p-2.5 shadow-none ring-0' : 'mt-4 p-5')}>
       <h2 className="font-display font-bold">Qual escola?</h2>
-      <select className="field-input mt-3 appearance-none" value={destinoId} onChange={(e) => setDestinoId(e.target.value)}>
+      <select className="field-input mt-3 appearance-none" value={destinoId} onChange={(e) => { setDestinoId(e.target.value); setPortao(null); }}>
         <option value="">Escolha a escola…</option>
         {destinos.map((d) => <option key={d.id} value={d.id}>{nomeDestinoParaExibicao(d.nome)} — {d.bairro}</option>)}
       </select>
       {destino && <p className="mt-2 text-xs text-navy-500">{nomeDestinoParaExibicao(destino.nome)} · {destino.bairro}</p>}
-      <p className="mt-2 text-xs text-navy-400">Não achou a escola? Salve como rascunho e avise a equipe — não inventamos escolas.</p>
+      <p className="mt-2 text-xs text-navy-400">É o mesmo catálogo de escolas que as famílias usam na busca. Não achou a escola? Salve como rascunho e avise a equipe — não inventamos escolas.</p>
+      {destino && (
+        <details className="mt-3 rounded-xl bg-navy-50 p-3">
+          <summary className="cursor-pointer text-xs font-bold text-navy-700">{rota.sentido === 'ida' ? 'Limite de chegada' : 'Horário de liberação'}, tempo do grupo e portão (pode informar depois)</summary>
+          <div className="mt-2.5 space-y-2.5">
+            <CamposDaVisita sentido={rota.sentido} visita={visita} onChange={setVisita} />
+            <CampoPortao ponto={portao} especifico={!!portao} pontoDoCatalogo={pontoDoCatalogo}
+              onMover={(lat, lng) => setPortao({ lat, lng })} onUsarCatalogo={() => setPortao(null)} />
+          </div>
+        </details>
+      )}
 
       {aBordo.length > 0 ? (
         <>
@@ -600,14 +667,18 @@ function FormEscola({ rota, setRota, destinos, proxOrdem, aBordo, onFechar, comp
 
 /* ----------------------------- Horários ----------------------------- */
 export function Horarios({ rota, setRota, veiculo = null, onConfirmar, salvando }: { rota: Rota; setRota: (r: Rota) => void; veiculo?: Veiculo | null; onConfirmar: (rotaAtualizada: Rota) => void; salvando: boolean }) {
-  const [hora, setHora] = useState(rota.ultimoDesembarqueMin != null ? minutosParaTextoHora(rota.ultimoDesembarqueMin).replace('h', ':') : '');
+  const [hora, setHora] = useState(rota.ultimoDesembarqueMin != null ? minutosParaTextoHora(rota.ultimoDesembarqueMin).replace('h', ':').padStart(5, '0') : '');
   const [antecip, setAntecip] = useState(rota.limiteAntecipacaoMin != null ? String(rota.limiteAntecipacaoMin) : '');
-  const rotaComHorario = useMemo(() => ({ ...rota, ultimoDesembarqueMin: /^\d{1,2}:\d{2}$/.test(hora) ? horaParaMinutos(hora) : null, limiteAntecipacaoMin: antecip ? Number(antecip) : null }), [rota, hora, antecip]);
+  const [saidaHabitual, setSaidaHabitual] = useState(rota.saidaHabitualMin != null ? minutosParaTextoHora(rota.saidaHabitualMin).replace('h', ':').padStart(5, '0') : '');
+  const saidaHabitualMin = /^\d{1,2}:\d{2}$/.test(saidaHabitual) ? horaParaMinutos(saidaHabitual) : null;
+  const rotaComHorario = useMemo(() => ({ ...rota, ultimoDesembarqueMin: /^\d{1,2}:\d{2}$/.test(hora) ? horaParaMinutos(hora) : null, limiteAntecipacaoMin: antecip ? Number(antecip) : null, saidaHabitualMin }), [rota, hora, antecip, saidaHabitualMin]);
   const planejamento = useMemo(() => planejarRotaDoCadastro(rotaComHorario, veiculo), [rotaComHorario, veiculo]);
+
+  const periodoOk = !!rota.turno && !!rota.periodoConfirmado;
 
   function confirmar() {
     const min = /^\d{1,2}:\d{2}$/.test(hora) ? horaParaMinutos(hora) : null;
-    const atualizada = { ...rota, ultimoDesembarqueMin: min, limiteAntecipacaoMin: antecip ? Number(antecip) : null };
+    const atualizada = { ...rota, ultimoDesembarqueMin: min, limiteAntecipacaoMin: antecip ? Number(antecip) : null, saidaHabitualMin };
     setRota(atualizada);
     onConfirmar(atualizada);
   }
@@ -619,9 +690,16 @@ export function Horarios({ rota, setRota, veiculo = null, onConfirmar, salvando 
         <input className="field-input" type="time" value={hora} onChange={(e) => setHora(e.target.value)} />
       </div>
       <div className="mt-4">
-        <label className="field-label">Se precisar, você pode sair mais cedo? Quantos minutos antes?</label>
-        <input className="field-input" inputMode="numeric" placeholder="Ex.: 10" value={antecip} onChange={(e) => setAntecip(e.target.value.replace(/\D/g, ''))} />
+        <label className="field-label">Horário habitual de saída da van</label>
+        <input className="field-input" type="time" aria-label="Horário habitual de saída da van" value={saidaHabitual} onChange={(e) => setSaidaHabitual(e.target.value)} />
+        <p className="mt-1 text-[11px] text-navy-400">A hora em que você costuma sair hoje. Em branco = ainda não informado.</p>
       </div>
+      <div className="mt-4">
+        <label className="field-label">Se precisar, você pode sair mais cedo? Quantos minutos antes?</label>
+        <input className="field-input" inputMode="numeric" placeholder="Ex.: 10" aria-label="Minutos que autoriza antecipar a saída" value={antecip} onChange={(e) => setAntecip(e.target.value.replace(/\D/g, ''))} />
+        <p className="mt-1 text-[11px] text-navy-400">0 = não autorizo sair antes. Em branco = ainda não informado (não presumimos nada).</p>
+      </div>
+      <div className="mt-4"><PeriodoEscolar rota={rotaComHorario} setRota={(r) => setRota({ ...rota, turno: r.turno, periodoConfirmado: r.periodoConfirmado })} /></div>
       {planejamento.plano?.valido ? (
         <div className="mt-4 rounded-xl bg-mint-50 p-3 text-sm text-mint-900">
           <p className="font-bold">Rota calculada de trás para frente</p>
@@ -637,7 +715,8 @@ export function Horarios({ rota, setRota, veiculo = null, onConfirmar, salvando 
         <p className="mt-3 rounded-xl bg-amber-50 p-3 text-xs text-amber-800">{planejamento.dadosFaltantes.slice(0, 2).join(' ') || 'Informe o horário final para calcular a saída.'}</p>
       )}
       <p className="mt-3 text-xs text-navy-400">O sistema usa o tempo real dos trechos no mapa e calcula os horários anteriores sem exigir que você informe horário em cada parada.</p>
-      <button className="btn btn-lg btn-primary mt-5 w-full" onClick={confirmar} disabled={salvando}>
+      {!periodoOk && <p className="mt-3 text-xs font-semibold text-amber-800">Confirme o período escolar para concluir a rota.</p>}
+      <button className="btn btn-lg btn-primary mt-5 w-full" onClick={confirmar} disabled={salvando || !periodoOk}>
         {salvando ? <><Loader2 className="h-5 w-5 animate-spin" /> Salvando…</> : 'Concluir rota'}
       </button>
     </div>

@@ -1,5 +1,5 @@
 import type { Rota, Veiculo, ParadaRota, PassageiroRota } from '@/types/motorista';
-import { PARADA_ESCOLA_MIN, atendimentoNaCasa } from '@/lib/tempos-parada';
+import { atendimentoNaCasa } from '@/lib/tempos-parada';
 import { atendimentoGrupo } from '@/lib/cadastro-rota';
 import { capacidadeAlunos, picoOcupacao, ocupacaoPorTrecho } from '@/lib/ocupacao-rota';
 

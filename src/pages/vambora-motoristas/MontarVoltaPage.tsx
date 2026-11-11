@@ -7,6 +7,7 @@ import { Card, SubHeader } from '@/components/vm/ui';
 import { MapaInterativoRota } from '@/components/motorista/MapaInterativoRota';
 import { CampoEndereco } from '@/components/search/CampoEndereco';
 import { obterRota, salvarRota } from '@/data/motorista-store';
+import { CampoDuracao, PeriodoEscolar, SaidaEAntecipacao } from '@/components/motorista/CadastroRotaEtapa1';
 import { ENDERECO_VAZIO, type EnderecoCampo } from '@/lib/endereco';
 import { alunosForaDeOrdem, alunosQuePodemVoltar, removerAluno, reordenarParadas, sugerirVolta, trocarEnderecoDoAluno } from '@/lib/rota-volta';
 import { cn, nomeDestinoParaExibicao } from '@/lib/utils';
@@ -136,18 +137,25 @@ export function MontarVoltaPage() {
               {paradas.map((p, i) => (
                 <ItemParada key={p.id} parada={p} numero={i + 1} aberta={aberta === p.id} onAbrir={() => setAberta((a) => (a === p.id ? null : p.id))}
                   embarcam={volta.passageiros.filter((x) => x.embarqueParadaId === p.id)} descem={volta.passageiros.filter((x) => x.desembarqueParadaId === p.id)}
-                  onHorario={(min) => setVolta((v) => (v ? { ...v, paradas: v.paradas.map((q) => (q.id === p.id ? { ...q, horarioChegadaMin: min } : q)) } : v))}
+                  onHorario={(min) => setVolta((v) => (v ? { ...v, paradas: v.paradas.map((q) => (q.id === p.id ? { ...q, liberacaoMin: min } : q)) } : v))}
+                  onGrupo={(min) => setVolta((v) => (v ? { ...v, paradas: v.paradas.map((q) => (q.id === p.id ? { ...q, atendimentoGrupoMin: min } : q)) } : v))}
                   onRemover={(alunoId) => { setVolta((v) => (v ? removerAluno(v, alunoId) : v)); setAberta(null); }}
                   onEndereco={(alunoId, rotulo, ponto) => { setVolta((v) => (v ? trocarEnderecoDoAluno(v, alunoId, rotulo, ponto) : v)); setAberta(null); }} />
               ))}
             </Reorder.Group>
+
+            <Card className="space-y-4">
+              <PeriodoEscolar rota={volta} setRota={(r) => setVolta(r)} />
+              <SaidaEAntecipacao rota={volta} setRota={(r) => setVolta(r)} />
+            </Card>
 
             <button type="button" onClick={() => montar(voltam)} className="mx-auto flex min-h-[44px] items-center gap-2 text-sm font-semibold text-navy-500"><RotateCcw className="h-4 w-4" /> Voltar à sugestão</button>
             {erro && <p role="alert" className="rounded-2xl bg-red-50 p-3 text-sm text-red-700">{erro}</p>}
 
             <div className="fixed inset-x-0 bottom-0 z-20 border-t border-navy-100 bg-white/95 p-3 backdrop-blur">
               <div className="vm-screen">
-                <button type="button" className="btn btn-lg btn-primary w-full" disabled={salvando || !volta.passageiros.length || foraDeOrdem.length > 0} onClick={salvar}>
+                {!(volta.turno && volta.periodoConfirmado) && <p className="mb-2 text-center text-xs font-semibold text-amber-800">Confirme o período escolar desta volta para salvar.</p>}
+                <button type="button" className="btn btn-lg btn-primary w-full" disabled={salvando || !volta.passageiros.length || foraDeOrdem.length > 0 || !(volta.turno && volta.periodoConfirmado)} onClick={salvar}>
                   {salvando ? <Loader2 className="h-5 w-5 animate-spin" /> : <Check className="h-5 w-5" />} Salvar rota de volta
                 </button>
               </div>
@@ -159,9 +167,9 @@ export function MontarVoltaPage() {
   );
 }
 
-function ItemParada({ parada, numero, embarcam, descem, aberta, onAbrir, onHorario, onRemover, onEndereco }: {
+function ItemParada({ parada, numero, embarcam, descem, aberta, onAbrir, onHorario, onGrupo, onRemover, onEndereco }: {
   parada: ParadaRota; numero: number; embarcam: PassageiroRota[]; descem: PassageiroRota[];
-  aberta: boolean; onAbrir: () => void; onHorario: (min: number | null) => void;
+  aberta: boolean; onAbrir: () => void; onHorario: (min: number | null) => void; onGrupo: (min: number | null) => void;
   onRemover: (alunoId: string) => void; onEndereco: (alunoId: string, rotulo: string, ponto: { lat: number; lng: number } | null) => void;
 }) {
   const arrasto = useDragControls();
@@ -170,6 +178,8 @@ function ItemParada({ parada, numero, embarcam, descem, aberta, onAbrir, onHorar
   const [endereco, setEndereco] = useState<EnderecoCampo>(ENDERECO_VAZIO);
   const titulo = escola ? nomeDestinoParaExibicao(parada.destinoNome || parada.rotulo || 'Escola') : `Casa de ${listar(descem.map((x) => x.identificacao)) || '—'}`;
   const Icone = escola ? School : Home;
+  // Liberação dos alunos na volta (rotas antigas guardavam no horário da parada).
+  const liberacao = parada.liberacaoMin ?? parada.horarioChegadaMin ?? null;
 
   return (
     <Reorder.Item value={parada.id} dragListener={false} dragControls={arrasto} className="vm-card relative select-none bg-white p-0" whileDrag={{ scale: 1.03, boxShadow: '0 12px 30px rgba(11,31,58,.22)', zIndex: 5 }} data-testid="parada-volta">
@@ -178,7 +188,7 @@ function ItemParada({ parada, numero, embarcam, descem, aberta, onAbrir, onHorar
         <button type="button" onClick={onAbrir} className="min-w-0 flex-1 text-left" aria-expanded={aberta}>
           <p className="truncate text-sm font-bold text-navy-900"><span className="mr-1 text-navy-400">{numero}.</span>{titulo}</p>
           <p className="truncate text-xs text-navy-500">
-            {escola ? `Embarcam ${embarcam.length} · ${parada.horarioChegadaMin != null ? `saída às ${paraHora(parada.horarioChegadaMin)}` : 'toque para informar o horário de saída'}` : (parada.rotulo || 'Endereço não informado')}
+            {escola ? `Embarcam ${embarcam.length} · ${liberacao != null ? `liberação às ${paraHora(liberacao)}` : 'toque para informar a liberação dos alunos'}` : (parada.rotulo || 'Endereço não informado')}
           </p>
           {!escola && !parada.confirmado && <p className="mt-0.5 inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700"><MapPin className="h-3 w-3" /> sem ponto no mapa</p>}
         </button>
@@ -189,9 +199,12 @@ function ItemParada({ parada, numero, embarcam, descem, aberta, onAbrir, onHorar
       {aberta && (
         <div className="space-y-2 border-t border-navy-100 p-3">
           {escola ? (
-            <label className="block text-sm font-semibold text-navy-700">Horário de saída da escola
-              <input type="time" className="field-input mt-1" value={paraHora(parada.horarioChegadaMin)} onChange={(e) => onHorario(e.target.value ? paraMinutos(e.target.value) : null)} />
-            </label>
+            <>
+              <label className="block text-sm font-semibold text-navy-700">Horário de liberação dos alunos
+                <input type="time" className="field-input mt-1" value={paraHora(liberacao)} onChange={(e) => onHorario(e.target.value ? paraMinutos(e.target.value) : null)} />
+              </label>
+              <CampoDuracao rotulo="Tempo de atendimento do grupo" valor={parada.atendimentoGrupoMin} onChange={onGrupo} dica="Tempo parado na escola para todos embarcarem." />
+            </>
           ) : descem.map((x) => (
             <div key={x.id} className="rounded-2xl bg-navy-50 p-2.5">
               <div className="flex flex-wrap items-center gap-2">
