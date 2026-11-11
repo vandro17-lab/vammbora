@@ -14,10 +14,11 @@ import {
   type PlanoCalculado,
   type OpcaoEncaixe,
   type ClasseEncaixe,
+  type SituacaoEncaixe,
 } from '@/engine/encaixe-geografico';
 import { capacidadeAlunos, picoOcupacao } from '@/lib/ocupacao-rota';
 import { ESTIMATIVAS_INICIAIS, matrizConservadora, type EstimativasOperacionais } from '@/lib/inteligencia-operacional';
-import { atendimentoGrupo, horarioDaEscola } from '@/lib/cadastro-rota';
+import { atendimentoGrupo, duracaoMin, horarioDaEscola, minutoDoDia } from '@/lib/cadastro-rota';
 
 /**
  * Adaptador do SIMULADOR de encaixe: converte a rota real do motorista
@@ -75,6 +76,7 @@ export interface ParametrosSimulacao {
 export type CodigoMotivo =
   | 'localizacao'
   | 'escola_itinerario'
+  | 'escola_nao_aceita'
   | 'capacidade'
   | 'atraso'
   | 'tolerancia'
@@ -108,6 +110,64 @@ export interface ResultadoSimulacao {
   antecipacaoMin?: number;
   /** Explicação objetiva (pt-BR) da aceitação ou recusa. */
   explicacao?: string[];
+  /** Situação final: viável, depende de aprovação, incompatível (comprovado)
+   *  ou inconclusivo (faltou dado / busca não concluída — não é "não cabe"). */
+  situacao: SituacaoEncaixe;
+  /** O que depende de aprovação do motorista (vazio = nada). */
+  aprovacoes: string[];
+  /** De onde veio a saída habitual da van: do cadastro ou calculada de trás
+   *  para frente a partir dos horários das escolas (cadastro sem saída). */
+  fontePartida?: 'cadastrada' | 'calculada';
+  /** Antecipação EXATA exigida (min, com fração), após folgas e esperas. */
+  antecipacaoNecessariaMin?: number;
+  /** A escola do novo aluno entra como parada nova (casa e escola avaliadas juntas). */
+  escolaInserida?: boolean;
+  /** Viagem recalculada, trecho por trecho, comparada com a atual. */
+  trechos?: TrechoRecalculado[];
+}
+
+/** Uma linha do recálculo: um atendimento da viagem com o novo aluno. */
+export interface TrechoRecalculado {
+  /** Nome amigável (aluno ou escola). PRIVADO: só para o motorista. */
+  nome: string;
+  tipo: 'embarque' | 'desembarque' | 'escola';
+  /** É do novo aluno (ou a escola nova dele). */
+  novo: boolean;
+  /** Deslocamento pelas ruas até aqui (min; 0 = mesmo ponto) e alunos a bordo no trecho. */
+  deslocamentoMin: number;
+  ocupacaoNoTrecho: number;
+  chegadaMin: number;
+  /** Espera da van até o horário combinado/liberação (0 = sem espera). */
+  esperaMin: number;
+  atendimentoMin: number;
+  saidaMin: number;
+  ocupacaoApos: number;
+  /** Chegada na viagem ATUAL (null para o que é novo) e a diferença. */
+  chegadaAntesMin: number | null;
+  diferencaMin: number | null;
+}
+
+const INCONCLUSIVOS: CodigoMotivo[] = ['localizacao', 'trecho', 'rota_base', 'dados', 'van', 'busca_incompleta'];
+/** Recusa com dados completos é incompatibilidade; faltou dado/busca = inconclusivo. */
+export const situacaoDeCodigos = (codigos: CodigoMotivo[]): SituacaoEncaixe =>
+  codigos.some((c) => INCONCLUSIVOS.includes(c)) ? 'inconclusivo' : 'incompativel';
+
+/** Monta a tabela trecho a trecho de uma opção, comparando com a viagem atual. */
+export function detalharTrechos(opcao: OpcaoEncaixe, base: PlanoCalculado | null, nomes: Record<string, string>): TrechoRecalculado[] {
+  const antes = new Map((base?.eventos ?? []).map((e) => [e.compromisso.id, e.chegadaMin]));
+  return opcao.eventos.map((e) => {
+    const c = e.compromisso;
+    const a = antes.get(c.id) ?? null;
+    return {
+      // Novo aluno: na casa dele, "Novo aluno"; na escola, "Novo aluno — <escola>".
+      nome: nomes[c.id] ?? (c.id.startsWith('novo:')
+        ? ((c.tipo === 'embarque') === (opcao.sentido === 'ida') ? 'Novo aluno' : `Novo aluno — ${c.ponto.nome}`) : c.ponto.nome),
+      tipo: c.tipo, novo: c.id.startsWith('novo:'),
+      deslocamentoMin: e.deslocamentoMin, ocupacaoNoTrecho: e.ocupacaoNoTrecho,
+      chegadaMin: e.chegadaMin, esperaMin: e.esperaMin ?? 0, atendimentoMin: c.atendimentoMin, saidaMin: e.saidaMin, ocupacaoApos: e.ocupacaoApos,
+      chegadaAntesMin: a, diferencaMin: a == null ? null : Math.round((e.chegadaMin - a) * 100) / 100,
+    };
+  });
 }
 
 const coord = (v: number | undefined): v is number => typeof v === 'number' && Number.isFinite(v);
@@ -149,6 +209,7 @@ export function coletarPontos(
 const MAP_MOTIVO: Record<CodigoMotivo, string> = {
   localizacao: 'Faltam informações de localização de algum endereço (confirme os pontos no mapa).',
   escola_itinerario: 'A escola do novo aluno não faz parte do itinerário desta rota.',
+  escola_nao_aceita: 'O motorista informou que não aceita incluir esta escola nesta rota.',
   capacidade: 'A van ultrapassaria a capacidade de passageiros em algum trecho.',
   atraso: 'O aluno chegaria atrasado à escola.',
   tolerancia: 'Um aluno que já está na rota teria o horário alterado além do permitido.',
@@ -205,7 +266,10 @@ function montarOperacional(
     const ponto = pontoDeParada(parada);
     if (!ponto) return null;
     const ehEscola = parada.tipo === 'escola';
-    const limiteEscola = ehEscola ? limiteDaEscola(parada, rota, parada.ordem === ultimaEscolaOrdem) : undefined;
+    // VOLTA com liberação cadastrada: a escola não tem "chegar até" e sim "não
+    // sair antes de" — se a van chega cedo, ESPERA a liberação dos alunos.
+    const liberacao = ehEscola && rota.sentido === 'volta' ? minutoDoDia(parada.liberacaoMin) : null;
+    const limiteEscola = ehEscola && liberacao == null ? limiteDaEscola(parada, rota, parada.ordem === ultimaEscolaOrdem) : undefined;
     // Desembarques primeiro (liberam lugar antes de novos embarques no ponto).
     for (const pax of rota.passageiros.filter((x) => x.desembarqueParadaId === parada.id)) {
       compromissos.push({
@@ -218,7 +282,8 @@ function montarOperacional(
     // Marcador de escola carrega o limite mesmo sem passageiro descendo nela e
     // o tempo parado na escola (uma vez, para o grupo — não por aluno).
     if (ehEscola) {
-      compromissos.push({ id: 'escola:' + parada.id, ponto, tipo: 'escola', atendimentoMin: atendimentoGrupo(parada), ...(limiteEscola != null ? { limiteEscolaMin: limiteEscola } : {}) });
+      compromissos.push({ id: 'escola:' + parada.id, ponto, tipo: 'escola', atendimentoMin: atendimentoGrupo(parada), ...(limiteEscola != null ? { limiteEscolaMin: limiteEscola } : {}), ...(liberacao != null ? { naoAntesMin: liberacao } : {}) });
+      nomes['escola:' + parada.id] = nomeParada(parada);
     }
     for (const pax of rota.passageiros.filter((x) => x.embarqueParadaId === parada.id)) {
       compromissos.push({ id: 'emb:' + pax.id, ponto, tipo: 'embarque', alunoId: pax.id, atendimentoMin: ehEscola ? 0 : atendimentoDe(pax) });
@@ -231,10 +296,26 @@ function montarOperacional(
   // aluno novo trata "sem van" como indeterminado (ver simularEncaixeProgressivo).
   const capacidade = veiculo ? capacidadeAlunos(rota, veiculo) : Math.max(1, picoOcupacao(rota));
   const partida = partidaParaSequencia(inicio, compromissos, matriz);
+  // PONTO FINAL obrigatório: na ida, a viagem termina na última escola; o seu
+  // limite (deixar o último aluno até) vale para a viagem inteira.
+  const ultima = sequencia[sequencia.length - 1];
+  // (Só é "obrigatório" quando tem limite informado: sem ele, não há o que proteger.)
+  const pontoFinal = rota.sentido === 'ida' && ultima?.tipo === 'escola' && limiteDaEscola(ultima, rota, true) != null ? pontoDeParada(ultima) : null;
+  // Limite do ponto final:
+  //  - IDA: é o limite da última escola (o dela ou, na falta, "deixar o último
+  //    aluno até") — já está no compromisso dessa escola, acima.
+  //  - VOLTA: "última entrega até" vale para a viagem inteira, mas só quando as
+  //    escolas têm liberação cadastrada (no cadastro antigo esse mesmo campo
+  //    fazia o papel de horário de saída da escola).
+  const escolas = sequencia.filter((p) => p.tipo === 'escola');
+  const limiteFim = rota.sentido === 'volta' && escolas.length > 0 && escolas.every((p) => minutoDoDia(p.liberacaoMin) != null)
+    ? minutoDoDia(rota.ultimoDesembarqueMin) : null;
   return {
     id: rota.id || 'rota', versao: 1, sentido: rota.sentido, inicio,
     partidaMin: Math.max(0, partida ?? 0), capacidade, ocupacaoInicial: 0,
     compromissos, toleranciaMin: tolerancia,
+    ...(pontoFinal ? { pontoFinalId: pontoFinal.id } : {}),
+    ...(limiteFim != null ? { limiteFimMin: limiteFim } : {}),
   };
 }
 
@@ -244,7 +325,7 @@ function codigosDoProgressivo(motivos: string[], faltaDado: boolean, limite: boo
   for (const m of motivos) {
     if (m.includes('tempo/distância')) set.add('trecho');
     else if (m.includes('Capacidade')) set.add('capacidade');
-    else if (m.includes('Horário-limite')) set.add('atraso');
+    else if (m.includes('Horário-limite') || m.includes('ponto final')) set.add('atraso');
     else if (m.includes('Margem')) set.add('margem');
     else if (m.includes('Tolerância') || m.includes('Janela')) set.add('tolerancia');
     else if (m.includes('Tempo a bordo')) set.add('tempo_bordo');
@@ -266,6 +347,8 @@ export interface RotaAncorada {
   nomePorCompromisso: Record<string, string>;
   /** Ponto da escola `escolaId` quando ela já está no itinerário. */
   escolaExistente: PontoGeo | null;
+  /** Saída habitual usada: a do cadastro ou a calculada pelos horários das escolas. */
+  fontePartida: 'cadastrada' | 'calculada';
 }
 
 /**
@@ -291,16 +374,31 @@ export function montarRotaAncorada(
   // à meia-noite e o deslocamento falso estouraria a tolerância dos atuais.
   let compromissos = existente && params.horarioEscolaMin != null
     ? rotaBase.compromissos.map((c) =>
-        c.ponto.id === escolaId && (c.tipo === 'escola' || c.tipo === 'desembarque')
+        // (escola com liberação cadastrada na volta já tem o seu "não antes de")
+        c.ponto.id === escolaId && (c.tipo === 'escola' || c.tipo === 'desembarque') && c.naoAntesMin === undefined
           ? { ...c, limiteEscolaMin: params.horarioEscolaMin }
           : c)
     : rotaBase.compromissos;
   // Partida habitual = a mais tardia que cumpre todos os limites COM a margem
   // de segurança. A margem é exigida também de qualquer encaixe.
   // (Na volta a âncora é a SAÍDA da escola: não há horário-limite a proteger.)
-  const margem = sentido === 'ida' ? Math.max(0, params.margemMin ?? MARGEM_OPERACIONAL_MIN) : 0;
+  let margem = sentido === 'ida' ? Math.max(0, params.margemMin ?? MARGEM_OPERACIONAL_MIN) : 0;
   const ancora = partidaParaSequencia(rotaBase.inicio, compromissos, matriz);
-  const partidaMin = Math.max(0, ancora != null ? ancora - margem : rotaBase.partidaMin);
+  let partidaMin = Math.max(0, ancora != null ? ancora - margem : rotaBase.partidaMin);
+  let fontePartida: RotaAncorada['fontePartida'] = 'calculada';
+  // SAÍDA HABITUAL CADASTRADA manda: é dela que se mede qualquer antecipação.
+  // A margem exigida do encaixe nunca é maior que a folga que a própria rotina
+  // do motorista já tem (senão toda rota "justa" pareceria inválida).
+  const saidaCadastrada = minutoDoDia(rota.saidaHabitualMin);
+  if (saidaCadastrada != null) {
+    partidaMin = saidaCadastrada;
+    fontePartida = 'cadastrada';
+    const rotina = simularRota({ ...rotaBase, compromissos, partidaMin, margemSegurancaMin: 0 }, matriz);
+    if (rotina.eventos.length === compromissos.length) {
+      const folgas = rotina.eventos.filter((e) => e.compromisso.limiteEscolaMin !== undefined).map((e) => e.compromisso.limiteEscolaMin! - e.chegadaMin);
+      if (folgas.length) margem = Math.min(margem, Math.max(0, Math.floor(Math.min(...folgas) + 1e-6)));
+    }
+  }
   let rotaOp: RotaOperacional = { ...rotaBase, compromissos, partidaMin, margemSegurancaMin: margem };
 
   let base = simularRota(rotaOp, matriz);
@@ -329,7 +427,7 @@ export function montarRotaAncorada(
     rotaOp = { ...rotaOp, compromissos };
     base = simularRota(rotaOp, matriz);
   }
-  return { rotaOp, base, nomePorCompromisso, escolaExistente: existente?.ponto ?? null };
+  return { rotaOp, base, nomePorCompromisso, escolaExistente: existente?.ponto ?? null, fontePartida };
 }
 
 /**
@@ -343,7 +441,8 @@ export function simularEncaixeProgressivo(
   const sentido = rota.sentido;
   const vazio = (codigos: CodigoMotivo[], extra?: Partial<ResultadoSimulacao>): ResultadoSimulacao => ({
     sentido, elegivel: false, opcao: null, motivos: motivosDe(codigos), codigos,
-    base: null, partidaMin: null, nomePorCompromisso: {}, escolaNoItinerario: true, ...extra,
+    base: null, partidaMin: null, nomePorCompromisso: {}, escolaNoItinerario: true,
+    situacao: situacaoDeCodigos(codigos), aprovacoes: [], ...extra,
   });
 
   if (rota.passageiros.some((p) => p.id === aluno.alunoId)) return vazio(['aluno_duplicado']);
@@ -358,15 +457,23 @@ export function simularEncaixeProgressivo(
 
   const montada = montarRotaAncorada(rota, veiculo, matriz, params, aluno.escolaId);
   if (!montada) return vazio(['localizacao']);
-  const { rotaOp, base, nomePorCompromisso, escolaExistente: existente } = montada;
-  const escolaPonto = existente ?? aluno.escolaPonto ?? null;
-  if (!escolaPonto) return vazio(['escola_itinerario'], { escolaNoItinerario: false });
+  const { rotaOp, base, nomePorCompromisso, escolaExistente: existente, fontePartida } = montada;
+  // ESCOLA AINDA NÃO VISITADA: a lista de escolas aceitas da rota decide se dá
+  // para AVALIAR (nunca garante o encaixe). Lista revisada sem a escola = o
+  // motorista não aceita. Cadastro antigo (lista nunca revisada): avalia, mas
+  // incluir a escola depende de aprovação.
+  const aceita = existente ? null : (rota.escolasDisponiveis ?? []).find((e) => e.destinoId === aluno.escolaId) ?? null;
+  if (!existente && !aceita && rota.disponibilidadeRevisada) return vazio(['escola_nao_aceita'], { escolaNoItinerario: false, fontePartida });
+  const portao = aceita && coord(aceita.portaoLat ?? undefined) && coord(aceita.portaoLng ?? undefined)
+    ? { id: aluno.escolaId, nome: aluno.escolaPonto?.nome ?? 'Escola', lat: aceita.portaoLat as number, lng: aceita.portaoLng as number } : null;
+  const escolaPonto = existente ?? portao ?? aluno.escolaPonto ?? null;
+  if (!escolaPonto) return vazio(['escola_itinerario'], { escolaNoItinerario: false, fontePartida });
   // Rota-base que não fecha (trecho sem dado viário ou compromisso atual
   // descumprido) é inconclusiva: ninguém é recusado por causa dela.
   if (!base.valido) {
     const faltaDado = base.motivos.some((m) => m.includes('tempo/distância'));
     const detalhes = codigosDoProgressivo(base.motivos, faltaDado, false).filter((c) => c !== 'sem_encaixe');
-    return vazio([faltaDado ? 'trecho' : 'rota_base', ...detalhes.filter((c) => c !== 'trecho')], { base, partidaMin: rotaOp.partidaMin, nomePorCompromisso, escolaNoItinerario: !!existente });
+    return vazio([faltaDado ? 'trecho' : 'rota_base', ...detalhes.filter((c) => c !== 'trecho')], { base, partidaMin: rotaOp.partidaMin, nomePorCompromisso, escolaNoItinerario: !!existente, fontePartida });
   }
 
   const horarioAluno = params.horarioAlunoMin != null && Number.isFinite(params.horarioAlunoMin) ? params.horarioAlunoMin : params.horarioEscolaMin;
@@ -375,18 +482,29 @@ export function simularEncaixeProgressivo(
     // Exigência do novo aluno (a âncora da rota continua nos compromissos atuais).
     horarioEscolaMin: horarioAluno,
     atendimentoMin: params.atendimentoMin ?? ATENDIMENTO_PADRAO_MIN,
-    atendimentoEscolaNovaMin: PARADA_ESCOLA_MIN,
+    // Escola nova: o tempo do GRUPO informado na lista de aceitas; senão o padrão.
+    atendimentoEscolaNovaMin: duracaoMin(aceita?.atendimentoGrupoMin) ?? PARADA_ESCOLA_MIN,
   };
+  // Condições que o motorista informou para a escola aceita valem junto com as da família.
+  const limiteAceita = sentido === 'ida' ? minutoDoDia(aceita?.limiteChegadaMin) : null;
+  const liberacaoAceita = sentido === 'volta' ? minutoDoDia(aceita?.liberacaoMin) : null;
   const res = encontrarEncaixesProgressivo(rotaOp, pedido, matriz, {
     anteciparPartida: true,
     ...(params.antecipacaoMaxMin != null ? { antecipacaoMaxMin: params.antecipacaoMaxMin } : {}),
-    // Limite de antecipação cadastrado pelo motorista. Sem cadastro, só um ajuste
-    // pequeno (até a tolerância dos passageiros, máx. 10 min) é tratado como já
-    // aceito — suposição inicial explícita; acima disso depende do motorista.
-    antecipacaoAutorizadaMin: rota.limiteAntecipacaoMin ?? Math.min(TOLERANCIA_MAX_MIN, Math.max(0, params.toleranciaMin ?? TOLERANCIA_MAX_MIN)),
+    // Antecipação AUTORIZADA no cadastro (0 = não autoriza).
+    //  - Saída habitual CADASTRADA e antecipação não informada: nada é presumido;
+    //    qualquer saída mais cedo depende de aprovação do motorista.
+    //  - Saída apenas CALCULADA (cadastro antigo): ela é a mais tardia possível,
+    //    então toda inclusão a recua um pouco; esse recuo não é uma antecipação
+    //    real conhecida. Vale a regra anterior: até a tolerância dos passageiros
+    //    (máx. 10 min) é tratado como ajuste aceito; acima disso, aprovação.
+    antecipacaoAutorizadaMin: Math.max(0, rota.limiteAntecipacaoMin
+      ?? (fontePartida === 'cadastrada' ? 0 : Math.min(TOLERANCIA_MAX_MIN, Math.max(0, params.toleranciaMin ?? TOLERANCIA_MAX_MIN)))),
     inserirEscolaNova: !existente,
-    // Escola nova no itinerário: o único horário conhecido é o do novo aluno.
-    limiteEscolaNovaMin: horarioAluno,
+    escolaNovaExigeAprovacao: !existente && !aceita,
+    // Escola nova: vale o horário do novo aluno e, se houver, o limite do motorista.
+    limiteEscolaNovaMin: limiteAceita != null ? Math.min(horarioAluno, limiteAceita) : horarioAluno,
+    ...(liberacaoAceita != null ? { liberacaoNovoAlunoMin: liberacaoAceita } : {}),
     matrizConservadora: matrizConservadora(matriz, params.estimativas ?? ESTIMATIVAS_INICIAIS),
   });
   const explicacao = explicarEncaixe(res);
@@ -397,12 +515,16 @@ export function simularEncaixeProgressivo(
       sentido, elegivel: true, opcao: op, motivos: [], codigos: [],
       base, partidaMin: rotaOp.partidaMin, nomePorCompromisso, escolaNoItinerario: !!existente,
       classe: op.classe, antecipacaoMin: op.antecipacaoMin ?? 0, explicacao,
+      situacao: res.situacao, aprovacoes: op.aprovacoes ?? [], fontePartida,
+      antecipacaoNecessariaMin: op.antecipacaoNecessariaMin ?? 0, escolaInserida: res.escolaInserida,
+      trechos: detalharTrechos(op, base, nomePorCompromisso),
     };
   }
   const codigos = codigosDoProgressivo(res.motivos, res.faltaDadoViario, res.limiteAtingido);
   return {
     sentido, elegivel: false, opcao: null, motivos: motivosDe(codigos), codigos,
     base, partidaMin: rotaOp.partidaMin, nomePorCompromisso, escolaNoItinerario: !!existente, explicacao,
+    situacao: res.situacao, aprovacoes: [], fontePartida, escolaInserida: res.escolaInserida,
   };
 }
 

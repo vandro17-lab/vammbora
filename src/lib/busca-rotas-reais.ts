@@ -184,7 +184,7 @@ function ancoraHorarioEscola(rota: Rota, pedido: PedidoFamilia): { min: number |
 
 const INDETERMINADOS: CodigoMotivo[] = ['localizacao', 'trecho', 'rota_base', 'dados', 'van', 'busca_incompleta'];
 /** Recusas que NÃO dependem de tempos de trajeto (valem mesmo com estimativa). */
-const ESTRUTURAIS: CodigoMotivo[] = ['escola_itinerario', 'aluno_duplicado'];
+const ESTRUTURAIS: CodigoMotivo[] = ['escola_itinerario', 'escola_nao_aceita', 'aluno_duplicado'];
 
 function statusDeCodigos(codigos: CodigoMotivo[]): StatusBuscaReal {
   // Qualquer motivo "de dados" => indeterminado; caso contrário, incompatível de fato.
@@ -365,7 +365,13 @@ export function candidatasParaBusca(entradas: EntradaBuscaReal[], pedido: Pedido
     if (e.rota.sentido !== pedido.sentido) return false;
     if (turnoIncompativel(e.rota, pedido)) return false;
     if (e.veiculo && capacidadeAlunos(e.rota, e.veiculo) < 1) return false; // van sem lugar para aluno
-    return rotaAtendeDestino(e.rota, pedido.destinoId) || rotaPassaPertoDaEscola(e.rota, pedido.escolaPonto);
+    if (rotaAtendeDestino(e.rota, pedido.destinoId)) return true;
+    // Escola ainda não visitada: a lista de escolas ACEITAS da rota permite
+    // avaliar (não garante o encaixe). Lista revisada sem a escola = fora.
+    // Cadastro antigo (lista nunca revisada): vale a proximidade, como antes.
+    if ((e.rota.escolasDisponiveis ?? []).some((x) => x.destinoId === pedido.destinoId)) return true;
+    if (e.rota.disponibilidadeRevisada) return false;
+    return rotaPassaPertoDaEscola(e.rota, pedido.escolaPonto);
   });
 }
 

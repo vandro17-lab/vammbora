@@ -44,7 +44,7 @@ export function matrizDeTabelas(
       const min = tempos[i]?.[j];
       const met = distancias[i]?.[j];
       if (typeof min !== 'number' || typeof met !== 'number' || !Number.isFinite(min) || !Number.isFinite(met)) return null;
-      return { minutos: Math.max(0, Math.round(min)), metros: Math.max(0, Math.round(met)) };
+      return { minutos: Math.max(0, Math.round(min * 100) / 100), metros: Math.max(0, Math.round(met)) };
     },
   };
 }
