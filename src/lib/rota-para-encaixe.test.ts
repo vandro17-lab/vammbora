@@ -139,11 +139,18 @@ describe('simularEncaixeRota — adaptador do simulador', () => {
     expect(r.opcao!.alteracoes.every((a) => Math.abs(a.diferencaMin) <= 10)).toBe(true);
   });
 
-  it('11+12: tolerância contratual menor bloqueia qualquer alteração', () => {
-    // Tolerância 0: nenhuma inserção é possível sem mexer no horário dos antigos.
+  it('11+12: tolerância contratual 0 — só cabe sem mexer em NINGUÉM', () => {
+    // Volta: embarcar na escola junto do grupo não muda horário de ninguém (o
+    // tempo da escola é do grupo), e a casa nova só cabe no FIM da rota.
     const r = simularEncaixeRota(rotaVolta(), veiculo(5), aluno(), matriz(temposVolta), { horarioEscolaMin: 720, toleranciaMin: 0 });
-    expect(r.elegivel).toBe(false);
-    expect(r.codigos).toContain('tolerancia');
+    expect(r.elegivel).toBe(true);
+    expect(r.opcao!.alteracoes.every((a) => a.diferencaMin === 0)).toBe(true);
+    expect(r.opcao!.posicaoDesembarque).toBe(r.opcao!.eventos.length - 1);
+    // Sem caminho até a casa nova a partir da última casa, a entrega teria de
+    // entrar no meio e atrasar alguém: tolerância 0 bloqueia.
+    const r0 = simularEncaixeRota(rotaVolta(), veiculo(5), aluno(), matriz({ ...temposVolta, 'b>nova': null }), { horarioEscolaMin: 720, toleranciaMin: 0 });
+    expect(r0.elegivel).toBe(false);
+    expect(r0.codigos).toContain('tolerancia');
   });
 
   it('13: escola fora do itinerário', () => {

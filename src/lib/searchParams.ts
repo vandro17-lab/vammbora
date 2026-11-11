@@ -3,6 +3,14 @@ import { CIDADE_PADRAO } from '@/data/cidades';
 
 const TURNOS_VALIDOS: Turno[] = ['manha', 'tarde', 'noite', 'integral'];
 const MODALIDADES_VALIDAS: ModalidadeTrajeto[] = ['ida', 'volta', 'ambos'];
+const HORA_RE = /^([01]?\d|2[0-3]):[0-5]\d$/;
+
+/** "07:30" -> 450 (minuto do dia); inválido -> null. */
+export function horaParaMinutoDoDia(hora: string | null | undefined): number | null {
+  if (!hora || !HORA_RE.test(hora)) return null;
+  const [h, m] = hora.split(':').map(Number);
+  return h * 60 + m;
+}
 
 /** Serializa os critérios na URL (busca compartilhável e recarregável). */
 export function criteriosParaParams(c: CriteriosBusca): string {
@@ -18,6 +26,7 @@ export function criteriosParaParams(c: CriteriosBusca): string {
     p.set('olat', String(c.origemLat));
     p.set('olng', String(c.origemLng));
   }
+  if (c.horario && HORA_RE.test(c.horario)) p.set('horario', c.horario);
   return p.toString();
 }
 
@@ -40,6 +49,7 @@ export function paramsParaCriterios(sp: URLSearchParams): CriteriosBusca {
         : 'ida',
     origemLat: numeroOuUndef(sp.get('olat')),
     origemLng: numeroOuUndef(sp.get('olng')),
+    horario: HORA_RE.test(sp.get('horario') ?? '') ? (sp.get('horario') as string) : undefined,
   };
 }
 

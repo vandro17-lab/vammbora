@@ -100,8 +100,11 @@ describe('reorganização controlada', () => {
   });
 
   it('INVÁLIDA: deadline apertado demais — nem reorganizando cabe (incompatível comprovado)', () => {
-    const r = rotaDuas(714); // 1 min a menos do que a reorganização consegue
-    const full = encontrarEncaixesProgressivo(r, pedidoDuas, matrizDuas, { reorganizar: true });
+    // Mesmo limite do caso válido (714), mas o novo aluno demora 1 min a mais
+    // na casa: nem reorganizando cabe. (O tempo dele na escola é o do grupo —
+    // não soma; por isso o aperto vem da casa.)
+    const r = rotaDuas(714);
+    const full = encontrarEncaixesProgressivo(r, { ...pedidoDuas, atendimentoMin: 2 }, matrizDuas, { reorganizar: true });
     expect(full.classificacao).toBe('incompativel');
     expect(full.opcoes).toEqual([]);
     expect(full.limiteAtingido).toBe(false);

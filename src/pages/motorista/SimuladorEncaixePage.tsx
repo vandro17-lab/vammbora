@@ -77,16 +77,24 @@ function Simulador() {
   const veiculo = useMemo(() => veiculos.find((v) => v.id === rota?.veiculoId) ?? null, [veiculos, rota]);
   const escolas = useMemo(() => (rota ? escolasDaRota(rota) : []), [rota]);
 
-  // Ao trocar de rota, ajusta escola e horário sugerido (dado cadastrado ou turno).
+  // Ao trocar de rota, ajusta a escola escolhida.
   useEffect(() => {
     setResultado(null);
     setErro('');
     if (!rota) return;
-    const esc = escolasDaRota(rota);
-    setEscolaId(esc[0]?.id ?? '');
-    const min = rota.ultimoDesembarqueMin ?? limitePadraoDoTurno(rota.turno);
-    setHorario(min != null ? minutosParaTextoHora(min).replace('h', ':') : '');
+    setEscolaId(escolasDaRota(rota)[0]?.id ?? '');
   }, [rota]);
+  // Horário sugerido É O DA ESCOLA ESCOLHIDA (mesma regra da busca das famílias):
+  // horário próprio da parada; o "último desembarque" só vale para a última
+  // escola da rota; por fim o padrão do turno.
+  useEffect(() => {
+    if (!rota) return;
+    const escolas = [...rota.paradas].filter((p) => p.tipo === 'escola').sort((a, b) => a.ordem - b.ordem);
+    const alvo = escolas.find((p) => p.destinoId === escolaId);
+    const ehUltima = !!alvo && alvo.ordem === escolas[escolas.length - 1]?.ordem;
+    const min = alvo?.horarioChegadaMin ?? (ehUltima ? rota.ultimoDesembarqueMin : null) ?? limitePadraoDoTurno(rota.turno);
+    setHorario(min != null ? minutosParaTextoHora(min).replace('h', ':') : '');
+  }, [rota, escolaId]);
 
   const horarioMin = /^\d{1,2}:\d{2}$/.test(horario) ? horaParaMinutos(horario) : null;
   const prontoParaSimular = !!rota && !!casa && !!escolaId && horarioMin != null && nomeAluno.trim().length > 0;
