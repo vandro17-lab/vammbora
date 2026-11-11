@@ -51,9 +51,10 @@ export default function App() {
         <VitrineProvider>
           <StartupExperience>
           <Routes>
+            {/* Páginas públicas independentes, sem cabeçalho e rodapé do aplicativo */}
+            <Route path="/" element={<PreLancamentoPage />} />
+            <Route path="/privacidade" element={<PrivacidadePage />} />
             <Route element={<Layout />}>
-              <Route path="/" element={<PreLancamentoPage />} />
-              <Route path="/privacidade" element={<PrivacidadePage />} />
               <Route path="/resultados" element={<PageTransition><SearchResultsPage /></PageTransition>} />
               <Route path="/van/:slug" element={<PageTransition><DriverProfilePage /></PageTransition>} />
               <Route path="/motorista" element={<PageTransition><DriverLandingPage /></PageTransition>} />
