@@ -1,3 +1,5 @@
+import { PreLancamentoPage } from '@/pages/PreLancamentoPage';
+import { PrivacidadePage } from '@/pages/PrivacidadePage';
 import { StartupExperience } from '@/components/brand/StartupExperience';
 import { SearchLoadingScreen } from '@/components/search/SearchLoadingScreen';
 import { BrowserRouter, Routes, Route, Outlet } from 'react-router-dom';
@@ -51,7 +53,8 @@ export default function App() {
           <StartupExperience>
           <Routes>
             <Route element={<Layout />}>
-              <Route path="/" element={<PageTransition><HomePage /></PageTransition>} />
+              <Route path="/" element={<PreLancamentoPage />} />
+              <Route path="/privacidade" element={<PrivacidadePage />} />
               <Route path="/resultados" element={<PageTransition><SearchResultsPage /></PageTransition>} />
               <Route path="/van/:slug" element={<PageTransition><DriverProfilePage /></PageTransition>} />
               <Route path="/motorista" element={<PageTransition><DriverLandingPage /></PageTransition>} />
