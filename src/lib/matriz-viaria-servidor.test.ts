@@ -29,7 +29,7 @@ describe('matriz viária do servidor (busca das famílias)', () => {
     expect(await consultarTabelasViarias([A, B], 'k', falha as never)).toBeNull();
     expect(await consultarTabelasViarias(Array.from({ length: 26 }, (_, i) => ({ lat: -21 - i / 1000, lng: -50 })), 'k', ok as never)).toBeNull();
     const t = await consultarTabelasViarias([A, B], 'k', ok as never);
-    expect(t?.tempos[0][1]).toBe(3); // 125 s arredondado para cima
+    expect(t?.tempos[0][1]).toBe(2.08); // 125 s = 2,08 min: trecho curto não é arredondado para o minuto cheio
     expect(t?.tempos[1][0]).toBeNull();
   });
 

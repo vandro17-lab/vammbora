@@ -57,7 +57,9 @@ interface LinhaRota {
   id: string; name: string | null; owner_id: string; vehicle_id: string | null; direction: string; turno: string | null;
   monitor: boolean; monitor_ocupa_lugar: boolean; reserved_seats: number; last_dropoff_min: number | null; early_leave_limit_min?: number | null;
   status: string; is_demo: boolean; is_published: boolean; price_month: number | null; price_type: string | null;
+  habitual_departure_min?: number | null; availability_reviewed?: boolean | null;
   route_stops: LinhaStop[]; route_passengers: LinhaPax[];
+  route_school_availability?: { id: string; destination_id: string; days: string[] | null; gate_lat: number | null; gate_lng: number | null; arrival_deadline_min: number | null; release_time_min: number | null; group_service_min: number | string | null }[] | null;
 }
 
 function mapRota(r: LinhaRota): Rota {
@@ -79,6 +81,12 @@ function mapRota(r: LinhaRota): Rota {
     id: r.id, nome: r.name ?? '', sentido: (r.direction as Rota['sentido']) ?? 'ida', turno: (r.turno as Rota['turno']) ?? null,
     dias: [], veiculoId: r.vehicle_id, monitor: r.monitor, monitorOcupaLugar: r.monitor_ocupa_lugar,
     lugaresReservados: r.reserved_seats, ultimoDesembarqueMin: r.last_dropoff_min, limiteAntecipacaoMin: r.early_leave_limit_min ?? null,
+    // Etapa 1: saída habitual cadastrada e escolas que o motorista aceita incluir nesta rota.
+    saidaHabitualMin: r.habitual_departure_min ?? null, disponibilidadeRevisada: !!r.availability_reviewed,
+    escolasDisponiveis: (r.route_school_availability ?? []).map((e) => ({
+      id: e.id, destinoId: e.destination_id, dias: e.days ?? null, portaoLat: e.gate_lat ?? null, portaoLng: e.gate_lng ?? null,
+      limiteChegadaMin: e.arrival_deadline_min ?? null, liberacaoMin: e.release_time_min ?? null, atendimentoGrupoMin: numero(e.group_service_min),
+    })),
     status: (r.status as Rota['status']) ?? 'rascunho', isPublished: r.is_published, paradas, passageiros, atualizadoEm: '',
   };
 }
@@ -207,13 +215,13 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     // §10: `limit` alto e explícito evita o truncamento silencioso do PostgREST
     // (default 1000 linhas) com ~300 rotas na demonstração.
     const sentidoPedido = pedido.sentido;
-    const consultar = (colunasDaParada: string) => {
+    const consultar = (colunasDaParada: string, extras = '') => {
       let consulta = db
         .from('routes')
         .select(
           'id,name,owner_id,vehicle_id,direction,turno,monitor,monitor_ocupa_lugar,reserved_seats,last_dropoff_min,early_leave_limit_min,status,is_demo,is_published,price_month,price_type,' +
             `route_stops(${colunasDaParada}),` +
-            'route_passengers(id,identificacao,board_stop_id,alight_stop_id,destination_id,horario_habitual_min,ajuste_antes_min,ajuste_depois_min,atendimento_min)',
+            'route_passengers(id,identificacao,board_stop_id,alight_stop_id,destination_id,horario_habitual_min,ajuste_antes_min,ajuste_depois_min,atendimento_min)' + extras,
         )
         .eq('status', 'concluida')
         .eq('direction', sentidoPedido);
@@ -224,8 +232,9 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     // Visita à escola (limite de chegada, liberação, tempo do grupo): mesmos
     // dados que o simulador do motorista usa. Banco ainda sem essas colunas
     // (migração da etapa 1 pendente): consulta no formato anterior.
-    let { data: rotas, error: errR } = await consultar(`${PARADA_BASE},arrival_deadline_min,release_time_min,group_service_min`);
-    if (errR && (errR as { code?: string }).code === '42703') ({ data: rotas, error: errR } = await consultar(PARADA_BASE));
+    let { data: rotas, error: errR } = await consultar(`${PARADA_BASE},arrival_deadline_min,release_time_min,group_service_min`,
+      ',habitual_departure_min,availability_reviewed,route_school_availability(id,destination_id,days,gate_lat,gate_lng,arrival_deadline_min,release_time_min,group_service_min)');
+    if (errR && ['42703', '42P01', 'PGRST200', 'PGRST204'].includes(String((errR as { code?: string }).code))) ({ data: rotas, error: errR } = await consultar(PARADA_BASE));
     if (errR) return reply(res, 500, { erro: 'Falha ao consultar rotas.' });
 
     const linhas = (rotas ?? []) as unknown as LinhaRota[];

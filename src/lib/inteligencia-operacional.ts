@@ -82,7 +82,7 @@ export function matrizComFator(matriz: MatrizViaria, fator: number): MatrizViari
     origem: matriz.origem,
     obter: (de, para, partida) => {
       const t = matriz.obter(de, para, partida);
-      return t ? { minutos: Math.ceil(t.minutos * fator), metros: t.metros } : null;
+      return t ? { minutos: Math.ceil(t.minutos * fator * 10) / 10, metros: t.metros } : null;
     },
   };
 }

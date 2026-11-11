@@ -124,7 +124,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
           const i = celula.source_index;
           const j = celula.target_index;
           if (typeof i !== 'number' || typeof j !== 'number' || i < 0 || j < 0 || i >= n || j >= n) continue;
-          if (typeof celula.time === 'number' && Number.isFinite(celula.time)) tempos[i][j] = Math.max(0, Math.ceil(celula.time / 60));
+          if (typeof celula.time === 'number' && Number.isFinite(celula.time)) tempos[i][j] = Math.max(0, Math.round((celula.time / 60) * 100) / 100); // fração de minuto: trecho curto não vira 1 min
           if (typeof celula.distance === 'number' && Number.isFinite(celula.distance)) distancias[i][j] = Math.max(0, Math.round(celula.distance));
         }
       }

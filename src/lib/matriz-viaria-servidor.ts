@@ -40,7 +40,7 @@ export class MatrizPorCoordenadas implements MatrizViaria {
       const min = tempos[i]?.[j];
       const met = distancias[i]?.[j];
       if (i === j || typeof min !== 'number' || typeof met !== 'number' || !Number.isFinite(min) || !Number.isFinite(met)) return;
-      this.trechos.set(`${chave(de)}>${chave(para)}`, { minutos: Math.max(0, Math.round(min)), metros: Math.max(0, Math.round(met)) });
+      this.trechos.set(`${chave(de)}>${chave(para)}`, { minutos: Math.max(0, Math.round(min * 100) / 100), metros: Math.max(0, Math.round(met)) });
     }));
   }
 
@@ -90,7 +90,7 @@ export async function consultarTabelasViarias(
       for (const c of linha ?? []) {
         const i = c.source_index, j = c.target_index;
         if (typeof i !== 'number' || typeof j !== 'number' || i < 0 || j < 0 || i >= n || j >= n) continue;
-        if (typeof c.time === 'number' && Number.isFinite(c.time)) tempos[i][j] = Math.max(0, Math.ceil(c.time / 60));
+        if (typeof c.time === 'number' && Number.isFinite(c.time)) tempos[i][j] = Math.max(0, Math.round((c.time / 60) * 100) / 100); // fração de minuto: trecho curto não vira 1 min
         if (typeof c.distance === 'number' && Number.isFinite(c.distance)) distancias[i][j] = Math.max(0, Math.round(c.distance));
       }
     }
