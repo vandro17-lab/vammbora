@@ -51,9 +51,12 @@ export function VitrineProvider({ children }: { children: ReactNode }) {
           p,
           new Promise<never>((_, rej) => setTimeout(() => rej(new Error('tempo esgotado')), ms)),
         ]);
-      const [d, m] = await comTimeout(Promise.all([listarDestinos(), listarMotoristas()]), 12000);
-      setDestinos(d);
-      setMotoristas(m);
+      // Catálogo de escolas e vitrine de motoristas são consultas INDEPENDENTES:
+      // uma falha na vitrine não pode apagar as escolas (a busca depende delas).
+      const [d, m] = await comTimeout(Promise.allSettled([listarDestinos(), listarMotoristas()]), 12000);
+      if (d.status === 'rejected') throw d.reason;
+      setDestinos(d.value);
+      setMotoristas(m.status === 'fulfilled' ? m.value : []);
       setStatus('pronto');
     } catch {
       setDestinos([]);

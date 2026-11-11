@@ -53,7 +53,12 @@ export interface PedidoEncaixe {
   escola: PontoGeo;
   /** Horário máximo de chegada à escola (ida) ou mínimo de saída da escola (volta). */
   horarioEscolaMin: number;
+  /** Atendimento do aluno na CASA (min). */
   atendimentoMin?: number;
+  /** Tempo parado na escola quando ela é INSERIDA como parada nova (min). Com a
+   *  escola já no itinerário, o tempo da escola é o do marcador existente e o
+   *  lado "escola" do novo aluno não soma nada. */
+  atendimentoEscolaNovaMin?: number;
 }
 export interface EventoCalculado {
   compromisso: Compromisso; chegadaMin: number; saidaMin: number; ocupacaoApos: number;
@@ -159,8 +164,10 @@ export function encontrarEncaixes(rota: RotaOperacional, pedido: PedidoEncaixe, 
   if (!base.valido) return []; // nunca compara com uma rota-base inconsistente
   const tolerancia = Math.min(10, Math.max(0, rota.toleranciaMin ?? 10));
   const n = rota.compromissos.length;
-  const busca: Compromisso = { id: 'novo:embarque:' + pedido.alunoId, ponto: rota.sentido === 'ida' ? pedido.casa : pedido.escola, tipo: 'embarque', alunoId: pedido.alunoId, atendimentoMin: pedido.atendimentoMin ?? 1 };
-  const entrega: Compromisso = { id: 'novo:desembarque:' + pedido.alunoId, ponto: rota.sentido === 'ida' ? pedido.escola : pedido.casa, tipo: 'desembarque', alunoId: pedido.alunoId, atendimentoMin: pedido.atendimentoMin ?? 1, ...(rota.sentido === 'ida' ? { limiteEscolaMin: pedido.horarioEscolaMin } : {}) };
+  // Atendimento conta UMA vez, na casa; na escola (já no itinerário) o tempo é o do marcador.
+  const atendCasa = pedido.atendimentoMin ?? 1;
+  const busca: Compromisso = { id: 'novo:embarque:' + pedido.alunoId, ponto: rota.sentido === 'ida' ? pedido.casa : pedido.escola, tipo: 'embarque', alunoId: pedido.alunoId, atendimentoMin: rota.sentido === 'ida' ? atendCasa : 0 };
+  const entrega: Compromisso = { id: 'novo:desembarque:' + pedido.alunoId, ponto: rota.sentido === 'ida' ? pedido.escola : pedido.casa, tipo: 'desembarque', alunoId: pedido.alunoId, atendimentoMin: rota.sentido === 'ida' ? 0 : atendCasa, ...(rota.sentido === 'ida' ? { limiteEscolaMin: pedido.horarioEscolaMin } : {}) };
   const opcoes: OpcaoEncaixe[] = [];
   for (let i = 0; i <= n; i++) {
     for (let j = i + 1; j <= n + 1; j++) {
@@ -494,13 +501,18 @@ export function encontrarEncaixesProgressivo(
   if (escolaNova && opcoes.inserirEscolaNova === false) return vazio('indeterminado', { escolaInserida: false });
 
   const limiteEscola = escolaNova ? (opcoes.limiteEscolaNovaMin ?? pedido.horarioEscolaMin) : pedido.horarioEscolaMin;
+  // Atendimento conta UMA vez, na casa. Na escola: zero quando ela já está no
+  // itinerário (o marcador da escola traz o tempo do grupo); quando a escola é
+  // inserida como parada nova, o tempo da parada escolar entra aqui.
+  const atendCasa = pedido.atendimentoMin ?? 1;
+  const atendEscola = escolaNova ? (pedido.atendimentoEscolaNovaMin ?? atendCasa) : 0;
   const busca: Compromisso = {
     id: 'novo:embarque:' + pedido.alunoId, ponto: rota.sentido === 'ida' ? pedido.casa : pedido.escola,
-    tipo: 'embarque', alunoId: pedido.alunoId, atendimentoMin: pedido.atendimentoMin ?? 1,
+    tipo: 'embarque', alunoId: pedido.alunoId, atendimentoMin: rota.sentido === 'ida' ? atendCasa : atendEscola,
   };
   const entrega: Compromisso = {
     id: 'novo:desembarque:' + pedido.alunoId, ponto: rota.sentido === 'ida' ? pedido.escola : pedido.casa,
-    tipo: 'desembarque', alunoId: pedido.alunoId, atendimentoMin: pedido.atendimentoMin ?? 1,
+    tipo: 'desembarque', alunoId: pedido.alunoId, atendimentoMin: rota.sentido === 'ida' ? atendEscola : atendCasa,
     ...(rota.sentido === 'ida' ? { limiteEscolaMin: limiteEscola } : {}),
   };
 

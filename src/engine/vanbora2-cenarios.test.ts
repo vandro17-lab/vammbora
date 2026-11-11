@@ -35,11 +35,11 @@ describe('VanBora 2.0 — cenários representativos do encaixe', () => {
     expect(r.indeterminado_sem_trecho.classificacao).toBe('indeterminado');
   });
   it('viável com autorização: classe depende do que o motorista cadastrou', () => {
-    expect(r.autorizacao_nao_cadastrada).toMatchObject({ classificacao: 'compativel', classe: 'aprovacao_motorista', partida: 358 });
-    expect(r.autorizacao_cadastrada).toMatchObject({ classificacao: 'compativel', classe: 'pre_autorizado', partida: 358 });
+    expect(r.autorizacao_nao_cadastrada).toMatchObject({ classificacao: 'compativel', classe: 'aprovacao_motorista', partida: 359 });
+    expect(r.autorizacao_cadastrada).toMatchObject({ classificacao: 'compativel', classe: 'pre_autorizado', partida: 359 });
   });
   it('margem de segurança é exigida; sem margem o encaixe é sinalizado como frágil', () => {
-    expect(r.margem_exigida).toMatchObject({ classificacao: 'compativel', partida: 358, entrega: 378 }); // 6 min antes do limite 384
+    expect(r.margem_exigida).toMatchObject({ classificacao: 'compativel', partida: 359, entrega: 379 }); // 5 min antes do limite 384 (o novo aluno não soma tempo na escola: o tempo é do grupo)
     expect(r.sem_margem).toMatchObject({ classificacao: 'compativel', robusta: false });
   });
   it('explica aceitação e recusa em linguagem direta', () => {

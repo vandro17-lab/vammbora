@@ -363,7 +363,7 @@ function Config() {
         className="mx-auto mt-5 block w-full select-none py-3 text-center text-[11px] text-navy-400"
         aria-label="Versão do aplicativo"
       >
-        Vambora Motoristas · versão 0.1.0
+        VanBora Motoristas · versão 0.1.0
       </button>
     </>
   );

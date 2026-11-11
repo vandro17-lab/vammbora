@@ -31,7 +31,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { createClient } from '@supabase/supabase-js';
 import {
-  buscarEmRotasReais, candidatasParaBusca, compararResultados,
+  buscarEmRotasReais, candidatasParaBusca, compararResultados, contarInconclusivas,
   type PedidoFamilia, type EntradaBuscaReal, type ResultadoRotaReal,
 } from '../src/lib/busca-rotas-reais';
 import { criarMatrizDemo } from '../src/lib/encaixe';
@@ -49,8 +49,10 @@ const sentidoValido = (s: unknown): s is 'ida' | 'volta' => s === 'ida' || s ===
 const coordOk = (n: unknown): n is number => typeof n === 'number' && Number.isFinite(n);
 
 /* --------- Mapeadores de linha do banco -> domínio (mínimos, sem PII extra) --------- */
-interface LinhaStop { id: string; ordem: number; type: string; label: string | null; lat: number | null; lng: number | null; confirmed: boolean; destination_id: string | null; leg_time_min: number | null; habitual_arrival_min: number | null }
-interface LinhaPax { id: string; identificacao: string; board_stop_id: string | null; alight_stop_id: string | null; destination_id: string | null; horario_habitual_min: number | null; ajuste_antes_min?: number | null; ajuste_depois_min?: number | null; atendimento_min?: number | null }
+interface LinhaStop { id: string; ordem: number; type: string; label: string | null; lat: number | null; lng: number | null; confirmed: boolean; destination_id: string | null; leg_time_min: number | null; habitual_arrival_min: number | null; arrival_deadline_min?: number | null; release_time_min?: number | null; group_service_min?: number | string | null }
+interface LinhaPax { id: string; identificacao: string; board_stop_id: string | null; alight_stop_id: string | null; destination_id: string | null; horario_habitual_min: number | null; ajuste_antes_min?: number | null; ajuste_depois_min?: number | null; atendimento_min?: number | string | null }
+/** numeric do Postgres pode chegar como texto; NULL continua NULL (não informado). */
+const numero = (v: number | string | null | undefined): number | null => (v == null || v === '' || !Number.isFinite(Number(v)) ? null : Number(v));
 interface LinhaRota {
   id: string; name: string | null; owner_id: string; vehicle_id: string | null; direction: string; turno: string | null;
   monitor: boolean; monitor_ocupa_lugar: boolean; reserved_seats: number; last_dropoff_min: number | null; early_leave_limit_min?: number | null;
@@ -64,12 +66,14 @@ function mapRota(r: LinhaRota): Rota {
       id: s.id, ordem: s.ordem, tipo: s.type as ParadaRota['tipo'], rotulo: s.label ?? '',
       lat: s.lat ?? undefined, lng: s.lng ?? undefined, confirmado: s.confirmed,
       destinoId: s.destination_id, tempoAteProximaMin: s.leg_time_min, horarioChegadaMin: s.habitual_arrival_min ?? null,
+      // Visita à escola (etapa 1): limite de chegada, liberação e tempo do grupo.
+      limiteChegadaMin: s.arrival_deadline_min ?? null, liberacaoMin: s.release_time_min ?? null, atendimentoGrupoMin: numero(s.group_service_min),
     }))
     .sort((a, b) => a.ordem - b.ordem);
   const passageiros: PassageiroRota[] = (r.route_passengers ?? []).map((p) => ({
     id: p.id, identificacao: p.identificacao, embarqueParadaId: p.board_stop_id, desembarqueParadaId: p.alight_stop_id,
     destinoId: p.destination_id, horarioHabitualMin: p.horario_habitual_min ?? null,
-    ajusteAntesMin: p.ajuste_antes_min ?? null, ajusteDepoisMin: p.ajuste_depois_min ?? null, atendimentoMin: p.atendimento_min ?? null,
+    ajusteAntesMin: p.ajuste_antes_min ?? null, ajusteDepoisMin: p.ajuste_depois_min ?? null, atendimentoMin: numero(p.atendimento_min),
   }));
   return {
     id: r.id, nome: r.name ?? '', sentido: (r.direction as Rota['sentido']) ?? 'ida', turno: (r.turno as Rota['turno']) ?? null,
@@ -105,9 +109,9 @@ function limitado(ip: string, max = 20, janelaMs = 60_000): boolean {
  *  3) Rota sem matriz real (sem chave, falha, limite) mantém o resultado da
  *     prévia, que o núcleo já rebaixa para "sob confirmação".
  */
-async function avaliarComTemposReais(entradas: EntradaBuscaReal[], pedido: PedidoFamilia): Promise<{ resultados: ResultadoRotaReal[]; totalRotasAvaliadas: number }> {
+async function avaliarComTemposReais(entradas: EntradaBuscaReal[], pedido: PedidoFamilia): Promise<{ resultados: ResultadoRotaReal[]; totalRotasAvaliadas: number; inconclusivas: number }> {
   const candidatas = candidatasParaBusca(entradas, pedido);
-  if (candidatas.length === 0) return { resultados: [], totalRotasAvaliadas: 0 };
+  if (candidatas.length === 0) return { resultados: [], totalRotasAvaliadas: 0, inconclusivas: 0 };
   const previa = buscarEmRotasReais(candidatas, pedido, criarMatrizDemo()).resultados;
 
   const key = process.env.GEOAPIFY_API_KEY;
@@ -135,8 +139,12 @@ async function avaliarComTemposReais(entradas: EntradaBuscaReal[], pedido: Pedid
   const reais = comReal.size
     ? buscarEmRotasReais(candidatas.filter((e) => comReal.has(e.rota.id)), pedido, matrizReal).resultados
     : [];
+  // Sem matriz real (sem chave, falha do provedor ou fora do orçamento) a rota
+  // fica com a prévia: encaixe positivo vira "sob confirmação"; recusa vira
+  // INCONCLUSIVA (o núcleo já faz isso) — nunca uma impossibilidade.
   const estimados = previa.filter((r) => !comReal.has(r.rotaId));
-  return { resultados: [...reais, ...estimados].sort(compararResultados), totalRotasAvaliadas: candidatas.length };
+  const resultados = [...reais, ...estimados].sort(compararResultados);
+  return { resultados, totalRotasAvaliadas: candidatas.length, inconclusivas: contarInconclusivas(resultados) };
 }
 
 export default async function handler(req: IncomingMessage, res: ServerResponse) {
@@ -156,12 +164,14 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     raw += (chunk as Buffer).toString();
     if (raw.length > 8000) return reply(res, 413, { erro: 'Solicitação muito grande.' });
   }
-  let body: { origem?: { lat?: number; lng?: number }; destinoId?: string; escolaPonto?: { lat?: number; lng?: number } | null; sentido?: string; turno?: string | null; contratacao?: string | null };
+  let body: { origem?: { lat?: number; lng?: number }; destinoId?: string; escolaPonto?: { lat?: number; lng?: number } | null; sentido?: string; turno?: string | null; contratacao?: string | null; horarioMin?: number | null };
   try { body = JSON.parse(raw || '{}'); } catch { return reply(res, 400, { erro: 'JSON inválido.' }); }
 
   if (!body.origem || !coordOk(body.origem.lat) || !coordOk(body.origem.lng)) return reply(res, 400, { erro: 'Origem (lat/lng) é obrigatória.' });
   if (!body.destinoId || typeof body.destinoId !== 'string') return reply(res, 400, { erro: 'destinoId é obrigatório.' });
   if (!sentidoValido(body.sentido)) return reply(res, 400, { erro: 'sentido deve ser ida ou volta.' });
+  // Horário da família (minuto do dia): ida = precisa chegar até; volta = sai da escola a partir de.
+  const horarioFamiliaMin = typeof body.horarioMin === 'number' && Number.isInteger(body.horarioMin) && body.horarioMin >= 0 && body.horarioMin <= 1439 ? body.horarioMin : null;
 
   // §6.1: modo demonstração ligado SÓ por configuração do servidor (nunca pelo cliente).
   const demoLigado = process.env.BUSCAR_ROTAS_DEMO === '1' || process.env.BUSCAR_ROTAS_DEMO === 'true';
@@ -187,6 +197,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       sentido: body.sentido,
       turno: body.turno ?? null,
       contratacao: body.contratacao === 'avulso' ? 'avulso' : 'mensal',
+      horarioFamiliaMin,
     };
 
     // Rotas ELEGÍVEIS: concluídas, do sentido pedido. NÃO exige publicação
@@ -195,26 +206,37 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     // servidor passa a INCLUIR as rotas demonstrativas (sem alterar `is_demo`).
     // §10: `limit` alto e explícito evita o truncamento silencioso do PostgREST
     // (default 1000 linhas) com ~300 rotas na demonstração.
-    let consulta = db
-      .from('routes')
-      .select(
-        'id,name,owner_id,vehicle_id,direction,turno,monitor,monitor_ocupa_lugar,reserved_seats,last_dropoff_min,early_leave_limit_min,status,is_demo,is_published,price_month,price_type,' +
-          'route_stops(id,ordem,type,label,lat,lng,confirmed,destination_id,leg_time_min,habitual_arrival_min),' +
-          'route_passengers(id,identificacao,board_stop_id,alight_stop_id,destination_id,horario_habitual_min,ajuste_antes_min,ajuste_depois_min,atendimento_min)',
-      )
-      .eq('status', 'concluida')
-      .eq('direction', pedido.sentido);
-    if (!demoLigado) consulta = consulta.eq('is_demo', false);
-    const { data: rotas, error: errR } = await consulta.limit(5000);
+    const sentidoPedido = pedido.sentido;
+    const consultar = (colunasDaParada: string) => {
+      let consulta = db
+        .from('routes')
+        .select(
+          'id,name,owner_id,vehicle_id,direction,turno,monitor,monitor_ocupa_lugar,reserved_seats,last_dropoff_min,early_leave_limit_min,status,is_demo,is_published,price_month,price_type,' +
+            `route_stops(${colunasDaParada}),` +
+            'route_passengers(id,identificacao,board_stop_id,alight_stop_id,destination_id,horario_habitual_min,ajuste_antes_min,ajuste_depois_min,atendimento_min)',
+        )
+        .eq('status', 'concluida')
+        .eq('direction', sentidoPedido);
+      if (!demoLigado) consulta = consulta.eq('is_demo', false);
+      return consulta.limit(5000);
+    };
+    const PARADA_BASE = 'id,ordem,type,label,lat,lng,confirmed,destination_id,leg_time_min,habitual_arrival_min';
+    // Visita à escola (limite de chegada, liberação, tempo do grupo): mesmos
+    // dados que o simulador do motorista usa. Banco ainda sem essas colunas
+    // (migração da etapa 1 pendente): consulta no formato anterior.
+    let { data: rotas, error: errR } = await consultar(`${PARADA_BASE},arrival_deadline_min,release_time_min,group_service_min`);
+    if (errR && (errR as { code?: string }).code === '42703') ({ data: rotas, error: errR } = await consultar(PARADA_BASE));
     if (errR) return reply(res, 500, { erro: 'Falha ao consultar rotas.' });
 
     const linhas = (rotas ?? []) as unknown as LinhaRota[];
-    if (linhas.length === 0) return reply(res, 200, { resultados: [], totalRotasAvaliadas: 0 });
+    if (linhas.length === 0) return reply(res, 200, { resultados: [], totalRotasAvaliadas: 0, inconclusivas: 0 });
 
     const vehicleIds = [...new Set(linhas.map((r) => r.vehicle_id).filter((v): v is string => !!v))];
     const vmap = new Map<string, LinhaVeiculo>();
     if (vehicleIds.length) {
-      const { data: veics } = await db.from('vehicles').select('id,seats_passenger').in('id', vehicleIds);
+      const { data: veics, error: errV } = await db.from('vehicles').select('id,seats_passenger').in('id', vehicleIds);
+      // Sem as vans não dá para avaliar lugares: é ERRO de consulta, não "sem oferta".
+      if (errV) return reply(res, 500, { erro: 'Falha ao consultar as vans das rotas.' });
       for (const v of veics ?? []) vmap.set(v.id as string, v as LinhaVeiculo);
     }
 
@@ -224,7 +246,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       veiculo: mapVeiculo(r.vehicle_id ? vmap.get(r.vehicle_id) : undefined),
     }));
 
-    const { resultados, totalRotasAvaliadas } = await avaliarComTemposReais(entradas, pedido);
+    const { resultados, totalRotasAvaliadas, inconclusivas } = await avaliarComTemposReais(entradas, pedido);
 
     // Resposta SEM PII: dados da PRÓPRIA rota (nome + van), nenhum dado de aluno.
     const publico = resultados.map((res0) => {
@@ -251,7 +273,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       };
     });
 
-    return reply(res, 200, { resultados: publico, totalRotasAvaliadas });
+    return reply(res, 200, { resultados: publico, totalRotasAvaliadas, inconclusivas });
   } catch (e) {
     return reply(res, 500, { erro: 'Erro interno ao avaliar rotas.' });
   }

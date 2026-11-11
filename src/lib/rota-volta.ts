@@ -104,7 +104,12 @@ export function sugerirVolta(ida: Rota, opcoes: { voltamIds?: string[]; distanci
       id, ordem: i, tipo: p.tipo === 'escola' ? 'escola' : 'casa', rotulo: p.rotulo,
       lat: p.lat, lng: p.lng, confirmado: p.confirmado,
       destinoId: p.destinoId ?? null, destinoNome: p.destinoNome ?? null,
+      // Mesma unidade e mesmo ponto (inclusive portão marcado) da ida.
+      portaoEspecifico: p.tipo === 'escola' && !!p.portaoEspecifico,
+      // Horários da visita são da IDA: na volta (liberação, tempo do grupo)
+      // ainda não foram informados — nada é copiado nem presumido.
       horarioChegadaMin: null, tempoAteProximaMin: null,
+      limiteChegadaMin: null, liberacaoMin: null, atendimentoGrupoMin: null,
     };
   });
   const passageiros: PassageiroRota[] = voltam.map((x) => ({
@@ -117,9 +122,13 @@ export function sugerirVolta(ida: Rota, opcoes: { voltamIds?: string[]; distanci
   }));
 
   return {
-    id: '', nome: nomeDaVolta(ida.nome), sentido: 'volta', turno: ida.turno, dias: [...ida.dias],
+    // PERÍODO ESCOLAR é o dos alunos (o mesmo da ida), não o horário da viagem:
+    // a volta do meio-dia continua sendo do período da manhã. Fica "a confirmar".
+    id: '', nome: nomeDaVolta(ida.nome), sentido: 'volta', turno: ida.turno, periodoConfirmado: false, dias: [...ida.dias],
     veiculoId: ida.veiculoId, monitor: ida.monitor, monitorOcupaLugar: ida.monitorOcupaLugar,
-    lugaresReservados: ida.lugaresReservados, ultimoDesembarqueMin: null, limiteAntecipacaoMin: null,
+    lugaresReservados: ida.lugaresReservados, ultimoDesembarqueMin: null, saidaHabitualMin: null, limiteAntecipacaoMin: null,
+    // Escolas que aceita incluir valem por ROTA: a volta começa sem nenhuma.
+    escolasDisponiveis: [], disponibilidadeRevisada: false,
     status: 'rascunho', isPublished: false, paradas, passageiros, atualizadoEm: new Date().toISOString(),
   };
 }

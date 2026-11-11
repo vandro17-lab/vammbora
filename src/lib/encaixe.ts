@@ -52,6 +52,8 @@ export function criarMatrizDemo(opts?: { fatorRuas?: number; kmh?: number }): Ma
       if (a.id === b.id) return { minutos: 0, metros: 0 };
       if (![a.lat, a.lng, b.lat, b.lng].every(Number.isFinite)) return null;
       const metros = Math.round(haversineMetros(a, b) * fatorRuas);
+      // Mesmo lugar com ids diferentes (ex.: duas casas no mesmo ponto): 0, não 1.
+      if (metros < 15) return { minutos: 0, metros: 0 };
       const minutos = Math.max(1, Math.round(metros / metrosPorMin));
       return { minutos, metros };
     },

@@ -2,60 +2,40 @@ import { cn } from '@/lib/utils';
 
 interface LogoProps {
   className?: string;
-  /** Cor do texto. 'light' para fundos escuros, 'dark' para fundos claros. */
+  /** Mantido por compatibilidade: a logo oficial tem fundo preto e serve em qualquer superfície. */
   variant?: 'light' | 'dark';
+  /** false = só o emblema (espaços pequenos). */
   showWordmark?: boolean;
+  /** Altura da arte, em classes utilitárias (padrão: h-8). */
+  altura?: string;
 }
 
-/** Ícone original da van — identidade amarelo escolar e preto (SVG). */
-export function VanMark({ className }: { className?: string }) {
+/**
+ * LOGO OFICIAL do VanBora (arte em public/brand, gerada por `npm run icons` a
+ * partir de `vanbora-logo.png`, sem redesenho).
+ *
+ * A arte oficial é sobre PRETO, sem transparência: por isso ela vai sempre
+ * dentro de uma placa preta de cantos arredondados — some em cabeçalhos
+ * pretos e continua íntegra em fundos claros.
+ */
+export function Logo({ className, showWordmark = true, altura = 'h-8' }: LogoProps) {
   return (
-    <svg
-      viewBox="0 0 48 48"
-      className={className}
-      role="img"
-      aria-label="VanBora"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <rect width="48" height="48" rx="12" fill="#facc15" />
-      {/* corpo da van */}
-      <path
-        d="M9 29c0-1 .4-1.9 1.1-2.6l3.4-3.4c.6-.6 1.5-1 2.4-1h15.3c.8 0 1.6.3 2.2.9l4.3 4.1c.6.6 1 1.4 1 2.3V33a2 2 0 0 1-2 2h-1.2"
-        stroke="#171717"
-        strokeWidth="2.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
+    <span className={cn('inline-flex shrink-0 items-center rounded-xl bg-black px-2 py-1', className)}>
+      <img
+        src={showWordmark ? '/brand/vanbora-horizontal.png' : '/brand/vanbora-emblema.png'}
+        alt="VanBora" draggable={false} decoding="async"
+        className={cn(altura, 'w-auto select-none')}
       />
-      <path d="M9 29v4a2 2 0 0 0 2 2h1.3" stroke="#171717" strokeWidth="2.4" strokeLinecap="round" />
-      {/* janelas */}
-      <path
-        d="M16.5 23.5v4.2M23 23.5v4.2"
-        stroke="#525252"
-        strokeWidth="2"
-        strokeLinecap="round"
-      />
-      {/* rodas */}
-      <circle cx="16" cy="35" r="3.1" fill="#facc15" stroke="#171717" strokeWidth="2.2" />
-      <circle cx="33" cy="35" r="3.1" fill="#facc15" stroke="#171717" strokeWidth="2.2" />
-    </svg>
-  );
-}
-
-export function Logo({ className, variant = 'dark', showWordmark = true }: LogoProps) {
-  return (
-    <span className={cn('inline-flex items-center gap-2.5', className)}>
-      <VanMark className="h-9 w-9 shrink-0" />
-      {showWordmark && (
-        <span
-          className={cn(
-            'font-display text-xl font-extrabold tracking-tight',
-            variant === 'light' ? 'text-white' : 'text-navy-900',
-          )}
-        >
-          Van<span className="text-mint-600">Bora</span>
-        </span>
-      )}
     </span>
   );
+}
+
+/** Emblema oficial (triângulo + van escolar), para espaços pequenos. */
+export function VanMark({ className }: { className?: string }) {
+  return <Logo showWordmark={false} className={cn('!p-0.5', className)} altura="h-full" />;
+}
+
+/** Logo oficial completa (emblema, nome e assinatura), para aberturas e telas de entrada. */
+export function LogoCompleta({ className }: { className?: string }) {
+  return <img src="/brand/vanbora-logo.png" alt="VanBora — mais vagas, mais conexões" draggable={false} decoding="async" className={cn('h-auto w-full select-none', className)} />;
 }

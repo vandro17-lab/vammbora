@@ -36,7 +36,8 @@ export function horaParaMinutos(hhmm: string): number {
 }
 
 /** Converte minutos desde a meia-noite em texto "6h38". */
-export function minutosParaTextoHora(min: number): string {
+export function minutosParaTextoHora(minutos: number): string {
+  const min = Math.round(minutos); // tempos de atendimento podem ter fração de minuto
   const h = Math.floor(min / 60);
   const m = min % 60;
   return `${h}h${m.toString().padStart(2, '0')}`;

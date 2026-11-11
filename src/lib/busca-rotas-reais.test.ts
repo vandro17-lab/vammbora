@@ -7,6 +7,7 @@ import {
   type EntradaBuscaReal,
 } from './busca-rotas-reais';
 import { criarMatrizDemo, type MatrizViaria } from '@/lib/encaixe';
+import { simularEncaixeProgressivo } from '@/lib/rota-para-encaixe';
 import type { Rota, Veiculo, ParadaRota, PassageiroRota } from '@/types/motorista';
 
 /** Matriz de TESTE (origem 'fixture-testada'): mesmos números determinísticos
@@ -106,12 +107,36 @@ describe('avaliarRotaReal — IDA (T07, T12)', () => {
 });
 
 describe('avaliarRotaReal — capacidade por trecho (T08)', () => {
-  it('rejeita quando um trecho já excede a capacidade da van', () => {
-    // Capacidade 1: o trecho casaB→escola já leva 2 alunos > 1 → sem encaixe honesto.
+  it('rota cadastrada ACIMA da capacidade da van é inconsistente: inconclusiva (revisar), nunca encaixe', () => {
+    // Capacidade 1 com 2 alunos no trecho casaB→escola: a própria rota não fecha.
     const r = avaliarRotaReal(rotaIda(), veiculo(1), pedidoIda());
-    expect(r.status).toBe('incompativel');
+    expect(r.status).toBe('indeterminado');
+    expect(r.codigos).toContain('rota_base');
     expect(r.codigos).toContain('capacidade');
     expect(r.passagemCasaMin).toBeNull();
+  });
+
+  it('van LOTADA no pico: o motor decide por TRECHO — nunca há mais gente a bordo do que lugares', () => {
+    const r = avaliarRotaReal(rotaIda(), veiculo(2), pedidoIda());
+    expect(r.vagas).toBe(0);
+    const sim = simularEncaixeProgressivo(rotaIda(), veiculo(2), {
+      alunoId: 'familia', nome: 'F', casa: { id: 'familia-casa', nome: 'Casa', ...C.familia }, escolaId: 'esc1',
+    }, FIXTURE, { horarioEscolaMin: 7 * 60 });
+    expect(sim.elegivel).toBe(r.status === 'compativel');
+    if (sim.opcao) expect(sim.opcao.eventos.every((e) => e.ocupacaoApos <= 2)).toBe(true);
+    else expect(r.codigos).toContain('capacidade');
+  });
+
+  it('van sem lugar para aluno (monitor ocupa o único lugar) → incompatível, nunca capacidade inventada', () => {
+    const r = avaliarRotaReal({ ...rotaIda(), monitor: true, monitorOcupaLugar: true, passageiros: [] }, veiculo(1), pedidoIda());
+    expect(r.status).toBe('incompativel');
+    expect(r.codigos).toContain('capacidade');
+  });
+
+  it('van não cadastrada → inconclusivo (não some em silêncio)', () => {
+    const r = avaliarRotaReal(rotaIda(), null, pedidoIda());
+    expect(r.status).toBe('indeterminado');
+    expect(r.codigos).toContain('van');
   });
 
   it('capacidade folgada (4) aceita a família', () => {
@@ -192,18 +217,27 @@ describe('avaliarRotaReal — SEM PII (T21)', () => {
   });
 });
 
-describe('buscarEmRotasReais — agregação por sentido + vaga', () => {
-  it('avalia só rotas do sentido pedido, COM vaga, e ordena compatíveis primeiro', () => {
+describe('buscarEmRotasReais — agregação por sentido + capacidade por trecho', () => {
+  it('avalia as rotas do sentido pedido (lotada no pico INCLUSA: o motor decide por trecho) e ordena compatíveis primeiro', () => {
     const entradas = [
       { rota: rotaIda(), veiculo: veiculo(4) }, // 2 ocupados em 4 → 2 vagas
       { rota: rotaVolta(), veiculo: veiculo(4) }, // outro sentido → fora
-      { rota: { ...rotaIda(), id: 'ida-lotada' }, veiculo: veiculo(2) }, // 2 ocupados em 2 → 0 vaga → fora
+      { rota: { ...rotaIda(), id: 'ida-lotada' }, veiculo: veiculo(2) }, // pico lotado: avaliada, recusada por trecho
     ];
     const out = buscarEmRotasReais(entradas, pedidoIda());
-    expect(out.totalRotasAvaliadas).toBe(1); // ida com vaga; a lotada e a de volta saem
-    expect(out.resultados[0].status).toBe('compativel');
-    expect(out.resultados[0].rotaId).toBe('rota-ida');
+    expect(out.totalRotasAvaliadas).toBe(2); // a lotada é AVALIADA (antes era descartada pelo pico)
+    expect(out.inconclusivas).toBe(0);
+    expect(out.resultados.find((r) => r.rotaId === 'rota-ida')?.status).toBe('compativel');
     expect(out.resultados.every((r) => r.sentido === 'ida')).toBe(true);
+    expect(out.resultados.map((r) => r.rotaId).sort()).toEqual(['ida-lotada', 'rota-ida']);
+  });
+
+  it('F01: vaga por TRECHO — quem embarca depois de um desembarque cabe mesmo com o pico lotado', () => {
+    // Van de 1 lugar. Aluno atual: casaA → escola X. Família: casa (perto de B) → escola Y, depois de X.
+    const rota = rotaIdaDuasEscolas();
+    const r = avaliarRotaReal(rota, veiculo(1), pedidoIda({ destinoId: 'escY', escolaPonto: C.casaB }));
+    expect(r.vagas).toBe(0); // pico lotado…
+    expect(r.status).toBe('compativel'); // …mas o lugar vaga em X antes de a família embarcar
   });
 });
 

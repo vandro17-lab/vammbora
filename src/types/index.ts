@@ -125,6 +125,9 @@ export interface CriteriosBusca {
    *  autocomplete (geocodificado). Quando ausentes, estima-se pela região. */
   origemLat?: number;
   origemLng?: number;
+  /** Horário informado pela família (HH:MM). Ida: precisa chegar à escola até
+   *  esse horário. Volta: sai da escola a partir dele. */
+  horario?: string;
 }
 
 /** Resultado de uma avaliação de compatibilidade para um motorista. */

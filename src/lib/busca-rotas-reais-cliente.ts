@@ -7,6 +7,7 @@ import {
   type EntradaBuscaReal,
   type StatusBuscaReal,
 } from '@/lib/busca-rotas-reais';
+import { horaParaMinutoDoDia } from '@/lib/searchParams';
 
 /**
  * Cliente da BUSCA REAL. Produz os dados de cartão (`CartaoRotaRealDados`) a
@@ -48,16 +49,26 @@ export type EstadoBuscaReal = 'nao_configurado' | 'ok' | 'erro';
 const sentidosDe = (m: ModalidadeTrajeto): ('ida' | 'volta')[] => (m === 'ambos' ? ['ida', 'volta'] : [m]);
 const mostravel = (s: StatusBuscaReal) => s === 'compativel' || s === 'sob_confirmacao';
 
+export interface RespostaBuscaReal {
+  estado: EstadoBuscaReal;
+  /** Só compatível / sob confirmação (nunca um falso encaixe). */
+  resultados: CartaoRotaRealDados[];
+  /** Rotas candidatas que NÃO puderam ser avaliadas (dado faltando, van sem
+   *  cadastro, trecho sem tempo, avaliação não concluída). Não é "sem vaga". */
+  inconclusivas: number;
+}
+
 /** PROD: consulta a função server-side. Só mostra compatível/sob confirmação. */
 export async function buscarRotasReais(
   criterios: CriteriosBusca,
   escolaPonto?: { lat: number; lng: number } | null,
   signal?: AbortSignal,
-): Promise<{ estado: EstadoBuscaReal; resultados: CartaoRotaRealDados[] }> {
+): Promise<RespostaBuscaReal> {
   if (!Number.isFinite(criterios.origemLat) || !Number.isFinite(criterios.origemLng) || !criterios.destinoId) {
-    return { estado: 'ok', resultados: [] };
+    return { estado: 'ok', resultados: [], inconclusivas: 0 };
   }
   const todos: CartaoRotaRealDados[] = [];
+  let inconclusivas = 0;
   for (const sentido of sentidosDe(criterios.modalidade)) {
     try {
       const r = await fetch('/api/buscar-rotas', {
@@ -71,17 +82,21 @@ export async function buscarRotasReais(
           sentido,
           turno: criterios.turno,
           contratacao: criterios.contratacao,
+          // Ida: precisa chegar até; volta: sai da escola a partir de.
+          horarioMin: horaParaMinutoDoDia(criterios.horario),
         }),
       });
-      if (r.status === 503) return { estado: 'nao_configurado', resultados: [] };
-      if (!r.ok) return { estado: 'erro', resultados: [] };
-      const d = (await r.json()) as { resultados?: CartaoRotaRealDados[] };
-      for (const x of d.resultados ?? []) if (mostravel(x.status)) todos.push(x);
+      if (r.status === 503) return { estado: 'nao_configurado', resultados: [], inconclusivas: 0 };
+      if (!r.ok) return { estado: 'erro', resultados: [], inconclusivas: 0 };
+      const d = (await r.json()) as { resultados?: CartaoRotaRealDados[]; inconclusivas?: number };
+      const lista = d.resultados ?? [];
+      for (const x of lista) if (mostravel(x.status)) todos.push(x);
+      inconclusivas += typeof d.inconclusivas === 'number' ? d.inconclusivas : lista.filter((x) => x.status === 'indeterminado').length;
     } catch {
-      return { estado: 'erro', resultados: [] };
+      return { estado: 'erro', resultados: [], inconclusivas: 0 };
     }
   }
-  return { estado: 'ok', resultados: todos };
+  return { estado: 'ok', resultados: todos, inconclusivas };
 }
 
 /* ===================== Modo demonstração (localStorage) =====================
@@ -92,26 +107,37 @@ export async function buscarRotasReaisDemo(
   criterios: CriteriosBusca,
   escolaPonto?: { lat: number; lng: number } | null,
 ): Promise<CartaoRotaRealDados[]> {
-  if (!Number.isFinite(criterios.origemLat) || !Number.isFinite(criterios.origemLng) || !criterios.destinoId) return [];
+  return (await buscarRotasReaisDemoCompleta(criterios, escolaPonto)).resultados;
+}
+
+export async function buscarRotasReaisDemoCompleta(
+  criterios: CriteriosBusca,
+  escolaPonto?: { lat: number; lng: number } | null,
+): Promise<RespostaBuscaReal> {
+  const vazio: RespostaBuscaReal = { estado: 'ok', resultados: [], inconclusivas: 0 };
+  if (!Number.isFinite(criterios.origemLat) || !Number.isFinite(criterios.origemLng) || !criterios.destinoId) return vazio;
   const [rotas, veiculos] = await Promise.all([listarRotas(), listarVeiculos()]);
   const veicPorId = new Map(veiculos.map((v) => [v.id, v]));
   const rotaPorId = new Map(rotas.map((r) => [r.id, r]));
   const entradas: EntradaBuscaReal[] = rotas
     .filter((r) => rotaElegivelParaBusca(r))
     .map((r) => ({ rota: r, veiculo: r.veiculoId ? veicPorId.get(r.veiculoId) ?? null : null }));
-  if (entradas.length === 0) return [];
+  if (entradas.length === 0) return vazio;
 
   const out: CartaoRotaRealDados[] = [];
+  let inconclusivas = 0;
   for (const sentido of sentidosDe(criterios.modalidade)) {
-    const { resultados } = buscarEmRotasReais(entradas, {
+    const { resultados, inconclusivas: n } = buscarEmRotasReais(entradas, {
       origem: { lat: criterios.origemLat!, lng: criterios.origemLng! },
       destinoId: criterios.destinoId,
       escolaPonto: escolaPonto ?? null,
       sentido,
       turno: criterios.turno,
       contratacao: criterios.contratacao,
+      horarioFamiliaMin: horaParaMinutoDoDia(criterios.horario),
     // Demonstração local: tempos ESTIMADOS — o núcleo limita a "sob confirmação".
     }, criarMatrizDemo());
+    inconclusivas += n;
     for (const r of resultados) {
       if (!mostravel(r.status)) continue; // nunca mostrar falso encaixe
       const rota = rotaPorId.get(r.rotaId);
@@ -132,5 +158,5 @@ export async function buscarRotasReaisDemo(
       });
     }
   }
-  return out;
+  return { estado: 'ok', resultados: out, inconclusivas };
 }

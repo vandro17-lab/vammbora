@@ -1,5 +1,6 @@
 import type { Rota, Veiculo, ParadaRota, PassageiroRota } from '@/types/motorista';
-import { PARADA_ESCOLA_MIN, atendimentoNaCasa } from '@/lib/tempos-parada';
+import { atendimentoNaCasa } from '@/lib/tempos-parada';
+import { atendimentoGrupo } from '@/lib/cadastro-rota';
 import { capacidadeAlunos, picoOcupacao, ocupacaoPorTrecho } from '@/lib/ocupacao-rota';
 
 /**
@@ -123,7 +124,7 @@ export function tempoRotaMin(rota: Rota): { total: number; dirigindo: number; pa
   for (const p of paradas) {
     const alunos = rota.passageiros.filter((x) => x.embarqueParadaId === p.id || x.desembarqueParadaId === p.id);
     if (!alunos.length) continue;
-    parado += p.tipo === 'escola' ? PARADA_ESCOLA_MIN : alunos.reduce((t, x) => t + atendimentoNaCasa(x), 0);
+    parado += p.tipo === 'escola' ? atendimentoGrupo(p) : alunos.reduce((t, x) => t + atendimentoNaCasa(x), 0);
   }
   const d = Math.round(dirigindo), e = Math.round(parado);
   return { total: d + e, dirigindo: d, parado: e };

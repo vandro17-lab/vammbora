@@ -6,7 +6,8 @@ import {
   type CodigoMotivo,
 } from '@/lib/rota-para-encaixe';
 import { haversineMetros, type MatrizViaria } from '@/lib/encaixe';
-import { vagasParaNovos } from '@/lib/ocupacao-rota';
+import { capacidadeAlunos, vagasParaNovos } from '@/lib/ocupacao-rota';
+import { horarioDaEscola } from '@/lib/cadastro-rota';
 
 /** Distância máxima (m) de uma parada da rota à escola pedida para a rota ser
  *  CANDIDATA quando não atende a escola (Tier B). Pré-filtro barato: o motor
@@ -52,6 +53,10 @@ export interface PedidoFamilia {
   contratacao?: 'mensal' | 'avulso' | null;
   /** Override opcional do horário-limite de escola (minuto do dia). */
   horarioEscolaMin?: number | null;
+  /** Horário informado pela FAMÍLIA (minuto do dia). Ida: até que horas o
+   *  aluno precisa chegar à escola. Volta: a partir de que horas sai da escola.
+   *  É exigência do novo aluno; não altera os compromissos dos atuais. */
+  horarioFamiliaMin?: number | null;
 }
 
 export type FonteHorario = 'rota' | 'turno' | 'nenhuma';
@@ -60,7 +65,8 @@ export interface ResultadoRotaReal {
   rotaId: string;
   sentido: 'ida' | 'volta';
   status: StatusBuscaReal;
-  /** Vagas livres da rota (capacidade − pico de ocupação). */
+  /** Vagas livres no trecho mais cheio (capacidade − pico). Informativo: o
+   *  encaixe é decidido por trecho pelo motor, não por este número. */
   vagas: number;
   /** A rota já atende a escola pedida (Tier A) ou foi avaliada por proximidade (Tier B). */
   atendeEscola: boolean;
@@ -104,10 +110,27 @@ export function rotaElegivelParaBusca(
  *  o motor ainda precisa provar que cabe. */
 export function rotaPassaPertoDaEscola(rota: Rota, escolaPonto?: { lat: number; lng: number } | null): boolean {
   if (!escolaPonto || !Number.isFinite(escolaPonto.lat) || !Number.isFinite(escolaPonto.lng)) return false;
-  return rota.paradas.some(
-    (p) => p.lat != null && p.lng != null && Number.isFinite(p.lat) && Number.isFinite(p.lng)
-      && haversineMetros({ lat: p.lat, lng: p.lng }, escolaPonto) <= PROX_ESCOLA_M,
-  );
+  const pontos = [...rota.paradas].sort((a, b) => a.ordem - b.ordem)
+    .filter((p) => p.lat != null && p.lng != null && Number.isFinite(p.lat) && Number.isFinite(p.lng))
+    .map((p) => ({ lat: p.lat as number, lng: p.lng as number }));
+  if (pontos.some((p) => haversineMetros(p, escolaPonto) <= PROX_ESCOLA_M)) return true;
+  // Corredor: a escola pode estar no CAMINHO entre duas paradas distantes
+  // (trecho longo sem parada perto dela). Mede a distância ao segmento.
+  for (let i = 0; i + 1 < pontos.length; i++) {
+    if (distanciaAoSegmentoM(escolaPonto, pontos[i], pontos[i + 1]) <= PROX_ESCOLA_M) return true;
+  }
+  return false;
+}
+
+/** Distância (m) de um ponto ao segmento a→b, em projeção local (válida para trechos urbanos). */
+export function distanciaAoSegmentoM(p: { lat: number; lng: number }, a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
+  const k = Math.cos(((a.lat + b.lat) / 2) * Math.PI / 180);
+  const ax = a.lng * k, ay = a.lat, bx = b.lng * k, by = b.lat, px = p.lng * k, py = p.lat;
+  const dx = bx - ax, dy = by - ay;
+  const comp2 = dx * dx + dy * dy;
+  const t = comp2 ? Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / comp2)) : 0;
+  const proj = { lat: ay + dy * t, lng: (ax + dx * t) / k };
+  return haversineMetros(p, proj);
 }
 
 /**
@@ -145,10 +168,10 @@ function ancoraHorarioEscola(rota: Rota, pedido: PedidoFamilia): { min: number |
     return { min: pedido.horarioEscolaMin, fonte: 'rota' };
   }
   const esc = escolaEscolhida(rota, pedido.destinoId);
-  // 2) Horário habitual de chegada da parada da escola escolhida (dado real).
-  if (esc && esc.alvo.horarioChegadaMin != null && Number.isFinite(esc.alvo.horarioChegadaMin)) {
-    return { min: esc.alvo.horarioChegadaMin, fonte: 'rota' };
-  }
+  // 2) Horário declarado da visita à escola escolhida (dado real): limite de
+  //    chegada na ida, liberação na volta; cadastro antigo: horário habitual.
+  const declarado = esc ? horarioDaEscola(esc.alvo, rota.sentido) : null;
+  if (declarado != null) return { min: declarado, fonte: 'rota' };
   // 3) Último desembarque só vale para a ÚLTIMA escola da rota.
   if (esc && esc.ehUltimaEscola && rota.ultimoDesembarqueMin != null && Number.isFinite(rota.ultimoDesembarqueMin)) {
     return { min: rota.ultimoDesembarqueMin, fonte: 'rota' };
@@ -159,7 +182,9 @@ function ancoraHorarioEscola(rota: Rota, pedido: PedidoFamilia): { min: number |
   return { min: null, fonte: 'nenhuma' };
 }
 
-const INDETERMINADOS: CodigoMotivo[] = ['localizacao', 'trecho', 'rota_base', 'dados'];
+const INDETERMINADOS: CodigoMotivo[] = ['localizacao', 'trecho', 'rota_base', 'dados', 'van', 'busca_incompleta'];
+/** Recusas que NÃO dependem de tempos de trajeto (valem mesmo com estimativa). */
+const ESTRUTURAIS: CodigoMotivo[] = ['escola_itinerario', 'aluno_duplicado'];
 
 function statusDeCodigos(codigos: CodigoMotivo[]): StatusBuscaReal {
   // Qualquer motivo "de dados" => indeterminado; caso contrário, incompatível de fato.
@@ -174,6 +199,8 @@ const MOTIVO_AVULSO = 'Encaixe calculado; como é avulso, confirme a data direto
 const MOTIVO_SEM_ORIGEM = 'Confirme um endereço de origem válido no mapa para calcularmos a compatibilidade.';
 const MOTIVO_SEM_DESTINO = 'Escolha a escola de destino para avaliarmos esta rota.';
 const MOTIVO_SEM_HORARIO = 'Esta rota ainda não tem horário suficiente para estimar — horário sob confirmação.';
+const MOTIVO_SEM_AVALIACAO_REAL = 'Esta rota ainda não pôde ser avaliada com tempos reais de trajeto — tente novamente em instantes.';
+const MOTIVO_SEM_LUGAR = 'Esta van não tem lugar disponível para alunos.';
 
 /** Matriz sem dado viário real (tempos estimados pelas coordenadas)? */
 export const matrizEhEstimativa = (matriz: MatrizViaria): boolean => matriz.origem === 'demonstracao';
@@ -214,9 +241,14 @@ export function avaliarRotaReal(
   if (rota.sentido !== pedido.sentido) {
     return vazio('incompativel', 'Esta rota é do outro sentido (ida/volta).');
   }
-  // 1º FILTRO: sem vaga, não aparece como disponível.
-  if (vagas < 1) {
-    return vazio('incompativel', 'Esta van está sem vagas para novos passageiros.', ['capacidade']);
+  // Lugares: a van precisa existir e ter lugar para aluno. Vaga por TRECHO é
+  // decidida pelo motor (quem embarca depois de um desembarque pode caber
+  // mesmo com o pico lotado) — por isso NÃO há veto por "pico" aqui.
+  if (!veiculo) {
+    return vazio('indeterminado', 'A van desta rota não está cadastrada — não dá para avaliar os lugares.', ['van']);
+  }
+  if (capacidadeAlunos(rota, veiculo) < 1) {
+    return vazio('incompativel', MOTIVO_SEM_LUGAR, ['capacidade']);
   }
   if (!pedido.origem || !Number.isFinite(pedido.origem.lat) || !Number.isFinite(pedido.origem.lng)) {
     return vazio('indeterminado', MOTIVO_SEM_ORIGEM, ['localizacao']);
@@ -242,9 +274,16 @@ export function avaliarRotaReal(
       : {}),
   };
 
-  const sim = simularEncaixeProgressivo(rota, veiculo, aluno, matriz, { horarioEscolaMin: horarioEscola });
+  const horarioFamilia = pedido.horarioFamiliaMin != null && Number.isFinite(pedido.horarioFamiliaMin) ? pedido.horarioFamiliaMin : null;
+  const sim = simularEncaixeProgressivo(rota, veiculo, aluno, matriz, { horarioEscolaMin: horarioEscola, horarioAlunoMin: horarioFamilia });
 
   if (!sim.elegivel || !sim.opcao) {
+    const estrutural = sim.codigos.some((c) => ESTRUTURAIS.includes(c));
+    // Recusa calculada com tempos ESTIMADOS não é prova de nada: fica
+    // inconclusiva até a avaliação com tempos reais (nunca "incompatível").
+    if (temposEstimados && !estrutural) {
+      return vazio('indeterminado', MOTIVO_SEM_AVALIACAO_REAL, ['dados', ...sim.codigos]);
+    }
     return {
       ...vazio(statusDeCodigos(sim.codigos), sim.motivos[0] ?? 'Não foi possível encaixar nesta rota.', sim.codigos),
     };
@@ -300,6 +339,9 @@ export interface EntradaBuscaReal {
 export interface ResultadoBuscaReal {
   resultados: ResultadoRotaReal[];
   totalRotasAvaliadas: number;
+  /** Candidatas cuja avaliação ficou INCONCLUSIVA (falta de dado, van, trecho,
+   *  busca não concluída). Não são "sem vaga": a interface deve dizer isso. */
+  inconclusivas: number;
 }
 
 /** Turnos incompatíveis na IDA: ambos informados, diferentes e nenhum integral.
@@ -312,15 +354,17 @@ function turnoIncompativel(rota: Rota, pedido: PedidoFamilia): boolean {
 }
 
 /**
- * Recorte das CANDIDATAS, nesta ordem: mesmo sentido; turno compatível; COM
- * VAGA (capacidade − pico de ocupação ≥ 1); que já ATENDEM a escola (Tier A)
- * OU passam PERTO dela (Tier B). Não prova encaixe — só evita avaliar à toa.
+ * Recorte das CANDIDATAS, nesta ordem: mesmo sentido; turno compatível; van
+ * com lugar para aluno; que já ATENDEM a escola (Tier A) OU passam PERTO dela
+ * (Tier B). Não prova encaixe — só evita avaliar à toa. Rota sem van cadastrada
+ * continua candidata (sai como inconclusiva, não some em silêncio); vaga por
+ * trecho é decidida pelo motor, nunca pelo pico de ocupação.
  */
 export function candidatasParaBusca(entradas: EntradaBuscaReal[], pedido: PedidoFamilia): EntradaBuscaReal[] {
   return entradas.filter((e) => {
     if (e.rota.sentido !== pedido.sentido) return false;
     if (turnoIncompativel(e.rota, pedido)) return false;
-    if (vagasParaNovos(e.rota, e.veiculo) < 1) return false; // 1º filtro: vaga
+    if (e.veiculo && capacidadeAlunos(e.rota, e.veiculo) < 1) return false; // van sem lugar para aluno
     return rotaAtendeDestino(e.rota, pedido.destinoId) || rotaPassaPertoDaEscola(e.rota, pedido.escolaPonto);
   });
 }
@@ -364,5 +408,7 @@ export function buscarEmRotasReais(
   const resultados = candidatas
     .map((e) => avaliarRotaReal(e.rota, e.veiculo, pedido, matriz))
     .sort(compararResultados);
-  return { resultados, totalRotasAvaliadas: candidatas.length };
+  return { resultados, totalRotasAvaliadas: candidatas.length, inconclusivas: contarInconclusivas(resultados) };
 }
+
+export const contarInconclusivas = (r: ResultadoRotaReal[]): number => r.filter((x) => x.status === 'indeterminado').length;

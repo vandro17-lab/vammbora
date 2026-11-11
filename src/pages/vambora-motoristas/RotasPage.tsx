@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   Users, Navigation, Clock, Plus, ChevronRight, MapPin, School, Sunrise, Sunset,
-  Maximize2, Car, Flag, MapPinned, Route as RouteIcon,
+  Maximize2, Car, Flag, MapPinned, Route as RouteIcon, Copy, AlertCircle,
 } from 'lucide-react';
 import { Path } from '@phosphor-icons/react';
 import { VMShell } from '@/components/vm/VMShell';
@@ -11,7 +11,10 @@ import { Card, SubHeader, DemoChip, EstadoVazio, AvisoErro } from '@/components/
 import { MapaInterativoRota } from '@/components/motorista/MapaInterativoRota';
 import { SugestaoRotaMelhor } from '@/components/motorista/SugestaoRotaMelhor';
 import { useDadosMotorista } from '@/lib/vm/useDadosMotorista';
-import { publicarRota } from '@/data/motorista-store';
+import { publicarRota, duplicarRota } from '@/data/motorista-store';
+import { PendenciasRevisao } from '@/components/motorista/CadastroRotaEtapa1';
+import { pendenciasDeRevisao, totalDePendencias } from '@/lib/cadastro-rota';
+import { useVitrine } from '@/data/VitrineProvider';
 import { distanciaRotaKm, tempoRotaMin } from '@/lib/vm/cenario';
 import { minutosParaTextoHora, cn } from '@/lib/utils';
 import { planejarRotaDoCadastro } from '@/lib/rota-para-motor';
@@ -85,6 +88,11 @@ export function RotasPage() {
                             <span className="inline-flex items-center gap-1"><Navigation className="h-3.5 w-3.5 text-navy-400" /> {km.toFixed(1).replace('.', ',')} km</span>
                             <span className="inline-flex items-center gap-1"><Clock className="h-3.5 w-3.5 text-navy-400" /> {horario(r)}</span>
                           </div>
+                          {!dados.demo && totalDePendencias(pendenciasDeRevisao(r)) > 0 && (
+                            <p className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
+                              <AlertCircle className="h-3 w-3" /> Precisa de revisão ({totalDePendencias(pendenciasDeRevisao(r))})
+                            </p>
+                          )}
                         </div>
                         <ChevronRight className="h-5 w-5 shrink-0 text-navy-300" />
                       </Card>
@@ -151,6 +159,22 @@ export function RotaDetalhePage() {
   const [mapaGrande, setMapaGrande] = useState(false);
   const [publicando, setPublicando] = useState(false);
   const [erroPub, setErroPub] = useState<string | null>(null);
+  const { destinos } = useVitrine();
+  const [duplicando, setDuplicando] = useState(false);
+  const [erroDup, setErroDup] = useState<string | null>(null);
+
+  /** Cópia completa (paradas, alunos, horários, escolas) como rascunho; abre a cópia para edição. */
+  async function duplicar() {
+    if (!rota) return;
+    setDuplicando(true); setErroDup(null);
+    try {
+      const copia = await duplicarRota(rota.id);
+      navigate(`/painel/rota/${copia.id}`);
+    } catch (e) {
+      setErroDup('Não foi possível duplicar: ' + (e as Error).message);
+      setDuplicando(false);
+    }
+  }
 
   async function alternarPublicacao() {
     if (!rota) return;
@@ -217,6 +241,20 @@ export function RotaDetalhePage() {
             </Link>
           )}
         </Card>
+
+        {/* Cadastro: o que falta informar + duplicar */}
+        {!dados.demo && (
+          <Card className="p-4">
+            <PendenciasRevisao rota={rota} destinos={destinos} compacto />
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Link to={`/painel/rota/${rota.id}`} className="rounded-full bg-navy-900 px-4 py-2 text-sm font-bold text-white transition active:scale-95">Editar cadastro</Link>
+              <button type="button" onClick={duplicar} disabled={duplicando} className="inline-flex items-center gap-1.5 rounded-full bg-navy-100 px-4 py-2 text-sm font-bold text-navy-700 transition active:scale-95 disabled:opacity-60">
+                <Copy className="h-4 w-4" /> {duplicando ? 'Duplicando…' : 'Duplicar rota'}
+              </button>
+            </div>
+            {erroDup && <p role="alert" className="mt-2 rounded-xl bg-red-50 p-2.5 text-xs text-red-700">{erroDup}</p>}
+          </Card>
+        )}
 
         {/* Volta sugerida a partir desta ida */}
         {!dados.demo && rota.sentido === 'ida' && rota.passageiros.length > 0 && (

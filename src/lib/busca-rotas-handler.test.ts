@@ -6,7 +6,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
  * Verifica a cola: elegibilidade (anúncio ativo), uso do motor e AUSÊNCIA DE PII.
  */
 
-const estado: { canned: Record<string, unknown[]> } = { canned: {} };
+const estado: { canned: Record<string, unknown[]>; erros: Record<string, { message: string } | undefined> } = { canned: {}, erros: {} };
 
 vi.mock('@supabase/supabase-js', () => ({
   createClient: () => ({
@@ -14,8 +14,8 @@ vi.mock('@supabase/supabase-js', () => ({
       const b: Record<string, unknown> = {};
       const self = () => b;
       b.select = self; b.eq = self; b.in = self; b.limit = self; b.order = self; b.range = self;
-      b.then = (resolve: (v: { data: unknown[]; error: null }) => void) =>
-        resolve({ data: estado.canned[table] ?? [], error: null });
+      b.then = (resolve: (v: { data: unknown[] | null; error: { message: string } | null }) => void) =>
+        resolve(estado.erros[table] ? { data: null, error: estado.erros[table]! } : { data: estado.canned[table] ?? [], error: null });
       return b;
     },
   }),
@@ -73,6 +73,8 @@ beforeEach(() => {
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-key-teste';
   process.env.GEOAPIFY_API_KEY = 'geo-key-teste';
   estado.canned = {};
+  estado.erros = {};
+  delete process.env.BUSCAR_ROTAS_MAX_VIARIAS;
 });
 afterEach(() => { vi.unstubAllGlobals(); });
 
@@ -162,5 +164,71 @@ describe('api/buscar-rotas (handler, mock Supabase)', () => {
     const res = fakeRes();
     await handler(fakeReq({ ...pedido, origem: null }), res as never);
     expect(res.statusCode).toBe(400);
+  });
+
+  /* ---------------- Regressões da auditoria de 10/11/2026 ---------------- */
+
+  it('F05: o horário informado pela família chega ao servidor e é usado como exigência do novo aluno', async () => {
+    mockProvedorViario();
+    estado.canned = { routes: [rotaRealCanon()], vehicles: [{ id: 'veic-1', seats_passenger: 6 }] };
+    // Precisa chegar às 06:00: a rota (limite 07:00) teria de sair cedo demais → não confirma.
+    const cedo = fakeRes();
+    await handler(fakeReq({ ...pedido, horarioMin: 6 * 60 }), cedo as never);
+    const outCedo = JSON.parse(cedo.body);
+    expect(outCedo.resultados[0].status).not.toBe('compativel');
+    // Precisa chegar às 07:30: o horário da rota (até 07:00) atende → compatível, e a chegada mostrada respeita a rota.
+    const tarde = fakeRes();
+    await handler(fakeReq({ ...pedido, horarioMin: 7 * 60 + 30 }), tarde as never);
+    const outTarde = JSON.parse(tarde.body);
+    expect(outTarde.resultados[0].status).toBe('compativel');
+    expect(outTarde.resultados[0].horarioEscolaMin).toBeLessThanOrEqual(7 * 60);
+    // Valor inválido é ignorado (não derruba a busca).
+    const invalido = fakeRes();
+    await handler(fakeReq({ ...pedido, horarioMin: 99999 }), invalido as never);
+    expect(invalido.statusCode).toBe(200);
+  });
+
+  it('F02: rota fora do orçamento viário fica INCONCLUSIVA (nunca "incompatível" por estimativa)', async () => {
+    process.env.BUSCAR_ROTAS_MAX_VIARIAS = '1';
+    mockProvedorViario();
+    // Duas rotas iguais; a família mora LONGE: pela estimativa nenhuma cabe.
+    estado.canned = { routes: [rotaRealCanon(), { ...rotaRealCanon(), id: 'rota-2', name: 'Rota Dois' }], vehicles: [{ id: 'veic-1', seats_passenger: 6 }] };
+    const res = fakeRes();
+    await handler(fakeReq({ ...pedido, origem: { lat: -21.7, lng: -50.95 } }), res as never);
+    const out = JSON.parse(res.body);
+    expect(out.totalRotasAvaliadas).toBe(2);
+    const semMatriz = out.resultados.find((r: { temposEstimados: boolean }) => r.temposEstimados);
+    expect(semMatriz).toBeTruthy();
+    expect(semMatriz.status).toBe('indeterminado');
+    expect(out.inconclusivas).toBeGreaterThanOrEqual(1);
+  });
+
+  it('F02: provedor viário fora do ar + estimativa negativa => inconclusivo, não recusa', async () => {
+    mockProvedorViario(false);
+    estado.canned = { routes: [rotaRealCanon()], vehicles: [{ id: 'veic-1', seats_passenger: 6 }] };
+    const res = fakeRes();
+    await handler(fakeReq({ ...pedido, origem: { lat: -21.7, lng: -50.95 } }), res as never);
+    const out = JSON.parse(res.body);
+    expect(out.resultados[0].status).toBe('indeterminado');
+    expect(out.inconclusivas).toBe(1);
+  });
+
+  it('F10: erro ao consultar as vans é ERRO (500), não "nenhuma rota"', async () => {
+    mockProvedorViario();
+    estado.canned = { routes: [rotaRealCanon()] };
+    estado.erros = { vehicles: { message: 'falha simulada' } };
+    const res = fakeRes();
+    await handler(fakeReq(pedido), res as never);
+    expect(res.statusCode).toBe(500);
+  });
+
+  it('F10/F07: rota cuja van não veio do banco sai como inconclusiva (não some em silêncio)', async () => {
+    mockProvedorViario();
+    estado.canned = { routes: [rotaRealCanon()], vehicles: [] };
+    const res = fakeRes();
+    await handler(fakeReq(pedido), res as never);
+    const out = JSON.parse(res.body);
+    expect(out.resultados[0].status).toBe('indeterminado');
+    expect(out.inconclusivas).toBe(1);
   });
 });

@@ -74,3 +74,36 @@ caso contrário, a rota fica cadastrada mas **não** elegível ao encaixe autom�
 
 > Enquanto o contrato não estiver plenamente atendido (tempos/cálculo), o app **não** afirma que o
 > encaixe foi verificado. Isso é responsabilidade da revisão dos motores (ChatGPT).
+
+## Etapa 1 da busca e do encaixe — modelo de dados e cadastro (migração 0015)
+
+Regra geral: **`NULL`/vazio = não informado; zero = informado como zero.** Cadastro antigo não
+recebe horário nem autorização por suposição: o app lista o que falta em "Precisa de revisão"
+(`pendenciasDeRevisao`, em `src/lib/cadastro-rota.ts`).
+
+| Informação | Onde fica | Observação |
+|---|---|---|
+| Endereço de saída da van | parada `route_stops.type = 'saida'` | já existia |
+| Horário habitual de saída | `routes.habitual_departure_min` | novo |
+| Quanto autoriza antecipar | `routes.early_leave_limit_min` | já existia; `0` = não autoriza, `NULL` = não informado |
+| Período escolar | `routes.turno` + `routes.turno_confirmed` | separado de `routes.direction`; o app sugere pelo horário e o motorista confirma |
+| Ponto final obrigatório e limite | última parada + `routes.last_dropoff_min` | preservado |
+| Endereço do aluno | parada `casa` do aluno | ida: embarque; volta: desembarque |
+| Escola do aluno | `destination_id` da parada de escola do aluno | sempre o ID do catálogo `destinations` (o mesmo das famílias) |
+| Horário habitual e flexibilidade do aluno | `route_passengers.horario_habitual_min`, `ajuste_antes_min`, `ajuste_depois_min` | já existiam |
+| Tempo de atendimento do aluno | `route_passengers.atendimento_min` | agora `numeric(6,2)`: `0.5` = 30 s |
+| Portão da escola | `lat`/`lng` da parada + `route_stops.gate_custom` | a unidade continua sendo `destination_id` |
+| Limite de chegada (ida) | `route_stops.arrival_deadline_min` | novo; diferente de `habitual_arrival_min` |
+| Liberação (volta) | `route_stops.release_time_min` | novo |
+| Tempo de atendimento do grupo | `route_stops.group_service_min` | novo, aceita fração |
+| Escolas já no percurso | paradas `type = 'escola'` | — |
+| Escolas que aceita incluir | `route_school_availability` (+ `routes.availability_reviewed`) | pertence à rota (período, sentido e dias dela; `days` opcional restringe os dias); **não é parada** e não altera a duração |
+| Lista geral do motorista | `driver_destinations` | só sugere o preenchimento; não autoriza rota nenhuma |
+
+Compatibilidade: a RPC `salvar_rota_completa` mantém os campos novos quando o payload vem do app
+anterior (chaves ausentes); o app e a API leem no formato anterior se o banco ainda não tiver a
+migração. Enquanto o limite de chegada/liberação não for informado, os cálculos seguem usando o
+horário habitual da parada, como antes. O uso das escolas disponíveis pela busca fica para a
+próxima etapa.
+
+Teste local (PostgreSQL descartável, sem tocar no Supabase): `supabase/tests/rodar-local.sh`.

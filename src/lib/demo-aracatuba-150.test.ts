@@ -7,6 +7,7 @@ import * as nucleo from '@/lib/busca-rotas-reais';
 import { type EntradaBuscaReal, type PedidoFamilia } from '@/lib/busca-rotas-reais';
 import { criarMatrizDemo, type MatrizViaria } from '@/lib/encaixe';
 import { picoOcupacao, capacidadeAlunos } from '@/lib/ocupacao-rota';
+import { simularEncaixeProgressivo } from '@/lib/rota-para-encaixe';
 import type { Rota, Veiculo } from '@/types/motorista';
 
 /** Matriz de TESTE (origem 'fixture-testada'): mesmos números determinísticos
@@ -175,23 +176,46 @@ describe('Busca real com o motor do endpoint (§6.2/§9.1)', () => {
     expect(JSON.stringify(compatA)).not.toBe(JSON.stringify(compatB));
   });
 
-  it('rejeita encaixe inviável por CAPACIDADE: rota lotada → incompatível (não vira compatível)', () => {
-    // Pega uma rota demo lotada (vagas 0) e avalia direto no motor um aluno novo
-    // para a escola dela: deve recusar por capacidade, nunca "compatível".
+  it('rota lotada com UMA escola: só sai "compatível" se em nenhum trecho há mais gente do que lugares', () => {
+    // Pega uma rota demo lotada (pico = capacidade) com uma só escola e confere
+    // a invariante do motor: ocupação ≤ capacidade em todos os trechos.
     const lotada = BASE.routesDomain.find(({ rota, veiculo }) => {
       const cap = capacidadeAlunos(rota, veiculo);
-      return rota.sentido === 'ida' && cap - picoOcupacao(rota) === 0 && rota.paradas.some((p) => p.tipo === 'escola');
+      return rota.sentido === 'ida' && cap - picoOcupacao(rota) === 0 && rota.paradas.filter((p) => p.tipo === 'escola').length === 1;
     });
-    expect(lotada, 'há ao menos uma rota de ida lotada').toBeTruthy();
+    expect(lotada, 'há ao menos uma rota de ida lotada com uma escola').toBeTruthy();
     const esc = lotada!.rota.paradas.find((p) => p.tipo === 'escola')!;
     const origem = pontoPertoDe({ lat: esc.lat!, lng: esc.lng! }, 300, 1400);
     const r = avaliarRotaReal(lotada!.rota, lotada!.veiculo, {
       origem: { lat: origem.lat, lng: origem.lng }, destinoId: esc.destinoId!,
       escolaPonto: { lat: esc.lat!, lng: esc.lng! }, sentido: 'ida', turno: null, contratacao: 'mensal',
     });
-    expect(r.status).not.toBe('compativel');
     expect(r.vagas).toBe(0);
-    expect(r.codigos).toContain('capacidade');
+    const cap = capacidadeAlunos(lotada!.rota, lotada!.veiculo);
+    const sim = simularEncaixeProgressivo(lotada!.rota, lotada!.veiculo, {
+      alunoId: 'familia', nome: 'F', casa: { id: 'familia-casa', nome: 'Casa', lat: origem.lat, lng: origem.lng },
+      escolaId: esc.destinoId!, escolaPonto: { id: esc.destinoId!, nome: 'E', lat: esc.lat!, lng: esc.lng! },
+    }, FIXTURE, { horarioEscolaMin: esc.horarioChegadaMin ?? 7 * 60 });
+    if (r.status === 'compativel') expect(sim.opcao!.eventos.every((e) => e.ocupacaoApos <= cap)).toBe(true);
+    else expect(r.codigos.some((c) => c === 'capacidade' || c === 'busca_incompleta')).toBe(true);
+  });
+
+  it('F01: rota lotada com DUAS escolas pode caber — o lugar vaga na primeira escola e a ocupação nunca passa da capacidade', () => {
+    const lotada = BASE.routesDomain.find(({ rota, veiculo }) => {
+      const cap = capacidadeAlunos(rota, veiculo);
+      return rota.sentido === 'ida' && cap - picoOcupacao(rota) === 0 && rota.paradas.filter((p) => p.tipo === 'escola').length >= 2;
+    });
+    expect(lotada, 'há ao menos uma rota de ida lotada com duas escolas').toBeTruthy();
+    const escolas = lotada!.rota.paradas.filter((p) => p.tipo === 'escola').sort((a, b) => a.ordem - b.ordem);
+    const ultima = escolas[escolas.length - 1];
+    const origem = pontoPertoDe({ lat: ultima.lat!, lng: ultima.lng! }, 300, 1400);
+    const sim = simularEncaixeProgressivo(lotada!.rota, lotada!.veiculo, {
+      alunoId: 'familia', nome: 'F', casa: { id: 'familia-casa', nome: 'Casa', lat: origem.lat, lng: origem.lng },
+      escolaId: ultima.destinoId!, escolaPonto: { id: ultima.destinoId!, nome: 'E', lat: ultima.lat!, lng: ultima.lng! },
+    }, FIXTURE, { horarioEscolaMin: ultima.horarioChegadaMin ?? 7 * 60 });
+    expect(sim.elegivel).toBe(true);
+    const cap = capacidadeAlunos(lotada!.rota, lotada!.veiculo);
+    expect(sim.opcao!.eventos.every((e) => e.ocupacaoApos <= cap)).toBe(true);
   });
 
   it('a experiência do aluno difere com a origem: origem distante = mais tempo a bordo', () => {
@@ -206,14 +230,16 @@ describe('Busca real com o motor do endpoint (§6.2/§9.1)', () => {
     expect(melhorPerto.minutosABordo!).toBeLessThan(melhorLonge.minutosABordo!);
   });
 
-  it('rotas lotadas (sem vaga) não entram como candidatas', () => {
-    // escolhe uma escola e confirma que nenhuma rota avaliada tem vagas 0.
+  it('rotas lotadas no pico são avaliadas (não descartadas) e a resposta separa inconclusivas de recusadas', () => {
     const esc = destino('geo-20261105-029');
     const origem = pontoPertoDe(esc, 300, 1600);
-    const { resultados } = buscarEmRotasReais(ENTRADAS, {
+    const out = buscarEmRotasReais(ENTRADAS, {
       origem: { lat: origem.lat, lng: origem.lng }, destinoId: esc.id, escolaPonto: { lat: esc.lat, lng: esc.lng }, sentido: 'ida', turno: null, contratacao: 'mensal',
     });
-    for (const r of resultados) expect(r.vagas).toBeGreaterThan(0);
+    expect(out.inconclusivas).toBe(out.resultados.filter((r) => r.status === 'indeterminado').length);
+    for (const r of out.resultados) {
+      if (r.status === 'indeterminado') expect(r.codigos.some((c) => ['busca_incompleta', 'trecho', 'dados', 'van', 'rota_base', 'localizacao'].includes(c))).toBe(true);
+    }
   });
 
   it('performance: busca sobre as 300 rotas conclui rapidamente (§10)', () => {

@@ -100,24 +100,27 @@ describe('vagas (1º filtro)', () => {
     const r = rota({ lugaresReservados: 2, paradas: [pSaida(), pCasa('a', 1, C.casaA), pEscola('e', 2, 'esc1', C.escola1, 7 * 60)], passageiros: [pax('p1', 'a', 'e', 'esc1')] });
     expect(vagasParaNovos(r, veiculo(5))).toBe(2); // 5 − 2 reservas − 1 ocupado
   });
-  it('sem vaga → avaliarRotaReal incompatível (capacidade), não aparece', () => {
+  it('van cheia no pico: o motor decide por trecho; nunca mais gente a bordo do que lugares', () => {
     const passageiros = Array.from({ length: 4 }, (_, i) => pax('p' + i, 'a', 'e', 'esc1'));
     const r = rota({ paradas: [pSaida(), pCasa('a', 1, C.casaA), pEscola('e', 2, 'esc1', C.escola1, 7 * 60)], passageiros });
     const res = avaliarRotaReal(r, veiculo(4), pedido(), M);
-    expect(res.status).toBe('incompativel');
-    expect(res.codigos).toContain('capacidade');
     expect(res.vagas).toBe(0);
+    const sim = simularEncaixeProgressivo(r, veiculo(4), { alunoId: 'familia', nome: 'F', casa: { id: 'familia-casa', nome: 'Casa', lat: pedido().origem!.lat, lng: pedido().origem!.lng }, escolaId: 'esc1' }, M, { horarioEscolaMin: 7 * 60 });
+    expect(sim.elegivel).toBe(res.status === 'compativel');
+    if (sim.opcao) expect(sim.opcao.eventos.every((e) => e.ocupacaoApos <= 4)).toBe(true);
+    else expect(res.codigos).toContain('capacidade');
   });
   it('com vaga → segue para avaliação', () => {
     const res = avaliarRotaReal(rotaIdaBasica(), veiculo(4), pedido(), M);
     expect(res.vagas).toBeGreaterThanOrEqual(1);
     expect(['compativel', 'sob_confirmacao']).toContain(res.status);
   });
-  it('buscarEmRotasReais remove a rota sem vaga', () => {
+  it('buscarEmRotasReais avalia a rota lotada e a recusa por trecho (não a descarta antes do motor)', () => {
     const cheia = rota({ id: 'cheia', paradas: [pSaida(), pCasa('a', 1, C.casaA), pEscola('e', 2, 'esc1', C.escola1, 7 * 60)], passageiros: Array.from({ length: 4 }, (_, i) => pax('q' + i, 'a', 'e', 'esc1')) });
     const entradas: EntradaBuscaReal[] = [{ rota: cheia, veiculo: veiculo(4) }, { rota: rotaIdaBasica(), veiculo: veiculo(4) }];
     const out = buscarEmRotasReais(entradas, pedido(), M);
-    expect(out.totalRotasAvaliadas).toBe(1);
+    expect(out.totalRotasAvaliadas).toBe(2);
+    expect(out.resultados.some((r) => r.rotaId === 'cheia')).toBe(true);
   });
 });
 

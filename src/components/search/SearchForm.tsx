@@ -83,9 +83,8 @@ export function SearchForm({ compact = false }: { compact?: boolean }) {
     }
     if (cancelada) return;
 
-    const paramsBase = criteriosParaParams({ cidadeId: CIDADE_PADRAO.id, endereco: texto, destinoId: destinoId || null, turno: turno || null, contratacao, dataAvulso: contratacao === 'avulso' ? dataAvulso : undefined, modalidade, origemLat: coord?.lat, origemLng: coord?.lng });
+    const paramsBase = criteriosParaParams({ cidadeId: CIDADE_PADRAO.id, endereco: texto, destinoId: destinoId || null, turno: turno || null, contratacao, dataAvulso: contratacao === 'avulso' ? dataAvulso : undefined, modalidade, origemLat: coord?.lat, origemLng: coord?.lng, horario });
     const params = new URLSearchParams(paramsBase);
-    params.set('horario', horario);
     navigate(`/resultados?${params.toString()}`, { preventScrollReset: true });
   }
   return (
