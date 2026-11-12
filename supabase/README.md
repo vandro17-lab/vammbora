@@ -17,6 +17,9 @@ supabase/
 └── seed.sql                        # dados de demonstração idempotentes (is_demo = true)
 ```
 
+> ⚠️ **Produção:** o histórico de migrações do projeto em uso diverge dos arquivos deste repositório.
+> **Não rode `supabase db push`** antes da reconciliação — veja [`HISTORICO-MIGRACOES.md`](HISTORICO-MIGRACOES.md).
+
 ## Como aplicar
 
 **Opção A — Painel (recomendado p/ iniciante):** cole o conteúdo de cada arquivo no
