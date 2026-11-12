@@ -101,7 +101,7 @@ export function SearchResultsPage(){
   return () => clearTimeout(id);
  }, [overlay.aberta, overlay.iniciadaEm, carregando, imagensProntas]);
  return <main className="container-page py-8">
-  <Link to="/" className="inline-flex items-center gap-2 text-sm font-semibold text-navy-700 hover:text-navy-900"><ArrowLeft size={17}/> Nova busca</Link>
+  <Link to="/buscar" className="inline-flex items-center gap-2 text-sm font-semibold text-navy-700 hover:text-navy-900"><ArrowLeft size={17}/> Nova busca</Link>
   <h1 className="mt-3 font-display text-3xl font-bold tracking-tight text-navy-900">Vans para {destino?.nome||'sua escola'}</h1>
   <p className="mt-2 text-sm text-navy-500">Localização e trajetos consultados em mapas reais.</p>
   {cancelada
@@ -110,7 +110,7 @@ export function SearchResultsPage(){
       <button type="button" className="btn btn-primary mt-4" onClick={()=>setTentativa(n=>n+1)}>Buscar novamente</button>
      </section>
    : buscaDemo
-   ? <FamilyDemoResults ofertas={ofertas} carregando={carregando} erro={erro} horario={horario} endereco={criterios.endereco} onEditar={()=>window.location.assign('/')}/>
+   ? <FamilyDemoResults ofertas={ofertas} carregando={carregando} erro={erro} horario={horario} endereco={criterios.endereco} onEditar={()=>window.location.assign('/buscar')}/>
    : <section className="mt-6" aria-busy={carregando}>
       {carregando&&<p className="text-sm text-navy-500">Avaliando as rotas cadastradas…</p>}
       {erro&&<p role="alert" className="rounded-xl bg-amber-50 p-4 text-sm text-amber-900 ring-1 ring-amber-200">{erro}</p>}
@@ -126,5 +126,11 @@ export function SearchResultsPage(){
          .finally(()=>setContinuando(false));
        }}/>}
      </section>}
+  {/* Pesquisar NÃO cria solicitação: só abre o formulário, já preenchido com esta busca. */}
+  {!cancelada&&!carregando&&<section className="mt-8 rounded-2xl bg-white p-5 ring-1 ring-navy-100" aria-labelledby="registrar-solicitacao">
+   <h2 id="registrar-solicitacao" className="font-display text-lg font-bold text-navy-900">Registre o que você procura</h2>
+   <p className="mt-1 text-sm text-navy-600">Guarde esta necessidade na sua conta, com os dados desta busca. Você confere tudo antes, e a solicitação só é criada quando você confirmar.</p>
+   <Link to={`/familia/solicitacoes/nova?${parametros}`} className="btn btn-primary mt-4">Registrar uma solicitação</Link>
+  </section>}
  </main>;
 }

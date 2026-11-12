@@ -17,6 +17,24 @@ const valid = (p: Point) => p && Number.isFinite(p.lat) && Number.isFinite(p.lng
 // Centro aproximado de Araçatuba, para enviesar a geocodificação.
 const ARACATUBA = { lat: -21.2089, lng: -50.4328 };
 
+const ESTADOS: Record<string, string> = {
+  AC: 'Acre', AL: 'Alagoas', AP: 'Amapá', AM: 'Amazonas', BA: 'Bahia', CE: 'Ceará', DF: 'Distrito Federal',
+  ES: 'Espírito Santo', GO: 'Goiás', MA: 'Maranhão', MT: 'Mato Grosso', MS: 'Mato Grosso do Sul', MG: 'Minas Gerais',
+  PA: 'Pará', PB: 'Paraíba', PR: 'Paraná', PE: 'Pernambuco', PI: 'Piauí', RJ: 'Rio de Janeiro', RN: 'Rio Grande do Norte',
+  RS: 'Rio Grande do Sul', RO: 'Rondônia', RR: 'Roraima', SC: 'Santa Catarina', SP: 'São Paulo', SE: 'Sergipe', TO: 'Tocantins',
+};
+
+/**
+ * Município onde procurar o endereço. Sem `cidade`/`uf` (ou inválidos), vale o
+ * padrão de sempre: Araçatuba/SP. Só letras, espaços, hífen e apóstrofo.
+ */
+export function municipioDaConsulta(cidade: unknown, uf: unknown): { cidade: string; estado: string } {
+  const c = typeof cidade === 'string' ? cidade.trim() : '';
+  const u = typeof uf === 'string' ? uf.trim().toUpperCase() : '';
+  if (c.length >= 2 && c.length <= 60 && /^[\p{L} '’-]+$/u.test(c) && ESTADOS[u]) return { cidade: c, estado: ESTADOS[u] };
+  return { cidade: 'Araçatuba', estado: 'São Paulo' };
+}
+
 /**
  * Separa a rua do número para a geocodificação ESTRUTURADA do Geoapify
  * (parâmetros `street` + `housenumber`, que não podem ser combinados com `text`).
@@ -68,7 +86,8 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       raw += chunk.toString();
       if (raw.length > 12000) return reply(res, 413, { erro: 'Solicitação muito grande.' });
     }
-    const data = JSON.parse(raw) as { operacao?: string; texto?: string; numero?: string; pontos?: Point[]; destinos?: Point[]; ponto?: Point };
+    const data = JSON.parse(raw) as { operacao?: string; texto?: string; numero?: string; pontos?: Point[]; destinos?: Point[]; ponto?: Point; cidade?: string; uf?: string };
+    const mun = municipioDaConsulta(data.cidade, data.uf);
     const op = data.operacao;
 
     // Roteamento e matriz são mais caros: exigem sessão Supabase (motorista logado).
@@ -143,7 +162,7 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       if (texto.length < minimo || texto.length > 120) return reply(res, 400, { erro: 'Digite um pouco mais do endereço.' });
       const endpoint = op === 'autocompletar' ? 'autocomplete' : 'search';
       url = new URL('https://api.geoapify.com/v1/geocode/' + endpoint);
-      url.searchParams.set('text', texto + ', Araçatuba, São Paulo, Brasil');
+      url.searchParams.set('text', `${texto}, ${mun.cidade}, ${mun.estado}, Brasil`);
       url.searchParams.set('filter', 'countrycode:br');
       url.searchParams.set('bias', `proximity:${ARACATUBA.lng},${ARACATUBA.lat}`);
       url.searchParams.set('lang', 'pt');
@@ -156,8 +175,8 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       url = new URL('https://api.geoapify.com/v1/geocode/search');
       url.searchParams.set('street', rua);
       if (num) url.searchParams.set('housenumber', num);
-      url.searchParams.set('city', 'Araçatuba');
-      url.searchParams.set('state', 'São Paulo');
+      url.searchParams.set('city', mun.cidade);
+      url.searchParams.set('state', mun.estado);
       url.searchParams.set('country', 'Brasil');
       url.searchParams.set('bias', `proximity:${ARACATUBA.lng},${ARACATUBA.lat}`);
       url.searchParams.set('lang', 'pt');
@@ -219,7 +238,12 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
 
     if (op === 'reverso') {
       const f = json.features?.[0]?.properties as Record<string, unknown> | undefined;
-      return reply(res, 200, { rotulo: f ? String(f.formatted ?? '') : '' });
+      // Município e UF do ponto (para conferir a cidade de embarque da família).
+      return reply(res, 200, {
+        rotulo: f ? String(f.formatted ?? '') : '',
+        cidade: f && typeof f.city === 'string' ? f.city : '',
+        uf: f && typeof f.state_code === 'string' ? f.state_code.toUpperCase() : '',
+      });
     }
 
     const props = json.features?.[0]?.properties;

@@ -22,7 +22,12 @@ export interface Cidade {
   id: string;
   nome: string;
   uf: string;
+  /** Área atendida (retângulo). Confere se um ponto confirmado é desta cidade. */
+  area?: { latMin: number; latMax: number; lngMin: number; lngMax: number };
 }
+
+/** Município brasileiro (IBGE): código, nome oficial, UF e sede. */
+export interface Municipio { ibge: number; nome: string; uf: string; lat: number; lng: number }
 
 export type RedeEnsino = 'estadual' | 'municipal' | 'privada' | 'federal';
 

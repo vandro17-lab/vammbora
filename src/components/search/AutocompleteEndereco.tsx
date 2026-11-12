@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { MapPin, Loader2 } from 'lucide-react';
-import { buscarEnderecos, normalizarTexto, type SugestaoEndereco } from '@/lib/geocode';
+import { buscarEnderecos, normalizarTexto, type MunicipioUF, type SugestaoEndereco } from '@/lib/geocode';
 import { comporComNumero, numeroDoEndereco, rotuloTemNumero } from '@/lib/endereco';
 
 export type { SugestaoEndereco };
@@ -30,9 +30,11 @@ function filtrarLocais(locais: SugestaoEndereco[], q: string): SugestaoEndereco[
  * pelo Photon/OpenStreetMap. Degrada sem erro para o usuário.
  */
 export function AutocompleteEndereco({
-  id, value, onChange, placeholder, locais = [], onEscolher,
+  id, value, onChange, placeholder, locais = [], onEscolher, municipio,
 }: {
   id?: string;
+  /** Município onde procurar o endereço (sem ele: o padrão de sempre). */
+  municipio?: MunicipioUF;
   value: string;
   onChange: (texto: string, coord?: { lat: number; lng: number }) => void;
   placeholder?: string;
@@ -68,7 +70,7 @@ export function AutocompleteEndereco({
     let vivo = true;
     setCarregando(true);
     const t = setTimeout(async () => {
-      const remoto = await buscarEnderecos(q, controlador.signal);
+      const remoto = await buscarEnderecos(q, controlador.signal, municipio);
       if (!vivo) return;
       const vistos = new Set<string>();
       const merge: SugestaoEndereco[] = [];
@@ -85,7 +87,7 @@ export function AutocompleteEndereco({
 
     return () => { vivo = false; controlador.abort(); clearTimeout(t); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value, locais]);
+  }, [value, locais, municipio?.nome, municipio?.uf]);
 
   function escolher(s: SugestaoEndereco) {
     // Número digitado antes de escolher: o campo passa a mostrar a rua da

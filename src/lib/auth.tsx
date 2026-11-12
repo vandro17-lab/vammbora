@@ -13,9 +13,11 @@ interface AuthState {
   carregando: boolean;
   entrar: (email: string, senha: string) => Promise<{ ok: boolean; erro?: string }>;
   /** Cadastro. `sessao` indica se já ficou logado (confirmação de e-mail desligada). */
-  cadastrar: (email: string, senha: string, nome?: string) => Promise<{ ok: boolean; erro?: string; sessao?: boolean }>;
-  /** Login social (OAuth). Redireciona o navegador para o provedor e volta. */
-  entrarComProvedor: (provedor: ProvedorOAuth) => Promise<{ ok: boolean; erro?: string }>;
+  /** `voltarPara`: caminho do app para o link de confirmação de e-mail (padrão: painel do motorista). */
+  cadastrar: (email: string, senha: string, nome?: string, voltarPara?: string) => Promise<{ ok: boolean; erro?: string; sessao?: boolean }>;
+  /** Login social (OAuth). Redireciona o navegador para o provedor e volta para
+   *  `voltarPara` (padrão: painel do motorista). */
+  entrarComProvedor: (provedor: ProvedorOAuth, voltarPara?: string) => Promise<{ ok: boolean; erro?: string }>;
   sair: () => Promise<void>;
 }
 
@@ -115,7 +117,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const cadastrar = async (email: string, senha: string, nome?: string) => {
+  const cadastrar = async (email: string, senha: string, nome?: string, voltarPara = '/painel') => {
     if (!supabase) return { ok: false, erro: 'Banco não configurado neste ambiente.' };
     try {
       type RespCadastro = Awaited<ReturnType<NonNullable<typeof supabase>['auth']['signUp']>>;
@@ -125,7 +127,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           password: senha,
           // Guarda o nome já no cadastro: o gatilho handle_new_user cria o
           // perfil com esse full_name, independe de a tela conseguir atualizar.
-          options: { data: { full_name: nome ?? '' }, emailRedirectTo: `${window.location.origin}/painel` },
+          options: { data: { full_name: nome ?? '' }, emailRedirectTo: `${window.location.origin}${caminhoSeguro(voltarPara)}` },
         }),
         20000,
         () => ({ data: { user: null, session: null }, error: { message: 'timeout' } } as unknown as RespCadastro),
@@ -137,10 +139,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const entrarComProvedor = async (provedor: ProvedorOAuth) => {
+  const entrarComProvedor = async (provedor: ProvedorOAuth, voltarPara = '/painel') => {
     if (!supabase) return { ok: false, erro: 'Banco não configurado neste ambiente.' };
-    // Volta para o painel do motorista; o supabase-js lê a sessão da URL ao retornar.
-    const redirectTo = `${window.location.origin}/painel`;
+    // Volta para o caminho pedido (padrão: painel do motorista); o supabase-js lê a sessão da URL ao retornar.
+    const redirectTo = `${window.location.origin}${caminhoSeguro(voltarPara)}`;
     const { error } = await supabase.auth.signInWithOAuth({
       provider: provedor,
       options: { redirectTo },
@@ -163,6 +165,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 }
 
 export const useAuth = () => useContext(Ctx);
+
+/** Só caminhos INTERNOS do app (evita redirecionar para outro site). */
+export function caminhoSeguro(caminho: string | null | undefined, padrao = '/painel'): string {
+  return typeof caminho === 'string' && /^\/(?!\/)[^\s\\]*$/.test(caminho) ? caminho : padrao;
+}
 
 function traduzErro(msg: string): string {
   const m = msg.toLowerCase();
