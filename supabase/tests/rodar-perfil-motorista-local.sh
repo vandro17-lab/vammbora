@@ -30,7 +30,7 @@ $COMO "$BIN/pg_ctl" -D "$DIR/data" -o "-p $PORTA -c listen_addresses='' -k $DIR"
 SQL() { PGOPTIONS="-c client_min_messages=warning" psql -X -q -v ON_ERROR_STOP=1 -h "$DIR" -p "$PORTA" -U postgres -d postgres "$@"; }
 falhar() { echo "FALHOU: $*" >&2; exit 1; }
 
-NOVA="$RAIZ/migrations/20261112220000_perfil_motorista_real.sql"
+NOVA="$RAIZ/migrations/20261112205224_perfil_motorista_real.sql"
 
 SQL -c "create extension if not exists pgcrypto" -f "$RAIZ/tests/local/00_stubs_supabase.sql"
 SQL -c "alter default privileges in schema public grant all on tables to anon, authenticated, service_role;

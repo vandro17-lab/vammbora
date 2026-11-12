@@ -5,7 +5,7 @@ import { listarRotas, listarVeiculos } from '@/data/motorista-store';
 /**
  * Acesso ao PERFIL PROFISSIONAL do motorista logado.
  *
- * - Banco real: RPCs da migração 20261112220000 (`meu_perfil_motorista`,
+ * - Banco real: RPCs da migração 20261112205224 (`meu_perfil_motorista`,
  *   `salvar_perfil_motorista`, `publicar_perfil_motorista`). O servidor só lê
  *   e grava o perfil DA PRÓPRIA conta; nunca recebe um id de motorista do app.
  * - Sem Supabase ou no modo demonstração explícito: guarda no navegador.

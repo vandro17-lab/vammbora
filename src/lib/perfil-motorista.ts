@@ -2,7 +2,7 @@
  * PERFIL PROFISSIONAL DO MOTORISTA — regras puras (sem banco, sem tela).
  *
  * As mesmas regras são conferidas de novo no servidor pela RPC
- * `salvar_perfil_motorista` (migração 20261112220000): aqui servem para
+ * `salvar_perfil_motorista` (migração 20261112205224): aqui servem para
  * avisar cedo, em linguagem simples, e para montar o rascunho do formulário.
  */
 
