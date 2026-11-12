@@ -25,6 +25,7 @@ import { UiConfigProvider } from '@/lib/vm/useUiConfig';
 import { EdicaoAparenciaProvider } from '@/lib/vm/useEdicaoAparencia';
 import { Layout } from '@/components/layout/Layout';
 import { ScrollManager } from '@/components/ScrollManager';
+import { LimiteDeErro, AvisoErroLogin } from '@/components/ErroGeral';
 import { PageTransition } from '@/components/motion/PageTransition';
 import { VitrineProvider } from '@/data/VitrineProvider';
 import { AuthProvider } from '@/lib/auth';
@@ -49,8 +50,10 @@ import { rotasRedirecionamentoMotorista } from '@/app/navegacao-motorista';
 export default function App() {
   return (
     <BrowserRouter>
+      <LimiteDeErro>
       <ScrollManager />
       <AuthProvider>
+        <AvisoErroLogin />
         <AppAssetsProvider>
         <UiConfigProvider>
         <EdicaoAparenciaProvider>
@@ -120,6 +123,7 @@ export default function App() {
         </UiConfigProvider>
         </AppAssetsProvider>
       </AuthProvider>
+      </LimiteDeErro>
     </BrowserRouter>
   );
 }

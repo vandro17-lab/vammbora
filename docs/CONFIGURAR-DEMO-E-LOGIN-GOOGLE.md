@@ -80,6 +80,31 @@ O Google precisa de credenciais criadas por você (é gratuito). Passos:
 
 Depois disso, o botão **"Entrar com o Google"** em `/motorista/conta` funciona de ponta a ponta.
 
+### 2.2.1 Configuração atual de produção
+- **Site URL:** `https://vammboraa.vercel.app` (nunca `http://localhost:3000`: é para lá que o
+  Supabase manda quando o retorno pedido não está autorizado).
+- **Redirect URLs:** `https://vammboraa.vercel.app/**` (cobre `/app`, `/painel` e `/familia/...`).
+- O motorista volta para `/app` (Google e e-mail); a família volta para a página que pediu.
+
+### 2.2.2 Marca VanBora na tela do Google
+A tela do Google mostra "continuar para `rnulmjdsvvuirqijemzy.supabase.co`" porque o endereço de
+retorno do Google (Authorized redirect URI) é o do Supabase:
+`https://rnulmjdsvvuirqijemzy.supabase.co/auth/v1/callback`.
+
+**No Google Cloud** (Google Auth Platform do projeto do Client ID):
+1. **Branding:** nome do app `VanBora`, e-mail de suporte, logotipo (quadrado, 120×120 px),
+   página inicial `https://vammboraa.vercel.app`, Política de Privacidade
+   `https://vammboraa.vercel.app/privacidade` e Termos de Uso (a página ainda não existe).
+2. **Authorized domains:** o domínio do site e o do Supabase (`supabase.co`).
+3. **Audience:** app em produção (não "Testing").
+4. **Verificação da marca:** o Google só mostra o nome e o logotipo depois de verificar a marca
+   (exige o domínio do site verificado no Google Search Console). Sem isso, aparece o domínio.
+
+**No Supabase** (para trocar o domínio que aparece): com um domínio próprio (ex.:
+`auth.vanbora.com.br`), ativar **Custom Domain** (recurso pago) e trocar, no Google Cloud, o
+Authorized redirect URI para `https://auth.vanbora.com.br/auth/v1/callback`. Sem domínio próprio,
+o Google continua mostrando o domínio do Supabase.
+
 ### 2.3 Retorno das FAMÍLIAS (Etapa 3A)
 A família entra só ao confirmar uma solicitação e volta para o formulário. O app pede o retorno
 para `https://vammboraa.vercel.app/familia/solicitacoes/nova` (Google e link de confirmação do

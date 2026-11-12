@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import type { Session } from '@supabase/supabase-js';
-import { supabase, USE_SUPABASE } from '@/lib/supabase';
+import { supabase, USE_SUPABASE, RETORNO_AUTH_INICIAL } from '@/lib/supabase';
+import { mensagemErroLogin, urlSemErroDeAuth } from '@/lib/retorno-auth';
 
 interface AuthState {
   /** Sessão atual (null = deslogado). */
@@ -19,6 +20,9 @@ interface AuthState {
    *  `voltarPara` (padrão: painel do motorista). */
   entrarComProvedor: (provedor: ProvedorOAuth, voltarPara?: string) => Promise<{ ok: boolean; erro?: string }>;
   sair: () => Promise<void>;
+  /** Falha no retorno do login (Google ou link de e-mail), em linguagem simples. */
+  erroLogin: string | null;
+  limparErroLogin: () => void;
 }
 
 /** Provedores de login social suportados. Apple fica preparado para ligar depois. */
@@ -33,6 +37,8 @@ const Ctx = createContext<AuthState>({
   cadastrar: async () => ({ ok: false, erro: 'Auth indisponível' }),
   entrarComProvedor: async () => ({ ok: false, erro: 'Auth indisponível' }),
   sair: async () => {},
+  erroLogin: null,
+  limparErroLogin: () => {},
 });
 
 /** Resolve a promessa com um valor de fallback se estourar o tempo (evita UI presa). */
@@ -48,6 +54,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isAdmin, setIsAdmin] = useState(false);
   const [verificandoAdmin, setVerificandoAdmin] = useState(USE_SUPABASE);
   const [carregando, setCarregando] = useState(true);
+  const [erroLogin, setErroLogin] = useState<string | null>(
+    RETORNO_AUTH_INICIAL?.tipo === 'erro' ? mensagemErroLogin(RETORNO_AUTH_INICIAL) : null,
+  );
+
+  // Tira o erro do login da URL (recarregar não repete o aviso). O detalhe
+  // técnico fica só no console.
+  useEffect(() => {
+    if (RETORNO_AUTH_INICIAL?.tipo !== 'erro') return;
+    console.warn('[auth] retorno com erro:', RETORNO_AUTH_INICIAL.codigo, RETORNO_AUTH_INICIAL.descricao);
+    try { window.history.replaceState(window.history.state, '', urlSemErroDeAuth(window.location.href)); } catch { /* ignora */ }
+  }, []);
 
   // Verifica o papel de admin SEM nunca travar a UI: tem timeout e engole erros.
   async function checarAdmin(s: Session | null) {
@@ -80,11 +97,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // O carregamento inicial NÃO espera o check de admin (ele roda em segundo
     // plano). Assim o app libera assim que a sessão é conhecida, mesmo que o
     // banco esteja "frio" e a RPC demore.
-    supabase.auth.getSession().then(({ data }) => {
+    supabase.auth.getSession().then(({ data, error }) => {
       if (!vivo) return;
       setSession(data.session);
       setCarregando(false);
+      // Voltou do login com sessão na URL, mas ela não pôde ser lida/salva.
+      if (error && RETORNO_AUTH_INICIAL) {
+        console.warn('[auth] sessão do retorno não foi aceita:', error.message);
+        setErroLogin((atual) => atual ?? mensagemErroLogin({ tipo: 'erro', codigo: (error as { code?: string }).code, descricao: error.message }));
+      }
       void checarAdmin(data.session);
+    }).catch(() => {
+      // Nunca fica "carregando" para sempre.
+      if (!vivo) return;
+      setCarregando(false);
+      if (RETORNO_AUTH_INICIAL) setErroLogin((atual) => atual ?? 'Não foi possível entrar. Tente de novo em instantes.');
     });
     const { data: sub } = supabase.auth.onAuthStateChange((_evt, s) => {
       // IMPORTANTE: não chamar funções do Supabase (ex.: rpc) de forma
@@ -158,7 +185,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <Ctx.Provider value={{ session, isAdmin, verificandoAdmin, carregando, entrar, cadastrar, entrarComProvedor, sair }}>
+    <Ctx.Provider value={{ session, isAdmin, verificandoAdmin, carregando, entrar, cadastrar, entrarComProvedor, sair, erroLogin, limparErroLogin: () => setErroLogin(null) }}>
       {children}
     </Ctx.Provider>
   );
