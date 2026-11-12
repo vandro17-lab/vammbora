@@ -17,7 +17,7 @@ import { Navigate, Route } from 'react-router-dom';
 /** Alvos de link da entrada (testáveis sem DOM; usados pela tela de entrada). */
 export const LINKS_ENTRADA_MOTORISTA = {
   voltar: '/',
-  /** Autenticação existente (login Google/e-mail); após logar vai para `/painel`. */
+  /** Autenticação existente (login Google/e-mail); após logar vai para `/app`. */
   entrar: '/motorista/conta',
   /** App Vambora Motoristas (experiência visual + dados reais/demo). */
   app: '/app',

@@ -31,7 +31,8 @@ export function ContaMotoristaPage() {
       return;
     }
     setEnviando(true);
-    const r = await entrarComProvedor('google');
+    // Volta para o mesmo painel do login por e-mail (/app).
+    const r = await entrarComProvedor('google', '/app');
     // Em caso de sucesso o navegador é redirecionado; só tratamos o erro.
     if (!r.ok) {
       setEnviando(false);
@@ -60,7 +61,7 @@ export function ContaMotoristaPage() {
     }
 
     // CADASTRO simples: criar a conta e já entrar, sem etapa extra de aprovação.
-    const r = await cadastrar(email, senha, nome);
+    const r = await cadastrar(email, senha, nome, '/app');
     if (!r.ok) {
       setEnviando(false);
       setErro(r.erro ?? 'Não foi possível criar a conta.');

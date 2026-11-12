@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import { lerRetornoAuth, type RetornoAuth } from '@/lib/retorno-auth';
 
 /**
  * Cliente Supabase (opcional).
@@ -65,6 +66,13 @@ export const DEMO_MOTORISTA = import.meta.env.VITE_DEMO_MOTORISTA === 'true';
  * mostra as ofertas de exemplo (motoristas e vans fictícios).
  */
 export const DEMO_BUSCA = import.meta.env.VITE_DEMO_BUSCA === 'true';
+
+/**
+ * Retorno do login lido ANTES de o cliente do Supabase processar (e limpar) a
+ * URL — para mostrar uma mensagem clara quando o Google ou o Supabase recusam.
+ */
+export const RETORNO_AUTH_INICIAL: RetornoAuth | null =
+  typeof window !== 'undefined' ? lerRetornoAuth(window.location.href) : null;
 
 export const supabase: SupabaseClient | null = USE_SUPABASE
   ? createClient(url as string, anonKey as string, {
