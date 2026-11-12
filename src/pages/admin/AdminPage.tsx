@@ -14,6 +14,7 @@ import {
 import { Logo } from '@/components/brand/Logo';
 import { useAuth } from '@/lib/auth';
 import { USE_SUPABASE } from '@/lib/supabase';
+import { InteressadosLancamento } from './InteressadosLancamento';
 import {
   adminListarMotoristas,
   adminListarInteressados,
@@ -292,6 +293,9 @@ function AdminDashboard({ onSair }: { onSair: () => void }) {
           )}
         </div>
       </section>
+
+      {/* Pré-lançamento: interessados (motoristas e famílias) — leitura só admin (RLS) */}
+      <InteressadosLancamento />
     </AdminShell>
   );
 }

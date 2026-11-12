@@ -15,6 +15,8 @@ interface JanelaAbertura extends Window { __ready?: boolean; renderAt?: (segundo
 
 function primeiraEntrada(pathname: string) {
   if (pathname.startsWith('/admin')) return false;
+  // Formulários de interesse e política: acesso direto, sem abertura animada.
+  if (pathname.startsWith('/interesse') || pathname === '/privacidade') return false;
   try { return sessionStorage.getItem(SESSION_KEY) !== 'seen'; }
   catch { return true; }
 }
