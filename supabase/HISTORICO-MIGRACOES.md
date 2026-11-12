@@ -75,8 +75,9 @@ Duas migrações, **nesta ordem**, ainda não aplicadas em produção (aguardam 
 usar `apply_migration` com os nomes `municipios_ibge` e `solicitacoes_familias` e renomear os
 arquivos para as versões registradas, conforme a regra acima.
 
-1. `20261112225900_municipios_ibge.sql` cria `public.municipios`: os 5.571 municípios do IBGE
-   (código, nome, UF, sede), leitura pública e sem escrita pela API. Fonte:
+1. `20261112225900_municipios_ibge.sql` cria `public.municipios`: os municípios do IBGE dos estados
+   com área atendida — hoje os 645 de SP — (código, nome, UF, sede), leitura pública e sem escrita
+   pela API. Ao abrir cobertura em outro estado, uma nova migração acrescenta os municípios dele. Fonte:
    github.com/kelvins/municipios-brasileiros (MIT). O app usa a mesma fonte em
    `src/data/municipios-cobertura.ts` (municípios com sede na área atendida).
 2. `20261112230000_solicitacoes_familias.sql` cria `public.transport_requests` (abaixo).
