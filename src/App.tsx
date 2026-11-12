@@ -1,5 +1,6 @@
-import { PreLancamentoPage } from '@/pages/PreLancamentoPage';
-import { PrivacidadePage } from '@/pages/PrivacidadePage';
+import { PreLancamentoPage } from '@/pages/prelancamento/PreLancamentoPage';
+import { PrivacidadePage } from '@/pages/prelancamento/PrivacidadePage';
+import { InteresseMotoristaPage, InteresseFamiliaPage } from '@/pages/prelancamento/FormularioInteresse';
 import { StartupExperience } from '@/components/brand/StartupExperience';
 import { SearchLoadingScreen } from '@/components/search/SearchLoadingScreen';
 import { BrowserRouter, Routes, Route, Outlet } from 'react-router-dom';
@@ -53,6 +54,8 @@ export default function App() {
           <Routes>
             {/* Páginas públicas independentes, sem cabeçalho e rodapé do aplicativo */}
             <Route path="/" element={<PreLancamentoPage />} />
+            <Route path="/interesse/motorista" element={<InteresseMotoristaPage />} />
+            <Route path="/interesse/familia" element={<InteresseFamiliaPage />} />
             <Route path="/privacidade" element={<PrivacidadePage />} />
             <Route element={<Layout />}>
               <Route path="/resultados" element={<PageTransition><SearchResultsPage /></PageTransition>} />
