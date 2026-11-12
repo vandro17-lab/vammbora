@@ -68,3 +68,21 @@ Observações:
 - **Não revogar `EXECUTE` de `motorista_elegivel` para `anon`/`authenticated` sem redesenhar a view.**
   A view chama essa função, e numa view o `EXECUTE` de função é conferido com o papel de quem
   consulta. Sem ele, a vitrine pública para de funcionar.
+
+## Preparada (NÃO aplicada) — Etapa 3A, solicitações das famílias
+
+`20261112230000_solicitacoes_familias.sql` cria `public.transport_requests` (solicitação de
+transporte da família). **Ainda não foi aplicada em produção**: aguarda autorização. Ao aplicar,
+usar `apply_migration` com o nome `solicitacoes_familias` e renomear o arquivo para a versão
+registrada, conforme a regra acima.
+
+- **Acesso:** RLS ligada; `anon` sem nenhum privilégio; `authenticated` só `SELECT`, `INSERT` e
+  `UPDATE` das **próprias** linhas (`owner_id = auth.uid()`); sem `DELETE`/`TRUNCATE`. Nenhuma view
+  ou RPC expõe a tabela.
+- **Gatilho `proteger_solicitacao`:** criação sempre `ativa`; até 10 abertas por conta;
+  `encerrada` é definitiva; `owner_id`, `chave_envio` e `created_at` não mudam.
+- **Cliques repetidos:** `unique (owner_id, chave_envio)`; o app usa `upsert ... ignoreDuplicates`.
+- **Radar (Etapa 3B):** colunas geradas `origem_lat_aprox`/`origem_lng_aprox` (grade de ~500 m) e
+  índice das solicitações ativas por escola e sentido. O endereço exato nunca deve sair da tabela.
+- **Prova local:** `supabase/tests/rodar-solicitacoes-local.sh` (aplica a migração duas vezes, roda
+  `supabase/tests/solicitacoes.sql` e confere que motoristas, vans, rotas e a vitrine ficam intactos).

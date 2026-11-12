@@ -1,4 +1,9 @@
 import { PreLancamentoPage } from '@/pages/PreLancamentoPage';
+import { InicioPage } from '@/pages/InicioPage';
+import { HomePage } from '@/pages/HomePage';
+import { EntrarFamiliaPage } from '@/pages/familia/EntrarFamiliaPage';
+import { SolicitacoesPage, SolicitacaoPage } from '@/pages/familia/SolicitacoesPages';
+import { NovaSolicitacaoPage, EditarSolicitacaoPage } from '@/pages/familia/SolicitacaoFormPage';
 import { PrivacidadePage } from '@/pages/PrivacidadePage';
 import { StartupExperience } from '@/components/brand/StartupExperience';
 import { SearchLoadingScreen } from '@/components/search/SearchLoadingScreen';
@@ -53,9 +58,17 @@ export default function App() {
           <StartupExperience>
           <Routes>
             {/* Páginas públicas independentes, sem cabeçalho e rodapé do aplicativo */}
-            <Route path="/" element={<PreLancamentoPage />} />
+            <Route path="/" element={<InicioPage />} />
+            <Route path="/pre-lancamento" element={<PreLancamentoPage />} />
             <Route path="/privacidade" element={<PrivacidadePage />} />
+            {/* Família — solicitações de transporte (conta exigida só para confirmar e acompanhar) */}
+            <Route path="/familia/entrar" element={<EntrarFamiliaPage />} />
+            <Route path="/familia/solicitacoes" element={<SolicitacoesPage />} />
+            <Route path="/familia/solicitacoes/nova" element={<NovaSolicitacaoPage />} />
+            <Route path="/familia/solicitacoes/:id" element={<SolicitacaoPage />} />
+            <Route path="/familia/solicitacoes/:id/editar" element={<EditarSolicitacaoPage />} />
             <Route element={<Layout />}>
+              <Route path="/buscar" element={<PageTransition><HomePage /></PageTransition>} />
               <Route path="/resultados" element={<PageTransition><SearchResultsPage /></PageTransition>} />
               <Route path="/van/:slug" element={<PageTransition><DriverProfilePage /></PageTransition>} />
               <Route path="/motorista" element={<PageTransition><DriverLandingPage /></PageTransition>} />
