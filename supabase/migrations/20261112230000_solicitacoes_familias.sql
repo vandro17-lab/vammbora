@@ -1,7 +1,8 @@
 -- ============================================================================
 -- VanBora — Etapa 3A: solicitações de transporte das FAMÍLIAS
 -- ----------------------------------------------------------------------------
--- NÃO APLICADA. Aplique pela ferramenta de migração do Supabase
+-- NÃO APLICADA. Depende de 20261112225900_municipios_ibge.sql (aplicar antes).
+-- Aplique pela ferramenta de migração do Supabase
 -- (apply_migration) e renomeie este arquivo para a VERSÃO REGISTRADA
 -- (supabase/HISTORICO-MIGRACOES.md). Execute numa única transação.
 --
@@ -45,7 +46,13 @@ create table if not exists public.transport_requests (
   -- Gerada pelo app a cada formulário: o mesmo envio repetido (clique duplo,
   -- rede lenta) não cria uma segunda solicitação.
   chave_envio            uuid not null,
+  -- ÁREA DE COBERTURA (mercado atendido) onde está o ponto — não é o município.
   city_id                text not null references public.cities(id) on delete restrict,
+  -- MUNICÍPIO real do embarque (IBGE). A escola pode ficar em outro município.
+  origem_municipio_ibge  integer not null references public.municipios(codigo_ibge) on delete restrict,
+  -- 'mapa': o serviço de mapas devolveu este município para o ponto confirmado;
+  -- 'familia': o mapa não identificou (ou divergiu) e a família confirmou.
+  origem_municipio_fonte text not null,
   destination_id         text not null references public.destinations(id) on delete restrict,
   -- PRIVADO: endereço e coordenada exata só para a própria família (e admin).
   origem_endereco        text not null,
@@ -81,6 +88,7 @@ create table if not exists public.transport_requests (
     and (sentido <> 'ida' or horario_volta_min is null) and (sentido <> 'volta' or horario_ida_min is null)),
   constraint transport_requests_etapa_chk check (etapa_ensino is null or etapa_ensino in
     ('infantil', 'fundamental_1', 'fundamental_2', 'medio', 'universitario')),
+  constraint transport_requests_municipio_fonte_chk check (origem_municipio_fonte in ('mapa', 'familia')),
   constraint transport_requests_alunos_chk check (quantidade_alunos between 1 and 8),
   constraint transport_requests_obs_chk check (observacoes is null or char_length(observacoes) <= 500),
   constraint transport_requests_status_chk check (status in ('ativa', 'pausada', 'encerrada')),
@@ -107,7 +115,30 @@ as $$
 declare
   v_abertas int;
   v_area public.cities%rowtype;
+  v_mun public.municipios%rowtype;
+  v_km double precision;
 begin
+  -- Só escola REAL e publicada (nunca de demonstração).
+  if tg_op = 'INSERT' or new.destination_id is distinct from old.destination_id then
+    if not exists (select 1 from public.destinations d
+                    where d.id = new.destination_id and d.is_published and not d.is_demo) then
+      raise exception 'A escola escolhida não está disponível. Escolha outra.' using errcode = 'P0001';
+    end if;
+  end if;
+
+  -- Município do embarque compatível com o ponto confirmado: a sede fica a até
+  -- 60 km (conferência de plausibilidade; o limite exato do município exige a
+  -- malha do IBGE, ainda não carregada).
+  if tg_op = 'INSERT' or new.origem_municipio_ibge is distinct from old.origem_municipio_ibge
+     or new.origem_lat is distinct from old.origem_lat or new.origem_lng is distinct from old.origem_lng then
+    select * into v_mun from public.municipios where codigo_ibge = new.origem_municipio_ibge;
+    v_km := sqrt(power((new.origem_lat - v_mun.lat) * 110.57, 2)
+               + power((new.origem_lng - v_mun.lng) * 111.32 * cos(radians(new.origem_lat)), 2));
+    if v_km > 60 then
+      raise exception 'O município informado não corresponde ao ponto confirmado no mapa. Confira a cidade e o ponto.' using errcode = 'P0001';
+    end if;
+  end if;
+
   -- A coordenada confirmada precisa ficar na área atendida da cidade informada.
   if tg_op = 'INSERT' or new.city_id is distinct from old.city_id
      or new.origem_lat is distinct from old.origem_lat or new.origem_lng is distinct from old.origem_lng then

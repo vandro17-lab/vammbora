@@ -80,6 +80,21 @@ O Google precisa de credenciais criadas por você (é gratuito). Passos:
 
 Depois disso, o botão **"Entrar com o Google"** em `/motorista/conta` funciona de ponta a ponta.
 
+### 2.3 Retorno das FAMÍLIAS (Etapa 3A)
+A família entra só ao confirmar uma solicitação e volta para o formulário. O app pede o retorno
+para `https://vammboraa.vercel.app/familia/solicitacoes/nova` (Google e link de confirmação do
+e-mail) ou para `/familia/solicitacoes...`. Em **Authentication → URL Configuration → Redirect URLs**,
+mantenha as entradas existentes (ex.: `/painel`) e **acrescente**:
+
+- `https://vammboraa.vercel.app/familia/**`
+
+Sem ela, o Supabase manda a pessoa para a **Site URL** (a tela inicial): a conta é criada, mas a
+família não volta ao formulário (o rascunho continua guardado e reaparece em "Nova solicitação").
+Se o modelo do e-mail de confirmação (**Authentication → Email Templates → Confirm signup**) foi
+personalizado, ele precisa usar `{{ .ConfirmationURL }}`, que respeita o retorno pedido.
+O Google não precisa de mudança: o endereço autorizado continua sendo
+`https://rnulmjdsvvuirqijemzy.supabase.co/auth/v1/callback`.
+
 ---
 
 ## Passo 3 — Variáveis de ambiente na Vercel

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { AutocompleteEndereco } from '@/components/search/AutocompleteEndereco';
 import { SeletorPontoMapa } from '@/components/motorista/SeletorPontoMapa';
-import { estimarNumeroNaRua, geocodificarPreciso, reverseGeocodificar, type Precisao, type SugestaoEndereco } from '@/lib/geocode';
+import { estimarNumeroNaRua, geocodificarPreciso, reverseGeocodificar, type MunicipioUF, type Precisao, type SugestaoEndereco } from '@/lib/geocode';
 import { avisoEndereco, escolherPonto, numeroDoEndereco, type Coord, type EnderecoCampo, type PontoSugestao } from '@/lib/endereco';
 import { cn } from '@/lib/utils';
 
@@ -20,9 +20,11 @@ const COR_AVISO = { neutro: 'bg-navy-50 text-navy-700', ok: 'bg-mint-50 text-min
  *    do mapa — e é descartado/refeito quando o texto muda.
  */
 export function CampoEndereco({
-  id, valor, onChange, locais = [], placeholder, mapaExterno = false,
+  id, valor, onChange, locais = [], placeholder, mapaExterno = false, municipio,
 }: {
   id?: string;
+  /** Município onde procurar o endereço (sem ele: o padrão de sempre). */
+  municipio?: MunicipioUF;
   /** Estado atual (controlado por quem usa o campo). */
   valor: EnderecoCampo;
   onChange: (e: EnderecoCampo) => void;
@@ -66,7 +68,7 @@ export function CampoEndereco({
     let vivo = true;
     const t = setTimeout(async () => {
       let achado = null;
-      try { achado = await geocodificarPreciso(endereco, '', ctrl.signal, { aceitarSemNumero: true }); }
+      try { achado = await geocodificarPreciso(endereco, '', ctrl.signal, { aceitarSemNumero: true, municipio }); }
       catch { /* mapa indisponível: fica o que já havia (reserva) */ }
       if (!vivo || ajustadoAMao.current) return; // resposta antiga ou ponto já marcado à mão
       const r = escolherPonto(achado, reservaAgora()); // a sugestão pode ter sido escolhida durante a consulta
@@ -85,7 +87,8 @@ export function CampoEndereco({
       onChangeRef.current({ texto, coord: fim.coord, precisao: fim.precisao, validando: false, refinando: false });
     }, 650);
     return () => { vivo = false; ctrl.abort(); clearTimeout(t); };
-  }, [texto]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [texto, municipio?.nome, municipio?.uf]);
 
   function aoDigitarOuEscolher(t: string, c?: Coord) {
     ajustadoAMao.current = false;
@@ -125,7 +128,7 @@ export function CampoEndereco({
   return (
     <div>
       <AutocompleteEndereco
-        id={id} value={texto} locais={locais} placeholder={placeholder}
+        id={id} value={texto} locais={locais} placeholder={placeholder} municipio={municipio}
         onChange={aoDigitarOuEscolher} onEscolher={aoEscolher}
       />
       {aviso && <p role="status" data-testid="aviso-endereco" data-tom={aviso.tom} className={cn('mt-2 rounded-xl p-2.5 text-sm', COR_AVISO[aviso.tom])}>{aviso.texto}</p>}

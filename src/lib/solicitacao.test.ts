@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   rascunhoVazio, rascunhoDaBusca, rascunhoDaSolicitacao, validarPasso, primeiroPassoComProblema,
-  solicitacaoParaBanco, solicitacaoDoBanco, cidadeDaSolicitacao, textoHorarios, acoesDoStatus, precisaEntrarParaConfirmar,
+  solicitacaoParaBanco, solicitacaoDoBanco, cidadeDaSolicitacao, situacaoMunicipio, fonteDoMunicipio, codigoDoMunicipio, textoHorarios, acoesDoStatus, precisaEntrarParaConfirmar,
   type RascunhoSolicitacao, type LinhaSolicitacao,
 } from '@/lib/solicitacao';
 import { paramsParaCriterios, criteriosParaParams } from '@/lib/searchParams';
@@ -12,9 +12,13 @@ import { CIDADES } from '@/data/cidades';
 const completo = (m: Partial<RascunhoSolicitacao> = {}): RascunhoSolicitacao => ({
   ...rascunhoVazio('chave-1'),
   endereco: { texto: 'Rua José Geraldo, 450', coord: { lat: -21.2, lng: -50.44 }, precisao: 'exato', validando: false },
+  municipioIbge: ARACATUBA, municipioDoMapa: { lat: -21.2, lng: -50.44, resultado: { nome: 'Araçatuba', uf: 'SP' } },
   destinoId: 'esc-1', sentido: 'ida', horarioIda: '07:00',
   ...m,
 });
+const ARACATUBA = 3502804;
+const BIRIGUI = 3506508;
+const PONTO_BIRIGUI = { lat: -21.2905, lng: -50.342 };
 
 describe('validação da solicitação (mesmas regras do banco)', () => {
   it('rascunho completo passa em todos os passos', () => {
@@ -82,7 +86,55 @@ describe('começar pela busca (nada inventado)', () => {
     const r = rascunhoDaBusca({ ...busca, origemLat: undefined, origemLng: undefined, modalidade: 'ida' }, 'k');
     expect(r.endereco.coord).toBeNull();
     expect(r.horarioVolta).toBe('');
-    expect(validarPasso('endereco', r)).toMatch(/mapa/);
+    expect(validarPasso('endereco', r)).toMatch(/cidade do embarque/);
+    expect(r.municipioIbge).toBeNull(); // a cidade não é presumida
+  });
+});
+
+describe('município real do embarque (não a área de cobertura)', () => {
+  const birigui = (m: Partial<RascunhoSolicitacao> = {}) => completo({
+    endereco: { texto: 'Rua Saudades, 300', coord: PONTO_BIRIGUI, precisao: 'exato', validando: false },
+    municipioIbge: BIRIGUI, municipioDoMapa: { ...PONTO_BIRIGUI, resultado: { nome: 'Birigui', uf: 'SP' } }, ...m,
+  });
+  it('Birigui fica Birigui/SP, mesmo dentro da área de cobertura de Araçatuba', () => {
+    const r = birigui();
+    expect(situacaoMunicipio(r)).toBe('confere');
+    expect(cidadeDaSolicitacao(r)).toBe('aracatuba-sp'); // cobertura
+    expect(solicitacaoParaBanco(r, 'aracatuba-sp')).toMatchObject({ origem_municipio_ibge: BIRIGUI, origem_municipio_fonte: 'mapa' });
+    expect(primeiroPassoComProblema(r)).toBeNull(); // escola pode ser em outro município
+  });
+  it('nome do mapa com acento ou caixa diferente ainda casa com o IBGE', () => {
+    expect(codigoDoMunicipio({ nome: 'ARACATUBA', uf: 'SP' })).toBe(ARACATUBA);
+    expect(codigoDoMunicipio({ nome: 'Birigui', uf: 'MG' })).toBeNull();
+    expect(codigoDoMunicipio({ nome: 'Distrito Qualquer', uf: 'SP' })).toBeNull();
+  });
+  it('mapa diverge da cidade escolhida: só segue com a confirmação da família', () => {
+    const r = birigui({ municipioIbge: ARACATUBA });
+    expect(situacaoMunicipio(r)).toBe('diverge');
+    expect(validarPasso('endereco', r)).toMatch(/Birigui\/SP/);
+    expect(fonteDoMunicipio(r)).toBeNull();
+    const confirmado = { ...r, municipioConfirmado: true };
+    expect(validarPasso('endereco', confirmado)).toBeNull();
+    expect(fonteDoMunicipio(confirmado)).toBe('familia');
+  });
+  it('mapa sem resposta: pede confirmação; ponto mudou: confere de novo', () => {
+    const sem = birigui({ municipioDoMapa: { ...PONTO_BIRIGUI, resultado: null } });
+    expect(situacaoMunicipio(sem)).toBe('sem_mapa');
+    expect(validarPasso('endereco', sem)).toMatch(/Confirme/);
+    const movido = birigui({ endereco: { texto: 'Rua Saudades, 300', coord: { lat: -21.29, lng: -50.35 }, precisao: 'ajustado', validando: false } });
+    expect(situacaoMunicipio(movido)).toBe('conferindo');
+    expect(validarPasso('endereco', movido)).toMatch(/conferindo/);
+  });
+  it('sem cidade escolhida não grava', () => {
+    expect(validarPasso('endereco', completo({ municipioIbge: null }))).toMatch(/cidade do embarque/);
+  });
+});
+
+describe('escolas disponíveis', () => {
+  it('escola fora da lista carregada (ou lista indisponível) não segue', () => {
+    expect(validarPasso('escola', completo(), new Set(['esc-1']))).toBeNull();
+    expect(validarPasso('escola', completo(), new Set(['outra']))).toMatch(/não está mais disponível/);
+    expect(validarPasso('escola', completo(), new Set())).toMatch(/não está mais disponível/);
   });
 });
 
@@ -100,7 +152,7 @@ describe('ida e volta do banco', () => {
   });
   it('lê do banco e volta ao rascunho para editar, mantendo a chave', () => {
     const linha: LinhaSolicitacao = {
-      id: 'id-1', chave_envio: 'chave-1', city_id: 'aracatuba', destination_id: 'esc-1', origem_endereco: 'Rua A, 10',
+      id: 'id-1', chave_envio: 'chave-1', city_id: 'aracatuba-sp', origem_municipio_ibge: 3502804, origem_municipio_fonte: 'mapa', destination_id: 'esc-1', origem_endereco: 'Rua A, 10',
       origem_lat: -21.2, origem_lng: -50.44, sentido: 'ambos', horario_ida_min: 425, horario_volta_min: 740,
       turno: null, etapa_ensino: 'medio', quantidade_alunos: 2, precisa_acessibilidade: true, observacoes: null,
       status: 'pausada', motivo_encerramento: null, created_at: '2026-11-12T10:00:00Z', updated_at: '2026-11-12T10:00:00Z',

@@ -12,6 +12,36 @@ export interface SugestaoEndereco { rotulo: string; lat: number; lng: number }
 export type Precisao = 'exato' | 'estimado' | 'rua' | 'aproximado' | 'ajustado';
 export interface PontoPreciso { rotulo: string; lat: number; lng: number; precisao: Precisao }
 
+/** Município (nome + UF) em que a busca de endereço é feita ou que o mapa identificou. */
+export interface MunicipioUF { nome: string; uf: string }
+
+const UF_POR_ESTADO: Record<string, string> = {
+  acre: 'AC', alagoas: 'AL', amapa: 'AP', amazonas: 'AM', bahia: 'BA', ceara: 'CE', 'distrito federal': 'DF',
+  'espirito santo': 'ES', goias: 'GO', maranhao: 'MA', 'mato grosso': 'MT', 'mato grosso do sul': 'MS',
+  'minas gerais': 'MG', para: 'PA', paraiba: 'PB', parana: 'PR', pernambuco: 'PE', piaui: 'PI',
+  'rio de janeiro': 'RJ', 'rio grande do norte': 'RN', 'rio grande do sul': 'RS', rondonia: 'RO', roraima: 'RR',
+  'santa catarina': 'SC', 'sao paulo': 'SP', sergipe: 'SE', tocantins: 'TO',
+};
+const ESTADO_POR_UF: Record<string, string> = {
+  AC: 'Acre', AL: 'Alagoas', AP: 'Amapá', AM: 'Amazonas', BA: 'Bahia', CE: 'Ceará', DF: 'Distrito Federal',
+  ES: 'Espírito Santo', GO: 'Goiás', MA: 'Maranhão', MT: 'Mato Grosso', MS: 'Mato Grosso do Sul', MG: 'Minas Gerais',
+  PA: 'Pará', PB: 'Paraíba', PR: 'Paraná', PE: 'Pernambuco', PI: 'Piauí', RJ: 'Rio de Janeiro', RN: 'Rio Grande do Norte',
+  RS: 'Rio Grande do Sul', RO: 'Rondônia', RR: 'Roraima', SC: 'Santa Catarina', SP: 'São Paulo', SE: 'Sergipe', TO: 'Tocantins',
+};
+
+/** UF a partir do que o provedor devolve ("SP", "São Paulo", "BR-SP"); null se não reconhecer. */
+export function ufDoEstado(estado: string | null | undefined): string | null {
+  if (!estado) return null;
+  const t = estado.trim();
+  const sigla = t.toUpperCase().replace(/^BR-/, '');
+  if (ESTADO_POR_UF[sigla]) return sigla;
+  return UF_POR_ESTADO[t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()] ?? null;
+}
+
+// Município padrão das buscas (o comportamento de sempre da busca e do motorista).
+const MUNICIPIO_PADRAO: MunicipioUF = { nome: 'Araçatuba', uf: 'SP' };
+const chaveMunicipio = (m?: MunicipioUF) => (m ? `${normalizarTexto(m.nome)}/${m.uf}` : '');
+
 /**
  * Separa a rua do número do endereço (espelha a lógica do proxy). Puro e
  * testável: usado no fallback sem chave e para montar a consulta.
@@ -87,26 +117,27 @@ export function reiniciarGeocodificacao(): void {
  * esse número, repete a busca só com a rua — a pessoa continua vendo (e podendo
  * escolher) a rua, em vez de a lista sumir ao digitar o número.
  */
-export async function buscarEnderecos(q: string, signal?: AbortSignal): Promise<SugestaoEndereco[]> {
-  const chave = normalizarTexto(q);
+export async function buscarEnderecos(q: string, signal?: AbortSignal, municipio?: MunicipioUF): Promise<SugestaoEndereco[]> {
+  const chave = `${normalizarTexto(q)}|${chaveMunicipio(municipio)}`;
   const memo = memoriaSugestoes.get(chave);
   if (memo) return memo;
-  let achados = await consultarSugestoes(q, signal);
+  let achados = await consultarSugestoes(q, signal, municipio);
   if (achados.length === 0 && !signal?.aborted) {
     const { rua, num } = numeroDoEndereco(q);
-    if (num && rua.length >= 3) achados = await consultarSugestoes(rua, signal);
+    if (num && rua.length >= 3) achados = await consultarSugestoes(rua, signal, municipio);
   }
   return achados.length && !signal?.aborted ? lembrar(memoriaSugestoes, chave, achados) : achados;
 }
 
 /** Uma consulta de sugestões: proxy privado (Geoapify); se faltar, Photon (sem chave). */
-async function consultarSugestoes(q: string, signal?: AbortSignal): Promise<SugestaoEndereco[]> {
+async function consultarSugestoes(q: string, signal?: AbortSignal, municipio?: MunicipioUF): Promise<SugestaoEndereco[]> {
+  const m = municipio ?? MUNICIPIO_PADRAO;
   // 1) Proxy privado Geoapify (melhor qualidade + privacidade), se configurado.
   if (!proxyIndisponivel) {
     try {
       const r = await fetch('/api/mapas', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ operacao: 'autocompletar', texto: q }), signal,
+        body: JSON.stringify({ operacao: 'autocompletar', texto: q, ...(municipio ? { cidade: m.nome, uf: m.uf } : {}) }), signal,
       });
       if (r.status === 503) {
         proxyIndisponivel = true; // sem GEOAPIFY_API_KEY: cai para o Photon
@@ -125,7 +156,7 @@ async function consultarSugestoes(q: string, signal?: AbortSignal): Promise<Suge
   // 2) Fallback SEM CHAVE: Photon (OpenStreetMap), enviesado para Araçatuba.
   try {
     const u = new URL('https://photon.komoot.io/api/');
-    u.searchParams.set('q', `${q}, Araçatuba`);
+    u.searchParams.set('q', `${q}, ${m.nome}`);
     u.searchParams.set('lat', String(ARACATUBA.lat));
     u.searchParams.set('lon', String(ARACATUBA.lng));
     u.searchParams.set('limit', '8');
@@ -165,9 +196,9 @@ async function consultarSugestoes(q: string, signal?: AbortSignal): Promise<Suge
  * chama informa a limitação e deixa ajustar no mapa.
  */
 export async function geocodificarPreciso(
-  texto: string, numero: string, signal?: AbortSignal, opcoes: { aceitarSemNumero?: boolean } = {},
+  texto: string, numero: string, signal?: AbortSignal, opcoes: { aceitarSemNumero?: boolean; municipio?: MunicipioUF } = {},
 ): Promise<PontoPreciso | null> {
-  const chave = `${normalizarTexto(texto)}|${numero}|${opcoes.aceitarSemNumero ? 1 : 0}`;
+  const chave = `${normalizarTexto(texto)}|${numero}|${opcoes.aceitarSemNumero ? 1 : 0}|${chaveMunicipio(opcoes.municipio)}`;
   if (memoriaPontos.has(chave)) return memoriaPontos.get(chave) ?? null;
   const ponto = await geocodificarSemMemoria(texto, numero, signal, opcoes);
   // Só guarda resposta de consulta concluída (nunca de uma consulta abortada).
@@ -175,8 +206,9 @@ export async function geocodificarPreciso(
 }
 
 async function geocodificarSemMemoria(
-  texto: string, numero: string, signal: AbortSignal | undefined, opcoes: { aceitarSemNumero?: boolean },
+  texto: string, numero: string, signal: AbortSignal | undefined, opcoes: { aceitarSemNumero?: boolean; municipio?: MunicipioUF },
 ): Promise<PontoPreciso | null> {
+  const mun = opcoes.municipio ?? MUNICIPIO_PADRAO;
   const rua = texto.trim();
   if (rua.length < 3) return null;
   // Número em campo próprio: regra antiga. Tudo no mesmo texto: acha o número
@@ -194,7 +226,7 @@ async function geocodificarSemMemoria(
     try {
       const r = await fetch('/api/mapas', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ operacao: 'geocodificar', texto: estruturado.rua, numero: estruturado.num }), signal,
+        body: JSON.stringify({ operacao: 'geocodificar', texto: estruturado.rua, numero: estruturado.num, ...(opcoes.municipio ? { cidade: mun.nome, uf: mun.uf } : {}) }), signal,
       });
       if (r.status === 503) {
         proxyIndisponivel = true;
@@ -222,7 +254,8 @@ async function geocodificarSemMemoria(
       u.searchParams.set('addressdetails', '1');
       u.searchParams.set('limit', '1');
       u.searchParams.set('countrycodes', 'br');
-      u.searchParams.set('city', 'Araçatuba');
+      u.searchParams.set('city', mun.nome);
+      u.searchParams.set('state', ESTADO_POR_UF[mun.uf] ?? mun.uf);
       u.searchParams.set('street', `${num} ${via}`);
       const r = await fetch(u, { signal, headers: { Accept: 'application/json' } });
       if (r.ok) {
@@ -248,7 +281,7 @@ async function geocodificarSemMemoria(
   // Fallback SEM CHAVE (2): Photon. Lê housenumber para classificar a precisão.
   try {
     const u = new URL('https://photon.komoot.io/api/');
-    u.searchParams.set('q', `${[via, num].filter(Boolean).join(' ')}, Araçatuba`);
+    u.searchParams.set('q', `${[via, num].filter(Boolean).join(' ')}, ${mun.nome}`);
     u.searchParams.set('lat', String(ARACATUBA.lat));
     u.searchParams.set('lon', String(ARACATUBA.lng));
     u.searchParams.set('limit', '1');
@@ -367,6 +400,46 @@ export async function reverseGeocodificar(lat: number, lng: number, signal?: Abo
     const via = p.street || p.name || '';
     const linha = via ? `${via}${p.housenumber ? ', ' + p.housenumber : ''}` : (p.name || '');
     return [linha, p.district || p.suburb, p.city].filter(Boolean).join(', ') || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * MUNICÍPIO (nome + UF) em que o serviço de mapas situa o ponto. Null quando
+ * nenhum provedor identifica com segurança — quem chama pede confirmação.
+ */
+export async function municipioDoPonto(lat: number, lng: number, signal?: AbortSignal): Promise<MunicipioUF | null> {
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  const valido = (nome: unknown, uf: string | null): MunicipioUF | null =>
+    typeof nome === 'string' && nome.trim().length >= 2 && uf ? { nome: nome.trim(), uf } : null;
+  if (!proxyIndisponivel) {
+    try {
+      const r = await fetch('/api/mapas', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ operacao: 'reverso', ponto: { lat, lng } }), signal,
+      });
+      if (r.status === 503) {
+        proxyIndisponivel = true;
+      } else if (r.ok) {
+        const d = (await r.json()) as { cidade?: string; uf?: string };
+        const m = valido(d.cidade, ufDoEstado(d.uf));
+        if (m) return m;
+      }
+    } catch {
+      /* segue para o fallback */
+    }
+  }
+  try {
+    const u = new URL('https://photon.komoot.io/reverse');
+    u.searchParams.set('lat', String(lat));
+    u.searchParams.set('lon', String(lng));
+    u.searchParams.set('limit', '1');
+    const r = await fetch(u, { signal });
+    if (!r.ok) return null;
+    const d = (await r.json()) as { features?: Array<{ properties: Record<string, string> }> };
+    const p = d.features?.[0]?.properties;
+    return p ? valido(p.city, ufDoEstado(p.state)) : null;
   } catch {
     return null;
   }

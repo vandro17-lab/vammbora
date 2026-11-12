@@ -26,6 +26,9 @@ export interface Cidade {
   area?: { latMin: number; latMax: number; lngMin: number; lngMax: number };
 }
 
+/** Município brasileiro (IBGE): código, nome oficial, UF e sede. */
+export interface Municipio { ibge: number; nome: string; uf: string; lat: number; lng: number }
+
 export type RedeEnsino = 'estadual' | 'municipal' | 'privada' | 'federal';
 
 export type NivelEnsino =

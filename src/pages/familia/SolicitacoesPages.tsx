@@ -8,7 +8,7 @@ import { USE_SUPABASE } from '@/lib/supabase';
 import { useVitrine } from '@/data/VitrineProvider';
 import { listarMinhasSolicitacoes, obterSolicitacao, mudarStatus } from '@/data/solicitacoes';
 import {
-  ETAPAS_ENSINO, MOTIVOS_ENCERRAMENTO, TEXTO_STATUS, acoesDoStatus, textoHorarios,
+  ETAPAS_ENSINO, MOTIVOS_ENCERRAMENTO, TEXTO_STATUS, acoesDoStatus, textoHorarios, textoMunicipio, municipioPorCodigo,
   type MotivoEncerramento, type Solicitacao, type StatusSolicitacao,
 } from '@/lib/solicitacao';
 import { TURNO_LABEL, cn, nomeDestinoParaExibicao } from '@/lib/utils';
@@ -142,7 +142,7 @@ export function SolicitacaoPage() {
                   <Status s={s.status} />
                 </div>
                 <dl className="mt-3 space-y-2.5 text-[15px]">
-                  <Item icone={<MapPin className="h-4 w-4" />} rotulo="Embarque">{s.endereco}</Item>
+                  <Item icone={<MapPin className="h-4 w-4" />} rotulo="Embarque">{s.endereco} — {textoMunicipio(municipioPorCodigo(s.municipioIbge)) || `município IBGE ${s.municipioIbge}`}</Item>
                   <Item icone={<Clock className="h-4 w-4" />} rotulo="Horários">{textoHorarios(s)}{s.turno ? ` · ${TURNO_LABEL[s.turno]}` : ''}</Item>
                   <Item rotulo="Alunos">{s.quantidadeAlunos} {s.quantidadeAlunos === 1 ? 'aluno' : 'alunos'}</Item>
                   {s.etapa && <Item icone={<School className="h-4 w-4" />} rotulo="Etapa escolar">{ETAPAS_ENSINO.find((e) => e.id === s.etapa)?.nome}</Item>}

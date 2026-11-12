@@ -66,6 +66,7 @@ import { criarSolicitacao, listarMinhasSolicitacoes, obterSolicitacao, atualizar
 const rascunho = (chave = 'chave-1'): RascunhoSolicitacao => ({
   ...rascunhoVazio(chave),
   endereco: { texto: 'Rua José Geraldo, 450', coord: { lat: -21.2, lng: -50.44 }, precisao: 'exato', validando: false },
+  municipioIbge: 3502804, municipioDoMapa: { lat: -21.2, lng: -50.44, resultado: { nome: 'Araçatuba', uf: 'SP' } },
   destinoId: 'esc-1', sentido: 'ida', horarioIda: '07:00',
 });
 
@@ -89,7 +90,11 @@ describe('criar solicitação', () => {
   });
   it('grava a cidade do ponto confirmado e o número de alunos', async () => {
     await criarSolicitacao({ ...rascunho(), quantidadeAlunos: 2 });
-    expect(db.upserts[0].linha).toMatchObject({ city_id: 'aracatuba-sp', quantidade_alunos: 2 });
+    expect(db.upserts[0].linha).toMatchObject({ city_id: 'aracatuba-sp', quantidade_alunos: 2, origem_municipio_ibge: 3502804, origem_municipio_fonte: 'mapa' });
+  });
+  it('município não conferido nem confirmado não chega ao servidor', async () => {
+    await expect(criarSolicitacao({ ...rascunho(), municipioDoMapa: { lat: -21.2, lng: -50.44, resultado: null } })).rejects.toThrow(/Confirme/);
+    expect(db.upserts).toHaveLength(0);
   });
   it('ponto fora das cidades atendidas não chega ao servidor', async () => {
     const fora = { ...rascunho(), endereco: { texto: 'Av. Paulista, 1000', coord: { lat: -23.56, lng: -46.65 }, precisao: 'ajustado' as const, validando: false } };

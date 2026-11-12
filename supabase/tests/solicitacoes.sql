@@ -31,9 +31,9 @@ begin
 end $$;
 -- Insere uma solicitação válida como o app faz (owner = conta logada).
 create function pg_temp.nova(p_chave uuid, p_sentido text default 'ida', p_status text default 'ativa') returns uuid language sql as $$
-  insert into public.transport_requests (owner_id, chave_envio, city_id, destination_id, origem_endereco, origem_lat, origem_lng,
+  insert into public.transport_requests (owner_id, chave_envio, city_id, origem_municipio_ibge, origem_municipio_fonte, destination_id, origem_endereco, origem_lat, origem_lng,
     sentido, horario_ida_min, horario_volta_min, status)
-  values (auth.uid(), p_chave, 'aracatuba-sp', 'esc-teste', 'Rua das Flores, 120 — Centro', -21.20345, -50.43912,
+  values (auth.uid(), p_chave, 'aracatuba-sp', 3502804, 'mapa', 'esc-teste', 'Rua das Flores, 120 — Centro', -21.20345, -50.43912,
     p_sentido, case when p_sentido <> 'volta' then 420 end, case when p_sentido <> 'ida' then 750 end, p_status)
   on conflict (owner_id, chave_envio) do nothing
   returning id
@@ -43,11 +43,15 @@ $$;
 \set B '''22222222-2222-4222-8222-222222222222'''
 \set CH1 '''c0000000-0000-4000-8000-000000000001'''
 
+insert into public.destinations (id, type, name, city_id, is_demo, is_published) values
+  ('esc-demo', 'escola', 'Escola Demonstração', 'aracatuba-sp', true, false),
+  ('esc-oculta', 'escola', 'Escola Não Publicada', 'aracatuba-sp', false, false) on conflict do nothing;
+
 -- S1 — anônimo não lê nem cria -------------------------------------------------
 begin; select pg_temp.anonimo();
 select pg_temp.recusa('select count(*) from public.transport_requests', 'S1 anon lê solicitações');
-select pg_temp.recusa($q$insert into public.transport_requests (owner_id, chave_envio, city_id, destination_id, origem_endereco, origem_lat, origem_lng, sentido, horario_ida_min)
-  values ('11111111-1111-4111-8111-111111111111', gen_random_uuid(), 'aracatuba-sp', 'esc-teste', 'Rua X, 1', -21.2, -50.4, 'ida', 420)$q$, 'S1 anon cria');
+select pg_temp.recusa($q$insert into public.transport_requests (owner_id, chave_envio, city_id, origem_municipio_ibge, origem_municipio_fonte, destination_id, origem_endereco, origem_lat, origem_lng, sentido, horario_ida_min)
+  values ('11111111-1111-4111-8111-111111111111', gen_random_uuid(), 'aracatuba-sp', 3502804, 'mapa', 'esc-teste', 'Rua X, 1', -21.2, -50.4, 'ida', 420)$q$, 'S1 anon cria');
 commit;
 \echo 'OK S1 anônimo sem acesso'
 
@@ -64,25 +68,43 @@ select pg_temp.ok((select quantidade_alunos = 1 from public.transport_requests w
 
 -- S3 — validações -------------------------------------------------------------
 begin; select pg_temp.como(:A);
-select pg_temp.recusa($q$insert into public.transport_requests (owner_id, chave_envio, city_id, destination_id, origem_endereco, origem_lat, origem_lng, sentido)
-  values (auth.uid(), gen_random_uuid(), 'aracatuba-sp', 'esc-teste', 'Rua das Flores, 120', -21.2, -50.4, 'ida')$q$, 'S3 sem horário da ida');
-select pg_temp.recusa($q$insert into public.transport_requests (owner_id, chave_envio, city_id, destination_id, origem_endereco, origem_lat, origem_lng, sentido, horario_ida_min)
-  values (auth.uid(), gen_random_uuid(), 'aracatuba-sp', 'esc-teste', 'Rua das Flores, 120', -21.2, -50.4, 'ambos', 420)$q$, 'S3 ida e volta sem horário da volta');
-select pg_temp.recusa($q$insert into public.transport_requests (owner_id, chave_envio, city_id, destination_id, origem_endereco, origem_lat, origem_lng, sentido, horario_ida_min)
-  values (auth.uid(), gen_random_uuid(), 'aracatuba-sp', 'escola-que-nao-existe', 'Rua das Flores, 120', -21.2, -50.4, 'ida', 420)$q$, 'S3 escola inexistente');
-select pg_temp.recusa($q$insert into public.transport_requests (owner_id, chave_envio, city_id, destination_id, origem_endereco, origem_lat, origem_lng, sentido, horario_ida_min)
-  values (auth.uid(), gen_random_uuid(), 'aracatuba-sp', 'esc-teste', 'Rua das Flores, 120', 48.8, 2.3, 'ida', 420)$q$, 'S3 coordenada fora do Brasil');
-select pg_temp.recusa($q$insert into public.transport_requests (owner_id, chave_envio, city_id, destination_id, origem_endereco, origem_lat, origem_lng, sentido, horario_ida_min, observacoes)
-  values (auth.uid(), gen_random_uuid(), 'aracatuba-sp', 'esc-teste', 'Rua das Flores, 120', -21.2, -50.4, 'ida', 420, repeat('a', 501))$q$, 'S3 observação longa');
-select pg_temp.recusa($q$insert into public.transport_requests (owner_id, chave_envio, city_id, destination_id, origem_endereco, origem_lat, origem_lng, sentido, horario_ida_min, etapa_ensino)
-  values (auth.uid(), gen_random_uuid(), 'aracatuba-sp', 'esc-teste', 'Rua das Flores, 120', -21.2, -50.4, 'ida', 420, 'pos_doutorado')$q$, 'S3 etapa inválida');
+select pg_temp.recusa($q$insert into public.transport_requests (owner_id, chave_envio, city_id, origem_municipio_ibge, origem_municipio_fonte, destination_id, origem_endereco, origem_lat, origem_lng, sentido)
+  values (auth.uid(), gen_random_uuid(), 'aracatuba-sp', 3502804, 'mapa', 'esc-teste', 'Rua das Flores, 120', -21.2, -50.4, 'ida')$q$, 'S3 sem horário da ida');
+select pg_temp.recusa($q$insert into public.transport_requests (owner_id, chave_envio, city_id, origem_municipio_ibge, origem_municipio_fonte, destination_id, origem_endereco, origem_lat, origem_lng, sentido, horario_ida_min)
+  values (auth.uid(), gen_random_uuid(), 'aracatuba-sp', 3502804, 'mapa', 'esc-teste', 'Rua das Flores, 120', -21.2, -50.4, 'ambos', 420)$q$, 'S3 ida e volta sem horário da volta');
+select pg_temp.recusa($q$insert into public.transport_requests (owner_id, chave_envio, city_id, origem_municipio_ibge, origem_municipio_fonte, destination_id, origem_endereco, origem_lat, origem_lng, sentido, horario_ida_min)
+  values (auth.uid(), gen_random_uuid(), 'aracatuba-sp', 3502804, 'mapa', 'escola-que-nao-existe', 'Rua das Flores, 120', -21.2, -50.4, 'ida', 420)$q$, 'S3 escola inexistente');
+select pg_temp.recusa($q$insert into public.transport_requests (owner_id, chave_envio, city_id, origem_municipio_ibge, origem_municipio_fonte, destination_id, origem_endereco, origem_lat, origem_lng, sentido, horario_ida_min)
+  values (auth.uid(), gen_random_uuid(), 'aracatuba-sp', 3502804, 'mapa', 'esc-teste', 'Rua das Flores, 120', 48.8, 2.3, 'ida', 420)$q$, 'S3 coordenada fora do Brasil');
+select pg_temp.recusa($q$insert into public.transport_requests (owner_id, chave_envio, city_id, origem_municipio_ibge, origem_municipio_fonte, destination_id, origem_endereco, origem_lat, origem_lng, sentido, horario_ida_min, observacoes)
+  values (auth.uid(), gen_random_uuid(), 'aracatuba-sp', 3502804, 'mapa', 'esc-teste', 'Rua das Flores, 120', -21.2, -50.4, 'ida', 420, repeat('a', 501))$q$, 'S3 observação longa');
+select pg_temp.recusa($q$insert into public.transport_requests (owner_id, chave_envio, city_id, origem_municipio_ibge, origem_municipio_fonte, destination_id, origem_endereco, origem_lat, origem_lng, sentido, horario_ida_min, etapa_ensino)
+  values (auth.uid(), gen_random_uuid(), 'aracatuba-sp', 3502804, 'mapa', 'esc-teste', 'Rua das Flores, 120', -21.2, -50.4, 'ida', 420, 'pos_doutorado')$q$, 'S3 etapa inválida');
+select pg_temp.recusa($q$insert into public.transport_requests (owner_id, chave_envio, city_id, origem_municipio_ibge, origem_municipio_fonte, destination_id, origem_endereco, origem_lat, origem_lng, sentido, horario_ida_min)
+  values (auth.uid(), gen_random_uuid(), 'aracatuba-sp', 3502804, 'mapa', 'esc-teste', 'Av. Paulista, 1000', -23.56, -46.65, 'ida', 420)$q$, 'S3 ponto fora da cidade da solicitação');
+select pg_temp.recusa($q$insert into public.transport_requests (owner_id, chave_envio, city_id, origem_municipio_ibge, origem_municipio_fonte, destination_id, origem_endereco, origem_lat, origem_lng, sentido, horario_ida_min, quantidade_alunos)
+  values (auth.uid(), gen_random_uuid(), 'aracatuba-sp', 3502804, 'mapa', 'esc-teste', 'Rua das Flores, 120', -21.2, -50.4, 'ida', 420, 0)$q$, 'S3 zero alunos');
+select pg_temp.recusa($q$insert into public.transport_requests (owner_id, chave_envio, city_id, origem_municipio_ibge, origem_municipio_fonte, destination_id, origem_endereco, origem_lat, origem_lng, sentido, horario_ida_min, quantidade_alunos)
+  values (auth.uid(), gen_random_uuid(), 'aracatuba-sp', 3502804, 'mapa', 'esc-teste', 'Rua das Flores, 120', -21.2, -50.4, 'ida', 420, 9)$q$, 'S3 alunos acima do limite');
+select pg_temp.recusa($q$insert into public.transport_requests (owner_id, chave_envio, city_id, origem_municipio_ibge, origem_municipio_fonte, destination_id, origem_endereco, origem_lat, origem_lng, sentido, horario_ida_min)
+  values (auth.uid(), gen_random_uuid(), 'aracatuba-sp', 3502804, 'mapa', 'esc-demo', 'Rua das Flores, 120', -21.2, -50.4, 'ida', 420)$q$, 'S3 escola de demonstração');
+select pg_temp.recusa($q$insert into public.transport_requests (owner_id, chave_envio, city_id, origem_municipio_ibge, origem_municipio_fonte, destination_id, origem_endereco, origem_lat, origem_lng, sentido, horario_ida_min)
+  values (auth.uid(), gen_random_uuid(), 'aracatuba-sp', 3502804, 'mapa', 'esc-oculta', 'Rua das Flores, 120', -21.2, -50.4, 'ida', 420)$q$, 'S3 escola não publicada');
+select pg_temp.recusa($q$insert into public.transport_requests (owner_id, chave_envio, city_id, origem_municipio_ibge, origem_municipio_fonte, destination_id, origem_endereco, origem_lat, origem_lng, sentido, horario_ida_min)
+  values (auth.uid(), gen_random_uuid(), 'aracatuba-sp', 3550308, 'mapa', 'esc-teste', 'Rua das Flores, 120', -21.2, -50.4, 'ida', 420)$q$, 'S3 município incompatível com o ponto (São Paulo)');
+select pg_temp.recusa($q$insert into public.transport_requests (owner_id, chave_envio, city_id, origem_municipio_ibge, origem_municipio_fonte, destination_id, origem_endereco, origem_lat, origem_lng, sentido, horario_ida_min)
+  values (auth.uid(), gen_random_uuid(), 'aracatuba-sp', 1234567, 'mapa', 'esc-teste', 'Rua das Flores, 120', -21.2, -50.4, 'ida', 420)$q$, 'S3 município inexistente');
+select pg_temp.recusa($q$insert into public.transport_requests (owner_id, chave_envio, city_id, origem_municipio_ibge, origem_municipio_fonte, destination_id, origem_endereco, origem_lat, origem_lng, sentido, horario_ida_min)
+  values (auth.uid(), gen_random_uuid(), 'aracatuba-sp', 3502804, 'chute', 'esc-teste', 'Rua das Flores, 120', -21.2, -50.4, 'ida', 420)$q$, 'S3 origem do município inválida');
 commit;
-select pg_temp.recusa($q$insert into public.transport_requests (owner_id, chave_envio, city_id, destination_id, origem_endereco, origem_lat, origem_lng, sentido, horario_ida_min)
-  values (auth.uid(), gen_random_uuid(), 'aracatuba-sp', 'esc-teste', 'Av. Paulista, 1000', -23.56, -46.65, 'ida', 420)$q$, 'S3 ponto fora da cidade da solicitação');
-select pg_temp.recusa($q$insert into public.transport_requests (owner_id, chave_envio, city_id, destination_id, origem_endereco, origem_lat, origem_lng, sentido, horario_ida_min, quantidade_alunos)
-  values (auth.uid(), gen_random_uuid(), 'aracatuba-sp', 'esc-teste', 'Rua das Flores, 120', -21.2, -50.4, 'ida', 420, 0)$q$, 'S3 zero alunos');
-select pg_temp.recusa($q$insert into public.transport_requests (owner_id, chave_envio, city_id, destination_id, origem_endereco, origem_lat, origem_lng, sentido, horario_ida_min, quantidade_alunos)
-  values (auth.uid(), gen_random_uuid(), 'aracatuba-sp', 'esc-teste', 'Rua das Flores, 120', -21.2, -50.4, 'ida', 420, 9)$q$, 'S3 alunos acima do limite');
+-- Origem em Birigui, escola em Araçatuba: permitido; o município fica gravado como Birigui.
+begin; select pg_temp.como(:A);
+insert into public.transport_requests (owner_id, chave_envio, city_id, origem_municipio_ibge, origem_municipio_fonte, destination_id, origem_endereco, origem_lat, origem_lng, sentido, horario_ida_min)
+  values (auth.uid(), 'c0000000-0000-4000-8000-0000000000b1', 'aracatuba-sp', 3506508, 'familia', 'esc-teste', 'Rua Saudades, 300', -21.2905, -50.3420, 'ida', 420);
+select pg_temp.ok((select m.nome = 'Birigui' and m.uf = 'SP' and t.origem_municipio_fonte = 'familia'
+  from public.transport_requests t join public.municipios m on m.codigo_ibge = t.origem_municipio_ibge
+  where t.chave_envio = 'c0000000-0000-4000-8000-0000000000b1'), 'S3 Birigui gravado como Birigui/SP (escola em Araçatuba)');
+rollback; -- não deixa a linha para os cenários seguintes
 \echo 'OK S3 validações'
 
 -- S4 — edição pela dona; campos protegidos ------------------------------------
@@ -120,8 +142,8 @@ begin; select pg_temp.como(:A); select pg_temp.nova('c0000000-0000-4000-8000-000
 begin; select pg_temp.como(:B);
 select pg_temp.ok((select count(*) from public.transport_requests) = 0, 'S6 B não vê as de A');
 update public.transport_requests set observacoes = 'invadido', status = 'encerrada' where owner_id = :A;
-select pg_temp.recusa($q$insert into public.transport_requests (owner_id, chave_envio, city_id, destination_id, origem_endereco, origem_lat, origem_lng, sentido, horario_ida_min)
-  values ('11111111-1111-4111-8111-111111111111', gen_random_uuid(), 'aracatuba-sp', 'esc-teste', 'Rua das Flores, 120', -21.2, -50.4, 'ida', 420)$q$, 'S6 B cria em nome de A');
+select pg_temp.recusa($q$insert into public.transport_requests (owner_id, chave_envio, city_id, origem_municipio_ibge, origem_municipio_fonte, destination_id, origem_endereco, origem_lat, origem_lng, sentido, horario_ida_min)
+  values ('11111111-1111-4111-8111-111111111111', gen_random_uuid(), 'aracatuba-sp', 3502804, 'mapa', 'esc-teste', 'Rua das Flores, 120', -21.2, -50.4, 'ida', 420)$q$, 'S6 B cria em nome de A');
 select pg_temp.ok(pg_temp.nova('c0000000-0000-4000-8000-000000000002'::uuid) is not null, 'S6 mesma chave em OUTRA conta é outra solicitação');
 commit;
 select pg_temp.ok((select status = 'ativa' and observacoes is null from public.transport_requests where chave_envio = 'c0000000-0000-4000-8000-000000000002'::uuid and owner_id = :A), 'S6 solicitação de A intacta');
@@ -153,6 +175,8 @@ select pg_temp.ok(not has_table_privilege('anon', 'public.public_listings', 'UPD
 select pg_temp.ok(not exists (select 1 from information_schema.view_table_usage where table_schema = 'public' and table_name = 'transport_requests'), 'S9 nenhuma view sobre solicitações');
 select pg_temp.ok(not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
   where n.nspname = 'public' and p.prosrc ilike '%transport_requests%' and p.proname <> 'proteger_solicitacao'), 'S9 nenhuma função lê solicitações');
+select pg_temp.ok(has_table_privilege('anon', 'public.municipios', 'SELECT') and not has_table_privilege('authenticated', 'public.municipios', 'UPDATE')
+  and not has_table_privilege('anon', 'public.municipios', 'INSERT'), 'S9 municípios: leitura pública, sem escrita');
 \echo 'OK S9 privilégios'
 
 -- S10 — motorista não vê endereços das famílias ----------------------------------

@@ -1,6 +1,6 @@
 import { supabase, USE_SUPABASE } from '@/lib/supabase';
 import {
-  primeiroPassoComProblema, solicitacaoDoBanco, solicitacaoParaBanco, cidadeDaSolicitacao,
+  primeiroPassoComProblema, solicitacaoDoBanco, solicitacaoParaBanco, cidadeDaSolicitacao, fonteDoMunicipio,
   type LinhaSolicitacao, type MotivoEncerramento, type RascunhoSolicitacao, type Solicitacao, type StatusSolicitacao,
 } from '@/lib/solicitacao';
 
@@ -11,7 +11,7 @@ import {
  * demonstração), guarda no navegador.
  */
 const K_LOCAL = 'vanbora.demo.solicitacoes';
-const COLUNAS = 'id,chave_envio,city_id,destination_id,origem_endereco,origem_lat,origem_lng,sentido,horario_ida_min,horario_volta_min,turno,etapa_ensino,quantidade_alunos,precisa_acessibilidade,observacoes,status,motivo_encerramento,created_at,updated_at';
+const COLUNAS = 'id,chave_envio,city_id,origem_municipio_ibge,origem_municipio_fonte,destination_id,origem_endereco,origem_lat,origem_lng,sentido,horario_ida_min,horario_volta_min,turno,etapa_ensino,quantidade_alunos,precisa_acessibilidade,observacoes,status,motivo_encerramento,created_at,updated_at';
 
 export const SOLICITACOES_NO_SERVIDOR = USE_SUPABASE && !!supabase;
 
@@ -64,6 +64,7 @@ function conferir(r: RascunhoSolicitacao): string {
   if (p) throw new Error(p.erro);
   const cidade = cidadeDaSolicitacao(r);
   if (!cidade) throw new Error('Esse endereço fica fora das cidades atendidas. Confira o ponto no mapa.');
+  if (!r.municipioIbge || !fonteDoMunicipio(r)) throw new Error('Confirme a cidade do embarque.');
   return cidade;
 }
 
@@ -90,7 +91,9 @@ export async function criarSolicitacao(r: RascunhoSolicitacao): Promise<Solicita
   if (existente) return existente;
   const agora = new Date().toISOString();
   const nova: Solicitacao = {
-    id: r.chave, chave: r.chave, cidadeId: linha.city_id, destinoId: linha.destination_id, endereco: linha.origem_endereco,
+    id: r.chave, chave: r.chave, cidadeId: linha.city_id,
+    municipioIbge: linha.origem_municipio_ibge as number, municipioFonte: linha.origem_municipio_fonte as Solicitacao['municipioFonte'],
+    destinoId: linha.destination_id, endereco: linha.origem_endereco,
     lat: linha.origem_lat as number, lng: linha.origem_lng as number, sentido: r.sentido,
     horarioIdaMin: linha.horario_ida_min, horarioVoltaMin: linha.horario_volta_min,
     turno: linha.turno as Solicitacao['turno'], etapa: linha.etapa_ensino as Solicitacao['etapa'],
@@ -133,6 +136,7 @@ async function gravar(id: string, campos: Record<string, unknown>): Promise<Soli
       sentido: c.sentido as Solicitacao['sentido'], horarioIdaMin: c.horario_ida_min as number | null, horarioVoltaMin: c.horario_volta_min as number | null,
       turno: c.turno as Solicitacao['turno'], etapa: c.etapa_ensino as Solicitacao['etapa'],
       cidadeId: c.city_id as string, quantidadeAlunos: c.quantidade_alunos as number,
+      municipioIbge: c.origem_municipio_ibge as number, municipioFonte: c.origem_municipio_fonte as Solicitacao['municipioFonte'],
       acessibilidade: !!c.precisa_acessibilidade, observacoes: c.observacoes as string | null,
     } : {}),
     ...(c.status !== undefined ? { status: c.status as StatusSolicitacao, motivoEncerramento: (c.motivo_encerramento as MotivoEncerramento | null) ?? null } : {}),

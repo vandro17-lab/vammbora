@@ -1,18 +1,20 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { Loader2, Lock, Minus, Plus } from 'lucide-react';
+import { CheckCircle2, Loader2, Lock, Minus, Plus } from 'lucide-react';
 import { VMShell } from '@/components/vm/VMShell';
 import { Card, SubHeader, AvisoErro } from '@/components/vm/ui';
 import { CampoEndereco } from '@/components/search/CampoEndereco';
 import { useVitrine } from '@/data/VitrineProvider';
 import { useAuth } from '@/lib/auth';
-import { locaisDeDestinos } from '@/lib/geocode';
+import { locaisDeDestinos, municipioDoPonto } from '@/lib/geocode';
+import { MUNICIPIOS_COBERTURA } from '@/data/municipios-cobertura';
 import { paramsParaCriterios } from '@/lib/searchParams';
 import { novoId } from '@/data/motorista-store';
 import { criarSolicitacao, atualizarSolicitacao, obterSolicitacao, SOLICITACOES_NO_SERVIDOR } from '@/data/solicitacoes';
 import {
   PASSOS_SOLICITACAO, ETAPAS_ENSINO, SENTIDOS, OBSERVACOES_MAX, ALUNOS_MIN, ALUNOS_MAX,
   validarPasso, primeiroPassoComProblema, rascunhoVazio, rascunhoDaBusca, rascunhoDaSolicitacao, precisaEntrarParaConfirmar,
+  situacaoMunicipio, municipioPorCodigo, codigoDoMunicipio, textoMunicipio,
   type PassoSolicitacao, type RascunhoSolicitacao,
 } from '@/lib/solicitacao';
 import { TURNO_LABEL, cn, nomeDestinoParaExibicao } from '@/lib/utils';
@@ -84,7 +86,10 @@ export function EditarSolicitacaoPage() {
 function FormularioSolicitacao({ inicial, editandoId }: { inicial: Guardado; editandoId?: string }) {
   const navigate = useNavigate();
   const { session } = useAuth();
-  const { destinos, destinosPorId, carregando: carregandoDestinos } = useVitrine();
+  const { destinos, destinosPorId, status: statusEscolas, recarregar: recarregarEscolas } = useVitrine();
+  const carregandoDestinos = statusEscolas === 'carregando';
+  // Só escolas REAIS carregadas agora contam como válidas (sem lista: nenhuma).
+  const escolasValidas = useMemo(() => new Set(statusEscolas === 'pronto' ? destinos.map((d) => d.id) : []), [destinos, statusEscolas]);
   const locais = useMemo(() => locaisDeDestinos(destinos), [destinos]);
   const [passo, setPasso] = useState<PassoSolicitacao>(inicial.passo);
   const [r, setR] = useState<RascunhoSolicitacao>(inicial.r);
@@ -96,22 +101,46 @@ function FormularioSolicitacao({ inicial, editandoId }: { inicial: Guardado; edi
   useEffect(() => { if (!editandoId) gravarRascunho({ passo, r }); }, [passo, r, editandoId]);
   useEffect(() => { titulo.current?.focus({ preventScroll: true }); }, [passo]);
 
+  // Município do PONTO confirmado, segundo o serviço de mapas (consultado de
+  // novo sempre que o ponto muda). Sem cidade escolhida, a identificada vira a
+  // escolha; divergência ou falta de resposta pedem confirmação da família.
+  const coord = r.endereco.coord;
+  const conferido = r.municipioDoMapa && coord && r.municipioDoMapa.lat === coord.lat && r.municipioDoMapa.lng === coord.lng;
+  useEffect(() => {
+    if (!coord || conferido) return;
+    const ctrl = new AbortController();
+    const prazo = setTimeout(() => ctrl.abort(), 8000);
+    let vivo = true;
+    municipioDoPonto(coord.lat, coord.lng, ctrl.signal).catch(() => null).then((resultado) => {
+      if (!vivo) return;
+      setR((a) => (a.endereco.coord?.lat !== coord.lat || a.endereco.coord?.lng !== coord.lng ? a : {
+        ...a,
+        municipioDoMapa: { lat: coord.lat, lng: coord.lng, resultado },
+        municipioIbge: a.municipioIbge ?? codigoDoMunicipio(resultado),
+      }));
+    }).finally(() => clearTimeout(prazo));
+    return () => { vivo = false; ctrl.abort(); clearTimeout(prazo); };
+  }, [coord?.lat, coord?.lng, conferido]); // eslint-disable-line react-hooks/exhaustive-deps
+  const situacao = situacaoMunicipio(r);
+  const municipioEscolhido = municipioPorCodigo(r.municipioIbge);
+
   const indice = PASSOS_SOLICITACAO.findIndex((p) => p.id === passo);
   const ultimo = indice === PASSOS_SOLICITACAO.length - 1;
   const mudar = (m: Partial<RascunhoSolicitacao>) => { setErro(null); setR((a) => ({ ...a, ...m })); };
   const irPara = (p: PassoSolicitacao) => { setErro(null); setPasso(p); };
   const sair = () => (editandoId ? navigate(`/familia/solicitacoes/${editandoId}`) : navigate(-1));
   const voltar = () => (indice > 0 ? irPara(PASSOS_SOLICITACAO[indice - 1].id) : sair());
-  const nomeDestino = (id: string) => (destinosPorId[id] ? nomeDestinoParaExibicao(destinosPorId[id].nome) : '—');
+  const nomeDestino = (id: string) => (escolasValidas.has(id) ? nomeDestinoParaExibicao(destinosPorId[id].nome) : '—');
 
   async function continuar() {
+    if ((passo === 'escola' || ultimo) && carregandoDestinos) { setErro('Aguarde: carregando as escolas.'); return; }
     if (!ultimo) {
-      const problema = validarPasso(passo, r);
+      const problema = validarPasso(passo, r, escolasValidas);
       if (problema) { setErro(problema); return; }
       irPara(PASSOS_SOLICITACAO[indice + 1].id);
       return;
     }
-    const pendente = primeiroPassoComProblema(r);
+    const pendente = primeiroPassoComProblema(r, escolasValidas);
     if (pendente) { setPasso(pendente.passo); setErro(pendente.erro); return; }
     // Confirmar exige conta: guarda o rascunho e volta para a revisão depois do login.
     if (!editandoId && precisaEntrarParaConfirmar(SOLICITACOES_NO_SERVIDOR, !!session)) {
@@ -146,9 +175,39 @@ function FormularioSolicitacao({ inicial, editandoId }: { inicial: Guardado; edi
         <main className="flex-1 px-4 pb-24 pt-3">
           <Card className="p-4 sm:p-5">
             {passo === 'endereco' && (
-              <Etapa tituloRef={titulo} titulo="De onde o aluno sai?" texto="Digite a rua e o número. Confira o alfinete no mapa.">
-                <label className="field-label" htmlFor="sol-endereco">Endereço de embarque</label>
-                <CampoEndereco id="sol-endereco" valor={r.endereco} onChange={(e) => mudar({ endereco: e })} locais={locais} placeholder="Ex.: Rua José Geraldo, 450" />
+              <Etapa tituloRef={titulo} titulo="De onde o aluno sai?" texto="Escolha a cidade, digite a rua e o número e confira o alfinete no mapa.">
+                <label className="field-label" htmlFor="sol-municipio">Cidade do embarque</label>
+                <select id="sol-municipio" className="field-input text-base" value={r.municipioIbge ?? ''}
+                  onChange={(e) => mudar({ municipioIbge: Number(e.target.value) || null, municipioConfirmado: false })}>
+                  <option value="">Escolha a cidade</option>
+                  {MUNICIPIOS_COBERTURA.map((m) => <option key={m.ibge} value={m.ibge}>{m.nome}/{m.uf}</option>)}
+                </select>
+                {/* O endereço é procurado NA cidade escolhida (sem ela, cairia na cidade padrão). */}
+                {municipioEscolhido || coord ? (<>
+                  <label className="field-label mt-3" htmlFor="sol-endereco">Endereço de embarque</label>
+                  <CampoEndereco id="sol-endereco" valor={r.endereco} locais={locais} placeholder="Ex.: Rua José Geraldo, 450"
+                    municipio={municipioEscolhido ?? undefined}
+                    onChange={(e) => mudar({ endereco: e, ...(e.coord?.lat !== r.endereco.coord?.lat || e.coord?.lng !== r.endereco.coord?.lng ? { municipioConfirmado: false } : {}) })} />
+                </>) : (
+                  <p className="mt-3 text-sm text-navy-600">Escolha a cidade para digitar o endereço.</p>
+                )}
+                {coord && situacao === 'conferindo' && r.municipioIbge != null && (
+                  <p role="status" className="mt-2 inline-flex items-center gap-1.5 text-sm text-navy-600"><Loader2 className="h-4 w-4 animate-spin" /> Conferindo a cidade no mapa…</p>
+                )}
+                {situacao === 'confere' && (
+                  <p role="status" className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-navy-800"><CheckCircle2 className="h-4 w-4 text-mint-600" /> Cidade conferida no mapa: {textoMunicipio(municipioEscolhido)}</p>
+                )}
+                {(situacao === 'diverge' || situacao === 'sem_mapa') && (
+                  <div className="mt-2 rounded-2xl bg-amber-50 p-3 text-sm text-amber-900 ring-1 ring-amber-200">
+                    <p>{situacao === 'diverge'
+                      ? `O mapa indica que este ponto fica em ${textoMunicipio(r.municipioDoMapa?.resultado ?? null)}. Confira o alfinete e a cidade escolhida.`
+                      : 'Não conseguimos conferir a cidade pelo mapa.'}</p>
+                    <label className="mt-2 flex min-h-[2.75rem] items-center gap-3 font-semibold">
+                      <input type="checkbox" className="h-5 w-5 accent-[#FFC700]" checked={r.municipioConfirmado} onChange={(e) => mudar({ municipioConfirmado: e.target.checked })} />
+                      Confirmo que o embarque fica em {textoMunicipio(municipioEscolhido)}
+                    </label>
+                  </div>
+                )}
                 <p className="mt-2 inline-flex gap-1.5 text-sm text-navy-600"><Lock className="mt-0.5 h-4 w-4 shrink-0" /> Seu endereço completo não é mostrado aos motoristas.</p>
               </Etapa>
             )}
@@ -156,10 +215,19 @@ function FormularioSolicitacao({ inicial, editandoId }: { inicial: Guardado; edi
             {passo === 'escola' && (
               <Etapa tituloRef={titulo} titulo="Para onde e em que horário?" texto="Escolha a escola e informe os horários.">
                 <label className="field-label" htmlFor="sol-destino">Escola ou destino</label>
-                <select id="sol-destino" className="field-input text-base" value={r.destinoId} disabled={carregandoDestinos} onChange={(e) => mudar({ destinoId: e.target.value })}>
-                  <option value="">{carregandoDestinos ? 'Carregando escolas…' : 'Escolha na lista'}</option>
-                  {destinos.map((d) => <option key={d.id} value={d.id}>{nomeDestinoParaExibicao(d.nome)}{d.bairro ? ` — ${d.bairro}` : ''}</option>)}
-                </select>
+                {statusEscolas === 'erro' ? (
+                  <div role="alert" className="rounded-2xl bg-red-50 p-4 text-red-800 ring-1 ring-red-100">
+                    <p className="font-semibold">Escolas indisponíveis no momento</p>
+                    <p className="mt-0.5 text-sm">Não conseguimos carregar a lista de escolas. Verifique a internet e tente de novo. O que você já preencheu continua guardado.</p>
+                    <button type="button" onClick={() => { setErro(null); recarregarEscolas(); }}
+                      className="mt-3 min-h-[2.75rem] rounded-full bg-white px-4 text-sm font-bold text-red-800 ring-1 ring-red-200">Tentar de novo</button>
+                  </div>
+                ) : (
+                  <select id="sol-destino" className="field-input text-base" value={escolasValidas.has(r.destinoId) ? r.destinoId : ''} disabled={carregandoDestinos} onChange={(e) => mudar({ destinoId: e.target.value })}>
+                    <option value="">{carregandoDestinos ? 'Carregando escolas…' : 'Escolha na lista'}</option>
+                    {destinos.map((d) => <option key={d.id} value={d.id}>{nomeDestinoParaExibicao(d.nome)}{d.bairro ? ` — ${d.bairro}` : ''}</option>)}
+                  </select>
+                )}
                 <p className="field-label mt-3">Trajeto</p>
                 <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="Trajeto">
                   {SENTIDOS.map((s) => (
@@ -181,7 +249,7 @@ function FormularioSolicitacao({ inicial, editandoId }: { inicial: Guardado; edi
             )}
 
             {passo === 'detalhes' && (
-              <Etapa tituloRef={titulo} titulo="Quantos alunos e mais detalhes" texto="Irmãos que saem do mesmo endereço para a mesma escola entram na mesma solicitação.">
+              <Etapa tituloRef={titulo} titulo="Quantos alunos e mais detalhes" texto="Mais de um aluno só se todos saem deste endereço, vão para esta escola e têm horários compatíveis. Se não, crie uma solicitação para cada um.">
                 <p className="field-label" id="sol-alunos-rotulo">Quantos alunos vão usar o transporte?</p>
                 <div className="flex items-center gap-3" role="group" aria-labelledby="sol-alunos-rotulo">
                   <button type="button" aria-label="Menos um aluno" disabled={r.quantidadeAlunos <= ALUNOS_MIN} onClick={() => mudar({ quantidadeAlunos: r.quantidadeAlunos - 1 })}
@@ -215,7 +283,7 @@ function FormularioSolicitacao({ inicial, editandoId }: { inicial: Guardado; edi
             {passo === 'revisao' && (
               <Etapa tituloRef={titulo} titulo="Confira antes de confirmar" texto="Você não precisa informar valores: o preço é proposto pelos motoristas.">
                 <dl className="divide-y divide-navy-50">
-                  <Linha rotulo="Embarque" valor={r.endereco.texto || '—'} onAlterar={() => irPara('endereco')} />
+                  <Linha rotulo="Embarque" valor={[r.endereco.texto || '—', textoMunicipio(municipioEscolhido)].filter(Boolean).join(' — ')} onAlterar={() => irPara('endereco')} />
                   <Linha rotulo="Escola" valor={nomeDestino(r.destinoId)} onAlterar={() => irPara('escola')} />
                   <Linha rotulo="Horários" valor={[r.sentido !== 'volta' && `ida até ${r.horarioIda || '—'}`, r.sentido !== 'ida' && `volta às ${r.horarioVolta || '—'}`].filter(Boolean).join(' · ')} onAlterar={() => irPara('escola')} />
                   <Linha rotulo="Alunos" valor={`${r.quantidadeAlunos} ${r.quantidadeAlunos === 1 ? 'aluno' : 'alunos'}`} onAlterar={() => irPara('detalhes')} />
