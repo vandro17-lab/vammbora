@@ -12,7 +12,7 @@ export function InicioPage() {
   return (
     <main id="conteudo" tabIndex={-1} className="flex min-h-dvh flex-col bg-black text-white outline-none">
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-5 pb-4 min-[360px]:px-6 pt-[max(env(safe-area-inset-top),1.25rem)] [@media(max-height:700px)]:pb-2 [@media(max-height:700px)]:pt-[max(env(safe-area-inset-top),0.75rem)]">
-        <LogoCompleta className="mx-auto w-[min(15rem,62vw,26dvh)] [@media(max-height:600px)]:w-[21dvh]" />
+        <LogoCompleta className="mx-auto w-[min(15rem,62vw,26dvh)] [@media(max-height:600px)]:w-[17dvh]" />
 
         <p className="mt-5 text-center text-[0.72rem] font-extrabold uppercase tracking-[0.14em] text-[#FFC700] [@media(max-height:700px)]:mt-3 [@media(max-height:700px)]:tracking-[0.08em]">
           Vitrine inteligente de transporte escolar

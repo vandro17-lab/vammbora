@@ -75,7 +75,7 @@ export function SolicitacoesPage() {
                           <p className="font-display text-[17px] font-bold leading-snug text-navy-900">{nomeDestino(s.destinoId)}</p>
                           <Status s={s.status} />
                         </div>
-                        <p className="mt-1 text-sm text-navy-600">{textoHorarios(s)}</p>
+                        <p className="mt-1 text-sm text-navy-600">{s.quantidadeAlunos} {s.quantidadeAlunos === 1 ? 'aluno' : 'alunos'} · {textoHorarios(s)}</p>
                         <p className="mt-0.5 text-xs text-navy-500">Criada em {new Date(s.criadaEm).toLocaleDateString('pt-BR')}</p>
                       </Card>
                     </Link>
@@ -144,6 +144,7 @@ export function SolicitacaoPage() {
                 <dl className="mt-3 space-y-2.5 text-[15px]">
                   <Item icone={<MapPin className="h-4 w-4" />} rotulo="Embarque">{s.endereco}</Item>
                   <Item icone={<Clock className="h-4 w-4" />} rotulo="Horários">{textoHorarios(s)}{s.turno ? ` · ${TURNO_LABEL[s.turno]}` : ''}</Item>
+                  <Item rotulo="Alunos">{s.quantidadeAlunos} {s.quantidadeAlunos === 1 ? 'aluno' : 'alunos'}</Item>
                   {s.etapa && <Item icone={<School className="h-4 w-4" />} rotulo="Etapa escolar">{ETAPAS_ENSINO.find((e) => e.id === s.etapa)?.nome}</Item>}
                   {s.acessibilidade && <Item rotulo="Acessibilidade">Precisa de veículo acessível</Item>}
                   {s.observacoes && <Item rotulo="Observações">{s.observacoes}</Item>}

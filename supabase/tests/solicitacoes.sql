@@ -59,6 +59,7 @@ commit;
 select pg_temp.ok((select count(*) = 1 from public.transport_requests where owner_id = :A), 'S2 uma solicitação só');
 select pg_temp.ok((select status = 'ativa' and encerrada_em is null from public.transport_requests where owner_id = :A), 'S2 nasce ativa (status enviado ignorado)');
 select pg_temp.ok((select origem_lat_aprox = -21.205 and origem_lng_aprox = -50.44 from public.transport_requests where owner_id = :A), 'S2 ponto aproximado em grade');
+select pg_temp.ok((select quantidade_alunos = 1 from public.transport_requests where owner_id = :A), 'S2 sem informar, 1 aluno');
 \echo 'OK S2 criação e envio repetido'
 
 -- S3 — validações -------------------------------------------------------------
@@ -76,6 +77,12 @@ select pg_temp.recusa($q$insert into public.transport_requests (owner_id, chave_
 select pg_temp.recusa($q$insert into public.transport_requests (owner_id, chave_envio, city_id, destination_id, origem_endereco, origem_lat, origem_lng, sentido, horario_ida_min, etapa_ensino)
   values (auth.uid(), gen_random_uuid(), 'aracatuba-sp', 'esc-teste', 'Rua das Flores, 120', -21.2, -50.4, 'ida', 420, 'pos_doutorado')$q$, 'S3 etapa inválida');
 commit;
+select pg_temp.recusa($q$insert into public.transport_requests (owner_id, chave_envio, city_id, destination_id, origem_endereco, origem_lat, origem_lng, sentido, horario_ida_min)
+  values (auth.uid(), gen_random_uuid(), 'aracatuba-sp', 'esc-teste', 'Av. Paulista, 1000', -23.56, -46.65, 'ida', 420)$q$, 'S3 ponto fora da cidade da solicitação');
+select pg_temp.recusa($q$insert into public.transport_requests (owner_id, chave_envio, city_id, destination_id, origem_endereco, origem_lat, origem_lng, sentido, horario_ida_min, quantidade_alunos)
+  values (auth.uid(), gen_random_uuid(), 'aracatuba-sp', 'esc-teste', 'Rua das Flores, 120', -21.2, -50.4, 'ida', 420, 0)$q$, 'S3 zero alunos');
+select pg_temp.recusa($q$insert into public.transport_requests (owner_id, chave_envio, city_id, destination_id, origem_endereco, origem_lat, origem_lng, sentido, horario_ida_min, quantidade_alunos)
+  values (auth.uid(), gen_random_uuid(), 'aracatuba-sp', 'esc-teste', 'Rua das Flores, 120', -21.2, -50.4, 'ida', 420, 9)$q$, 'S3 alunos acima do limite');
 \echo 'OK S3 validações'
 
 -- S4 — edição pela dona; campos protegidos ------------------------------------
@@ -86,6 +93,11 @@ commit;
 select pg_temp.ok((select observacoes = 'Prefere sair às 6h30' and etapa_ensino = 'fundamental_1' and precisa_acessibilidade
                    and owner_id = :A and chave_envio = :CH1::uuid and updated_at >= created_at
                    from public.transport_requests where chave_envio = :CH1::uuid), 'S4 edita; dono e chave não mudam');
+begin; select pg_temp.como(:A);
+update public.transport_requests set quantidade_alunos = 3 where owner_id = auth.uid();
+select pg_temp.ok((select quantidade_alunos = 3 from public.transport_requests where owner_id = auth.uid()), 'S4 informa 3 alunos (irmãos)');
+select pg_temp.recusa($q$update public.transport_requests set origem_lat = -23.56, origem_lng = -46.65 where owner_id = auth.uid()$q$, 'S4 mover o ponto para fora da cidade');
+commit;
 \echo 'OK S4 edição'
 
 -- S5 — pausar, reativar, encerrar (final) -------------------------------------
@@ -126,6 +138,8 @@ begin; select pg_temp.como(:B);
 select pg_temp.nova(gen_random_uuid()) from generate_series(1, 9);
 select pg_temp.ok((select count(*) = 10 from public.transport_requests where status in ('ativa', 'pausada')), 'S8 dez abertas');
 select pg_temp.recusa('select pg_temp.nova(gen_random_uuid())', 'S8 décima primeira');
+select pg_temp.ok(pg_temp.nova((select chave_envio from public.transport_requests order by created_at desc limit 1)) is null, 'S8 reenviar o mesmo pedido no limite não dá erro nem duplica');
+select pg_temp.ok((select count(*) = 10 from public.transport_requests where status in ('ativa', 'pausada')), 'S8 continuam dez');
 update public.transport_requests set status = 'encerrada' where id = (select id from public.transport_requests order by created_at limit 1);
 select pg_temp.ok(pg_temp.nova(gen_random_uuid()) is not null, 'S8 encerrar libera uma nova');
 commit;
@@ -136,6 +150,20 @@ select pg_temp.ok(not has_table_privilege('anon', 'public.transport_requests', '
 select pg_temp.ok(not has_table_privilege('authenticated', 'public.transport_requests', 'DELETE'), 'S9 sem DELETE');
 select pg_temp.ok(not has_function_privilege('authenticated', 'public.proteger_solicitacao()', 'EXECUTE'), 'S9 gatilho fora da API');
 select pg_temp.ok(not has_table_privilege('anon', 'public.public_listings', 'UPDATE'), 'S9 vitrine segue somente leitura');
+select pg_temp.ok(not exists (select 1 from information_schema.view_table_usage where table_schema = 'public' and table_name = 'transport_requests'), 'S9 nenhuma view sobre solicitações');
+select pg_temp.ok(not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+  where n.nspname = 'public' and p.prosrc ilike '%transport_requests%' and p.proname <> 'proteger_solicitacao'), 'S9 nenhuma função lê solicitações');
 \echo 'OK S9 privilégios'
+
+-- S10 — motorista não vê endereços das famílias ----------------------------------
+insert into public.user_roles (user_id, role) values ('33333333-3333-4333-8333-333333333333', 'motorista') on conflict do nothing;
+begin; select pg_temp.como('33333333-3333-4333-8333-333333333333');
+select pg_temp.ok((select count(*) from public.transport_requests) = 0, 'S10 motorista não lê solicitações');
+select pg_temp.ok((select count(*) from public.public_listings l where l::text ilike '%Rua das Flores%') = 0, 'S10 vitrine não contém endereços de famílias');
+commit;
+begin; select pg_temp.anonimo();
+select pg_temp.ok((select count(*) from public.public_listings l where l::text ilike '%Rua das Flores%') = 0, 'S10 consulta pública não contém endereços de famílias');
+commit;
+\echo 'OK S10 endereços privados'
 
 \echo 'OK — solicitações das famílias: todos os testes passaram'

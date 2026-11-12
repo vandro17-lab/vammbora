@@ -2,6 +2,7 @@ import type { CriteriosBusca, Turno } from '@/types';
 import type { EnderecoCampo } from '@/lib/endereco';
 import { ENDERECO_VAZIO } from '@/lib/endereco';
 import { horarioDoSentido, horaParaMinutoDoDia } from '@/lib/searchParams';
+import { CIDADES, cidadeDoPonto } from '@/data/cidades';
 
 /**
  * SOLICITAÇÃO DE TRANSPORTE DA FAMÍLIA (Etapa 3A) — regras puras.
@@ -18,6 +19,9 @@ export type MotivoEncerramento = 'contratou_vanbora' | 'contratou_fora' | 'desis
 export type PassoSolicitacao = 'endereco' | 'escola' | 'detalhes' | 'revisao';
 
 export const OBSERVACOES_MAX = 500;
+/** Alunos por solicitação (irmãos com a mesma origem e escola). */
+export const ALUNOS_MIN = 1;
+export const ALUNOS_MAX = 8;
 
 export const PASSOS_SOLICITACAO: { id: PassoSolicitacao; nome: string }[] = [
   { id: 'endereco', nome: 'Endereço' },
@@ -65,6 +69,7 @@ export interface RascunhoSolicitacao {
   horarioVolta: string;
   turno: Turno | '';
   etapa: EtapaEnsino | '';
+  quantidadeAlunos: number;
   acessibilidade: boolean;
   observacoes: string;
 }
@@ -83,6 +88,7 @@ export interface Solicitacao {
   horarioVoltaMin: number | null;
   turno: Turno | null;
   etapa: EtapaEnsino | null;
+  quantidadeAlunos: number;
   acessibilidade: boolean;
   observacoes: string | null;
   status: StatusSolicitacao;
@@ -96,7 +102,7 @@ const usaIda = (s: SentidoSolicitacao) => s !== 'volta';
 const usaVolta = (s: SentidoSolicitacao) => s !== 'ida';
 
 export function rascunhoVazio(chave: string): RascunhoSolicitacao {
-  return { chave, endereco: ENDERECO_VAZIO, destinoId: '', sentido: 'ida', horarioIda: '', horarioVolta: '', turno: '', etapa: '', acessibilidade: false, observacoes: '' };
+  return { chave, endereco: ENDERECO_VAZIO, destinoId: '', sentido: 'ida', horarioIda: '', horarioVolta: '', turno: '', etapa: '', quantidadeAlunos: 1, acessibilidade: false, observacoes: '' };
 }
 
 /**
@@ -127,7 +133,7 @@ export function rascunhoDaSolicitacao(s: Solicitacao): RascunhoSolicitacao {
     endereco: { texto: s.endereco, coord: { lat: s.lat, lng: s.lng }, precisao: 'ajustado', validando: false },
     destinoId: s.destinoId, sentido: s.sentido,
     horarioIda: hora(s.horarioIdaMin), horarioVolta: hora(s.horarioVoltaMin),
-    turno: s.turno ?? '', etapa: s.etapa ?? '', acessibilidade: s.acessibilidade, observacoes: s.observacoes ?? '',
+    turno: s.turno ?? '', etapa: s.etapa ?? '', quantidadeAlunos: s.quantidadeAlunos, acessibilidade: s.acessibilidade, observacoes: s.observacoes ?? '',
   };
 }
 
@@ -137,14 +143,20 @@ export function validarPasso(passo: PassoSolicitacao, r: RascunhoSolicitacao): s
     if (r.endereco.texto.trim().length < 5) return 'Digite o endereço de embarque com o número.';
     if (r.endereco.validando) return 'Aguarde: estamos localizando o endereço no mapa.';
     if (!r.endereco.coord) return 'Confirme o endereço no mapa. Se precisar, arraste o alfinete até a sua casa.';
+    if (!cidadeDoPonto(r.endereco.coord.lat, r.endereco.coord.lng)) {
+      return `Esse endereço fica fora das cidades atendidas (${CIDADES.map((c) => `${c.nome}/${c.uf}`).join(', ')}). Confira o ponto no mapa.`;
+    }
   }
   if (passo === 'escola') {
     if (!r.destinoId) return 'Escolha a escola ou o destino.';
     if (usaIda(r.sentido) && !HORA_RE.test(r.horarioIda)) return 'Informe até que horas o aluno precisa chegar à escola.';
     if (usaVolta(r.sentido) && !HORA_RE.test(r.horarioVolta)) return 'Informe a partir de que horas o aluno sai da escola.';
   }
-  if (passo === 'detalhes' && r.observacoes.trim().length > OBSERVACOES_MAX) {
-    return `As observações podem ter no máximo ${OBSERVACOES_MAX} caracteres.`;
+  if (passo === 'detalhes') {
+    if (!Number.isInteger(r.quantidadeAlunos) || r.quantidadeAlunos < ALUNOS_MIN || r.quantidadeAlunos > ALUNOS_MAX) {
+      return `Informe de ${ALUNOS_MIN} a ${ALUNOS_MAX} alunos.`;
+    }
+    if (r.observacoes.trim().length > OBSERVACOES_MAX) return `As observações podem ter no máximo ${OBSERVACOES_MAX} caracteres.`;
   }
   return null;
 }
@@ -155,6 +167,11 @@ export function primeiroPassoComProblema(r: RascunhoSolicitacao): { passo: Passo
     if (erro) return { passo: id, erro };
   }
   return null;
+}
+
+/** Cidade da solicitação: a do ponto confirmado (o servidor confere de novo). */
+export function cidadeDaSolicitacao(r: RascunhoSolicitacao): string | null {
+  return r.endereco.coord ? cidadeDoPonto(r.endereco.coord.lat, r.endereco.coord.lng)?.id ?? null : null;
 }
 
 /** Linha para o banco (owner_id e status são definidos no servidor). */
@@ -171,6 +188,7 @@ export function solicitacaoParaBanco(r: RascunhoSolicitacao, cidadeId: string) {
     horario_volta_min: usaVolta(r.sentido) ? horaParaMinutoDoDia(r.horarioVolta) : null,
     turno: r.turno || null,
     etapa_ensino: r.etapa || null,
+    quantidade_alunos: r.quantidadeAlunos,
     precisa_acessibilidade: r.acessibilidade,
     observacoes: r.observacoes.trim() || null,
   };
@@ -179,7 +197,7 @@ export function solicitacaoParaBanco(r: RascunhoSolicitacao, cidadeId: string) {
 export interface LinhaSolicitacao {
   id: string; chave_envio: string; city_id: string; destination_id: string; origem_endereco: string;
   origem_lat: number; origem_lng: number; sentido: string; horario_ida_min: number | null; horario_volta_min: number | null;
-  turno: string | null; etapa_ensino: string | null; precisa_acessibilidade: boolean; observacoes: string | null;
+  turno: string | null; etapa_ensino: string | null; quantidade_alunos: number; precisa_acessibilidade: boolean; observacoes: string | null;
   status: string; motivo_encerramento: string | null; created_at: string; updated_at: string;
 }
 
@@ -189,7 +207,7 @@ export function solicitacaoDoBanco(l: LinhaSolicitacao): Solicitacao {
     lat: l.origem_lat, lng: l.origem_lng, sentido: l.sentido as SentidoSolicitacao,
     horarioIdaMin: l.horario_ida_min, horarioVoltaMin: l.horario_volta_min,
     turno: (l.turno as Turno | null) ?? null, etapa: (l.etapa_ensino as EtapaEnsino | null) ?? null,
-    acessibilidade: !!l.precisa_acessibilidade, observacoes: l.observacoes ?? null,
+    quantidadeAlunos: l.quantidade_alunos ?? 1, acessibilidade: !!l.precisa_acessibilidade, observacoes: l.observacoes ?? null,
     status: l.status as StatusSolicitacao, motivoEncerramento: (l.motivo_encerramento as MotivoEncerramento | null) ?? null,
     criadaEm: l.created_at, atualizadaEm: l.updated_at,
   };

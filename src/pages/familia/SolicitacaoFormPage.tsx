@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { Loader2, Lock } from 'lucide-react';
+import { Loader2, Lock, Minus, Plus } from 'lucide-react';
 import { VMShell } from '@/components/vm/VMShell';
 import { Card, SubHeader, AvisoErro } from '@/components/vm/ui';
 import { CampoEndereco } from '@/components/search/CampoEndereco';
@@ -11,21 +11,31 @@ import { paramsParaCriterios } from '@/lib/searchParams';
 import { novoId } from '@/data/motorista-store';
 import { criarSolicitacao, atualizarSolicitacao, obterSolicitacao, SOLICITACOES_NO_SERVIDOR } from '@/data/solicitacoes';
 import {
-  PASSOS_SOLICITACAO, ETAPAS_ENSINO, SENTIDOS, OBSERVACOES_MAX,
+  PASSOS_SOLICITACAO, ETAPAS_ENSINO, SENTIDOS, OBSERVACOES_MAX, ALUNOS_MIN, ALUNOS_MAX,
   validarPasso, primeiroPassoComProblema, rascunhoVazio, rascunhoDaBusca, rascunhoDaSolicitacao, precisaEntrarParaConfirmar,
   type PassoSolicitacao, type RascunhoSolicitacao,
 } from '@/lib/solicitacao';
 import { TURNO_LABEL, cn, nomeDestinoParaExibicao } from '@/lib/utils';
 import { ExigirFamilia } from '@/pages/familia/SolicitacoesPages';
 
-/* Rascunho da NOVA solicitação: sobrevive a voltar etapas, recarregar e ao login. */
+/*
+ * Rascunho da NOVA solicitação: sobrevive a voltar etapas, recarregar e ao
+ * login — inclusive quando o link de confirmação do e-mail abre OUTRA aba (por
+ * isso localStorage, não sessionStorage). Fica só neste aparelho, expira em
+ * 24 h e é apagado ao confirmar ou cancelar.
+ */
 const K_RASCUNHO = 'vanbora.solicitacao.rascunho.v1';
+const VALIDADE_RASCUNHO_MS = 24 * 60 * 60 * 1000;
 interface Guardado { passo: PassoSolicitacao; r: RascunhoSolicitacao }
 function lerRascunho(): Guardado | null {
-  try { const v = sessionStorage.getItem(K_RASCUNHO); return v ? (JSON.parse(v) as Guardado) : null; } catch { return null; }
+  try {
+    const v = JSON.parse(localStorage.getItem(K_RASCUNHO) || 'null') as (Guardado & { em?: number }) | null;
+    if (!v?.r || !v.em || Date.now() - v.em > VALIDADE_RASCUNHO_MS) { localStorage.removeItem(K_RASCUNHO); return null; }
+    return { passo: v.passo, r: { ...rascunhoVazio(v.r.chave), ...v.r } };
+  } catch { return null; }
 }
-function gravarRascunho(g: Guardado) { try { sessionStorage.setItem(K_RASCUNHO, JSON.stringify(g)); } catch { /* segue em memória */ } }
-function limparRascunho() { try { sessionStorage.removeItem(K_RASCUNHO); } catch { /* ignora */ } }
+function gravarRascunho(g: Guardado) { try { localStorage.setItem(K_RASCUNHO, JSON.stringify({ ...g, em: Date.now() })); } catch { /* segue em memória */ } }
+function limparRascunho() { try { localStorage.removeItem(K_RASCUNHO); } catch { /* ignora */ } }
 
 /** Nova solicitação: preencher NÃO exige conta; confirmar exige. */
 export function NovaSolicitacaoPage() {
@@ -171,7 +181,16 @@ function FormularioSolicitacao({ inicial, editandoId }: { inicial: Guardado; edi
             )}
 
             {passo === 'detalhes' && (
-              <Etapa tituloRef={titulo} titulo="Mais alguns detalhes" texto="Tudo opcional. Ajuda o motorista a entender o atendimento.">
+              <Etapa tituloRef={titulo} titulo="Quantos alunos e mais detalhes" texto="Irmãos que saem do mesmo endereço para a mesma escola entram na mesma solicitação.">
+                <p className="field-label" id="sol-alunos-rotulo">Quantos alunos vão usar o transporte?</p>
+                <div className="flex items-center gap-3" role="group" aria-labelledby="sol-alunos-rotulo">
+                  <button type="button" aria-label="Menos um aluno" disabled={r.quantidadeAlunos <= ALUNOS_MIN} onClick={() => mudar({ quantidadeAlunos: r.quantidadeAlunos - 1 })}
+                    className="grid h-12 w-12 place-items-center rounded-full bg-white text-navy-900 ring-1 ring-navy-200 disabled:opacity-40"><Minus className="h-5 w-5" /></button>
+                  <output aria-live="polite" className="min-w-[5.5rem] text-center text-lg font-bold text-navy-900">{r.quantidadeAlunos} {r.quantidadeAlunos === 1 ? 'aluno' : 'alunos'}</output>
+                  <button type="button" aria-label="Mais um aluno" disabled={r.quantidadeAlunos >= ALUNOS_MAX} onClick={() => mudar({ quantidadeAlunos: r.quantidadeAlunos + 1 })}
+                    className="grid h-12 w-12 place-items-center rounded-full bg-white text-navy-900 ring-1 ring-navy-200 disabled:opacity-40"><Plus className="h-5 w-5" /></button>
+                </div>
+                <p className="mt-3 text-sm font-semibold text-navy-600">Opcional</p>
                 <label className="field-label" htmlFor="sol-etapa">Etapa escolar</label>
                 <select id="sol-etapa" className="field-input text-base" value={r.etapa} onChange={(e) => mudar({ etapa: e.target.value as RascunhoSolicitacao['etapa'] })}>
                   <option value="">Prefiro não informar</option>
@@ -188,7 +207,7 @@ function FormularioSolicitacao({ inicial, editandoId }: { inicial: Guardado; edi
                 </label>
                 <label className="field-label mt-3" htmlFor="sol-obs">Observações</label>
                 <textarea id="sol-obs" rows={2} maxLength={OBSERVACOES_MAX} className="field-input text-base" value={r.observacoes}
-                  placeholder="Ex.: dois irmãos na mesma escola" onChange={(e) => mudar({ observacoes: e.target.value })} />
+                  placeholder="Ex.: irmãos estudam em períodos diferentes" onChange={(e) => mudar({ observacoes: e.target.value })} />
                 <p className="mt-1 text-xs text-navy-500">Não escreva documentos nem informações de saúde.</p>
               </Etapa>
             )}
@@ -199,6 +218,7 @@ function FormularioSolicitacao({ inicial, editandoId }: { inicial: Guardado; edi
                   <Linha rotulo="Embarque" valor={r.endereco.texto || '—'} onAlterar={() => irPara('endereco')} />
                   <Linha rotulo="Escola" valor={nomeDestino(r.destinoId)} onAlterar={() => irPara('escola')} />
                   <Linha rotulo="Horários" valor={[r.sentido !== 'volta' && `ida até ${r.horarioIda || '—'}`, r.sentido !== 'ida' && `volta às ${r.horarioVolta || '—'}`].filter(Boolean).join(' · ')} onAlterar={() => irPara('escola')} />
+                  <Linha rotulo="Alunos" valor={`${r.quantidadeAlunos} ${r.quantidadeAlunos === 1 ? 'aluno' : 'alunos'}`} onAlterar={() => irPara('detalhes')} />
                   <Linha rotulo="Detalhes" valor={[ETAPAS_ENSINO.find((e) => e.id === r.etapa)?.nome, r.turno && TURNO_LABEL[r.turno], r.acessibilidade && 'veículo acessível'].filter(Boolean).join(' · ') || 'Nenhum'} onAlterar={() => irPara('detalhes')} />
                 </dl>
                 {!editandoId && <p className="mt-2 text-sm text-navy-600">Ao confirmar, sua solicitação fica ativa e guardada na sua conta.{precisaEntrarParaConfirmar(SOLICITACOES_NO_SERVIDOR, !!session) ? ' Vamos pedir para você entrar na sua conta.' : ''}</p>}

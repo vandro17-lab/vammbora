@@ -87,6 +87,15 @@ describe('criar solicitação', () => {
     await expect(criarSolicitacao(rascunho())).rejects.toThrow(/Entre na sua conta/);
     expect(db.upserts).toHaveLength(0);
   });
+  it('grava a cidade do ponto confirmado e o número de alunos', async () => {
+    await criarSolicitacao({ ...rascunho(), quantidadeAlunos: 2 });
+    expect(db.upserts[0].linha).toMatchObject({ city_id: 'aracatuba-sp', quantidade_alunos: 2 });
+  });
+  it('ponto fora das cidades atendidas não chega ao servidor', async () => {
+    const fora = { ...rascunho(), endereco: { texto: 'Av. Paulista, 1000', coord: { lat: -23.56, lng: -46.65 }, precisao: 'ajustado' as const, validando: false } };
+    await expect(criarSolicitacao(fora)).rejects.toThrow(/fora das cidades atendidas/);
+    expect(db.upserts).toHaveLength(0);
+  });
   it('rascunho incompleto não chega ao servidor', async () => {
     await expect(criarSolicitacao({ ...rascunho(), destinoId: '' })).rejects.toThrow(/escola/);
     expect(db.upserts).toHaveLength(0);

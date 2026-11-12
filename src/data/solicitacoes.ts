@@ -1,7 +1,6 @@
 import { supabase, USE_SUPABASE } from '@/lib/supabase';
-import { CIDADE_PADRAO } from '@/data/cidades';
 import {
-  primeiroPassoComProblema, solicitacaoDoBanco, solicitacaoParaBanco,
+  primeiroPassoComProblema, solicitacaoDoBanco, solicitacaoParaBanco, cidadeDaSolicitacao,
   type LinhaSolicitacao, type MotivoEncerramento, type RascunhoSolicitacao, type Solicitacao, type StatusSolicitacao,
 } from '@/lib/solicitacao';
 
@@ -12,7 +11,7 @@ import {
  * demonstração), guarda no navegador.
  */
 const K_LOCAL = 'vanbora.demo.solicitacoes';
-const COLUNAS = 'id,chave_envio,city_id,destination_id,origem_endereco,origem_lat,origem_lng,sentido,horario_ida_min,horario_volta_min,turno,etapa_ensino,precisa_acessibilidade,observacoes,status,motivo_encerramento,created_at,updated_at';
+const COLUNAS = 'id,chave_envio,city_id,destination_id,origem_endereco,origem_lat,origem_lng,sentido,horario_ida_min,horario_volta_min,turno,etapa_ensino,quantidade_alunos,precisa_acessibilidade,observacoes,status,motivo_encerramento,created_at,updated_at';
 
 export const SOLICITACOES_NO_SERVIDOR = USE_SUPABASE && !!supabase;
 
@@ -59,9 +58,13 @@ export async function obterSolicitacao(id: string): Promise<Solicitacao | null> 
 }
 
 /* ------------------------------- escritas ------------------------------- */
-function conferir(r: RascunhoSolicitacao) {
+/** Confere o rascunho e devolve a cidade identificada pelo ponto confirmado. */
+function conferir(r: RascunhoSolicitacao): string {
   const p = primeiroPassoComProblema(r);
   if (p) throw new Error(p.erro);
+  const cidade = cidadeDaSolicitacao(r);
+  if (!cidade) throw new Error('Esse endereço fica fora das cidades atendidas. Confira o ponto no mapa.');
+  return cidade;
 }
 
 /**
@@ -69,8 +72,7 @@ function conferir(r: RascunhoSolicitacao) {
  * repetido (mesma `chave`) devolve a solicitação já criada, sem duplicar.
  */
 export async function criarSolicitacao(r: RascunhoSolicitacao): Promise<Solicitacao> {
-  conferir(r);
-  const linha = solicitacaoParaBanco(r, CIDADE_PADRAO.id);
+  const linha = solicitacaoParaBanco(r, conferir(r));
   if (SOLICITACOES_NO_SERVIDOR && supabase) {
     const { data: sessao } = await supabase.auth.getSession();
     const dono = sessao.session?.user?.id;
@@ -92,7 +94,7 @@ export async function criarSolicitacao(r: RascunhoSolicitacao): Promise<Solicita
     lat: linha.origem_lat as number, lng: linha.origem_lng as number, sentido: r.sentido,
     horarioIdaMin: linha.horario_ida_min, horarioVoltaMin: linha.horario_volta_min,
     turno: linha.turno as Solicitacao['turno'], etapa: linha.etapa_ensino as Solicitacao['etapa'],
-    acessibilidade: linha.precisa_acessibilidade, observacoes: linha.observacoes,
+    quantidadeAlunos: linha.quantidade_alunos, acessibilidade: linha.precisa_acessibilidade, observacoes: linha.observacoes,
     status: 'ativa', motivoEncerramento: null, criadaEm: agora, atualizadaEm: agora,
   };
   gravarLocal([nova, ...lista]);
@@ -101,8 +103,7 @@ export async function criarSolicitacao(r: RascunhoSolicitacao): Promise<Solicita
 
 /** Edita os dados (a RLS só deixa alterar as da própria conta). */
 export async function atualizarSolicitacao(id: string, r: RascunhoSolicitacao): Promise<Solicitacao> {
-  conferir(r);
-  const { chave_envio: _chave, ...campos } = solicitacaoParaBanco(r, CIDADE_PADRAO.id);
+  const { chave_envio: _chave, ...campos } = solicitacaoParaBanco(r, conferir(r));
   void _chave;
   return gravar(id, campos);
 }
@@ -131,6 +132,7 @@ async function gravar(id: string, campos: Record<string, unknown>): Promise<Soli
       destinoId: c.destination_id as string, endereco: c.origem_endereco as string, lat: c.origem_lat as number, lng: c.origem_lng as number,
       sentido: c.sentido as Solicitacao['sentido'], horarioIdaMin: c.horario_ida_min as number | null, horarioVoltaMin: c.horario_volta_min as number | null,
       turno: c.turno as Solicitacao['turno'], etapa: c.etapa_ensino as Solicitacao['etapa'],
+      cidadeId: c.city_id as string, quantidadeAlunos: c.quantidade_alunos as number,
       acessibilidade: !!c.precisa_acessibilidade, observacoes: c.observacoes as string | null,
     } : {}),
     ...(c.status !== undefined ? { status: c.status as StatusSolicitacao, motivoEncerramento: (c.motivo_encerramento as MotivoEncerramento | null) ?? null } : {}),

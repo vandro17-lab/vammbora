@@ -22,6 +22,8 @@ export interface Cidade {
   id: string;
   nome: string;
   uf: string;
+  /** Área atendida (retângulo). Confere se um ponto confirmado é desta cidade. */
+  area?: { latMin: number; latMax: number; lngMin: number; lngMax: number };
 }
 
 export type RedeEnsino = 'estadual' | 'municipal' | 'privada' | 'federal';

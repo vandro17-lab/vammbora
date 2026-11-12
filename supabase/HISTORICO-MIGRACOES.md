@@ -79,8 +79,12 @@ registrada, conforme a regra acima.
 - **Acesso:** RLS ligada; `anon` sem nenhum privilégio; `authenticated` só `SELECT`, `INSERT` e
   `UPDATE` das **próprias** linhas (`owner_id = auth.uid()`); sem `DELETE`/`TRUNCATE`. Nenhuma view
   ou RPC expõe a tabela.
-- **Gatilho `proteger_solicitacao`:** criação sempre `ativa`; até 10 abertas por conta;
-  `encerrada` é definitiva; `owner_id`, `chave_envio` e `created_at` não mudam.
+- **Gatilho `proteger_solicitacao`:** criação sempre `ativa`; até 10 abertas por conta (o reenvio
+  do mesmo pedido não conta); `encerrada` é definitiva; `owner_id`, `chave_envio` e `created_at` não
+  mudam; o ponto confirmado precisa estar na área da cidade da solicitação.
+- **Cidade:** `cities` ganha a área atendida (`area_lat_min/max`, `area_lng_min/max`, opcionais); a
+  migração preenche `aracatuba-sp`. O app identifica a cidade pelo ponto confirmado.
+- **Alunos:** `quantidade_alunos` de 1 a 8 (irmãos com a mesma origem e escola).
 - **Cliques repetidos:** `unique (owner_id, chave_envio)`; o app usa `upsert ... ignoreDuplicates`.
 - **Radar (Etapa 3B):** colunas geradas `origem_lat_aprox`/`origem_lng_aprox` (grade de ~500 m) e
   índice das solicitações ativas por escola e sentido. O endereço exato nunca deve sair da tabela.

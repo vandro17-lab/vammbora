@@ -14,9 +14,30 @@
 -- solicitações; o radar futuro deverá ler por uma função própria, com dados
 -- minimizados (nunca o endereço nem a coordenada exata).
 --
--- NÃO faz: propostas, mensagens, notificações, radar, alteração de rotas, do
--- algoritmo de encaixe ou de qualquer tabela existente.
+-- NÃO faz: propostas, mensagens, notificações, radar, alteração de rotas ou do
+-- algoritmo de encaixe. Única mudança em tabela existente: `cities` ganha a
+-- ÁREA ATENDIDA (colunas novas, opcionais), usada para conferir que o ponto
+-- confirmado pela família fica na cidade da solicitação.
 -- ============================================================================
+
+-- Área atendida de cada cidade (retângulo). Sem área, a cidade não é conferida.
+alter table public.cities
+  add column if not exists area_lat_min double precision,
+  add column if not exists area_lat_max double precision,
+  add column if not exists area_lng_min double precision,
+  add column if not exists area_lng_max double precision;
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'cities_area_chk') then
+    alter table public.cities add constraint cities_area_chk check (
+      (area_lat_min is null and area_lat_max is null and area_lng_min is null and area_lng_max is null)
+      or (area_lat_min < area_lat_max and area_lng_min < area_lng_max));
+  end if;
+end $$;
+-- Mesma região que o app usa para localizar endereços (src/data/cidades.ts).
+update public.cities
+   set area_lat_min = -21.7, area_lat_max = -20.7, area_lng_min = -51.0, area_lng_max = -49.9
+ where id = 'aracatuba-sp' and area_lat_min is null;
 
 create table if not exists public.transport_requests (
   id                     uuid primary key default gen_random_uuid(),
@@ -39,6 +60,8 @@ create table if not exists public.transport_requests (
   horario_volta_min      int,
   turno                  public.turno,
   etapa_ensino           text,
+  -- Alunos atendidos por esta solicitação (irmãos: mesma origem e escola).
+  quantidade_alunos      smallint not null default 1,
   precisa_acessibilidade boolean not null default false,
   observacoes            text,
   status                 text not null default 'ativa',
@@ -58,6 +81,7 @@ create table if not exists public.transport_requests (
     and (sentido <> 'ida' or horario_volta_min is null) and (sentido <> 'volta' or horario_ida_min is null)),
   constraint transport_requests_etapa_chk check (etapa_ensino is null or etapa_ensino in
     ('infantil', 'fundamental_1', 'fundamental_2', 'medio', 'universitario')),
+  constraint transport_requests_alunos_chk check (quantidade_alunos between 1 and 8),
   constraint transport_requests_obs_chk check (observacoes is null or char_length(observacoes) <= 500),
   constraint transport_requests_status_chk check (status in ('ativa', 'pausada', 'encerrada')),
   constraint transport_requests_motivo_chk check (motivo_encerramento is null or motivo_encerramento in
@@ -82,8 +106,26 @@ set search_path = public
 as $$
 declare
   v_abertas int;
+  v_area public.cities%rowtype;
 begin
+  -- A coordenada confirmada precisa ficar na área atendida da cidade informada.
+  if tg_op = 'INSERT' or new.city_id is distinct from old.city_id
+     or new.origem_lat is distinct from old.origem_lat or new.origem_lng is distinct from old.origem_lng then
+    select * into v_area from public.cities where id = new.city_id;
+    if v_area.area_lat_min is not null and not (
+         new.origem_lat between v_area.area_lat_min and v_area.area_lat_max
+         and new.origem_lng between v_area.area_lng_min and v_area.area_lng_max) then
+      raise exception 'O endereço confirmado fica fora da cidade da solicitação. Confira o ponto no mapa.' using errcode = 'P0001';
+    end if;
+  end if;
+
   if tg_op = 'INSERT' then
+    -- Reenvio do MESMO pedido (clique duplo, rede lenta): o ON CONFLICT DO
+    -- NOTHING ignora; não pode esbarrar no limite abaixo.
+    if exists (select 1 from public.transport_requests
+                where owner_id = new.owner_id and chave_envio = new.chave_envio) then
+      return new;
+    end if;
     -- Nasce ativa; encerramento só depois. Limite de solicitações abertas por
     -- conta (proteção contra abuso e cliques em sequência).
     new.status := 'ativa';
@@ -159,6 +201,11 @@ begin
      or has_table_privilege('anon', 'public.transport_requests', 'INSERT')
      or has_table_privilege('anon', 'public.transport_requests', 'UPDATE') then
     raise exception 'anon com acesso a solicitações: abortando';
+  end if;
+  -- Nenhuma view expõe solicitações (o endereço exato é privado).
+  if exists (select 1 from information_schema.view_table_usage
+              where table_schema = 'public' and table_name = 'transport_requests') then
+    raise exception 'Há view sobre transport_requests: abortando';
   end if;
   if has_table_privilege('authenticated', 'public.transport_requests', 'DELETE')
      or has_table_privilege('authenticated', 'public.transport_requests', 'TRUNCATE') then
