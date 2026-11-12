@@ -44,23 +44,23 @@ SQL -f "$RAIZ/tests/local/20_perfil_motorista_dados.sql" >/dev/null
 echo "· cenário carregado"
 
 DIGITAL="select string_agg(t || '=' || n || ':' || h, ' ') from (
-  select 'drivers' t, count(*) n, md5(coalesce(string_agg(row(d.*)::text, '|' order by id), '')) h from public.drivers d
-  union all select 'driver_destinations', count(*), md5(coalesce(string_agg(row(x.*)::text, '|' order by driver_id, destination_id), '')) from public.driver_destinations x
-  union all select 'vehicles', count(*), md5(coalesce(string_agg(row(v.*)::text, '|' order by id), '')) from public.vehicles v
-  union all select 'routes', count(*), md5(coalesce(string_agg(row(r.*)::text, '|' order by id), '')) from public.routes r
-  union all select 'route_stops', count(*), md5(coalesce(string_agg(row(s.*)::text, '|' order by id), '')) from public.route_stops s
-  union all select 'route_passengers', count(*), md5(coalesce(string_agg(row(p.*)::text, '|' order by id), '')) from public.route_passengers p
+  select 'drivers' t, count(*) n, md5(coalesce(string_agg((to_jsonb(d) - 'contato_whatsapp_ativo')::text, '|' order by id), '')) h from public.drivers d
+  union all select 'driver_destinations', count(*), md5(coalesce(string_agg(to_jsonb(x)::text, '|' order by driver_id, destination_id), '')) from public.driver_destinations x
+  union all select 'vehicles', count(*), md5(coalesce(string_agg(to_jsonb(v)::text, '|' order by id), '')) from public.vehicles v
+  union all select 'routes', count(*), md5(coalesce(string_agg((to_jsonb(r) - 'oferta_pausada')::text, '|' order by id), '')) from public.routes r
+  union all select 'route_stops', count(*), md5(coalesce(string_agg(to_jsonb(s)::text, '|' order by id), '')) from public.route_stops s
+  union all select 'route_passengers', count(*), md5(coalesce(string_agg(to_jsonb(p)::text, '|' order by id), '')) from public.route_passengers p
 ) z"
 # Sem drivers (o teste cria perfis reais): só o que NÃO pode mudar.
 INTOCAVEL="select string_agg(t || '=' || n || ':' || h, ' ') from (
-  select 'drivers_demo' t, count(*) n, md5(coalesce(string_agg(row(d.*)::text, '|' order by id), '')) h from public.drivers d where is_demo
-  union all select 'driver_destinations', count(*), md5(coalesce(string_agg(row(x.*)::text, '|' order by driver_id, destination_id), '')) from public.driver_destinations x
-  union all select 'vehicles', count(*), md5(coalesce(string_agg(row(v.*)::text, '|' order by id), '')) from public.vehicles v
-  union all select 'routes', count(*), md5(coalesce(string_agg(row(r.*)::text, '|' order by id), '')) from public.routes r
-  union all select 'route_stops', count(*), md5(coalesce(string_agg(row(s.*)::text, '|' order by id), '')) from public.route_stops s
-  union all select 'route_passengers', count(*), md5(coalesce(string_agg(row(p.*)::text, '|' order by id), '')) from public.route_passengers p
+  select 'drivers_demo' t, count(*) n, md5(coalesce(string_agg((to_jsonb(d) - 'contato_whatsapp_ativo')::text, '|' order by id), '')) h from public.drivers d where is_demo
+  union all select 'driver_destinations', count(*), md5(coalesce(string_agg(to_jsonb(x)::text, '|' order by driver_id, destination_id), '')) from public.driver_destinations x
+  union all select 'vehicles', count(*), md5(coalesce(string_agg(to_jsonb(v)::text, '|' order by id), '')) from public.vehicles v
+  union all select 'routes', count(*), md5(coalesce(string_agg((to_jsonb(r) - 'oferta_pausada')::text, '|' order by id), '')) from public.routes r where r.id <> 'aaaaaaaa-1111-4000-8000-000000000001'
+  union all select 'route_stops', count(*), md5(coalesce(string_agg(to_jsonb(s)::text, '|' order by id), '')) from public.route_stops s where s.route_id <> 'aaaaaaaa-1111-4000-8000-000000000001'
+  union all select 'route_passengers', count(*), md5(coalesce(string_agg(to_jsonb(p)::text, '|' order by id), '')) from public.route_passengers p where p.route_id <> 'aaaaaaaa-1111-4000-8000-000000000001'
 ) z"
-VITRINE="begin; set local role anon; select count(*) || ':' || md5(coalesce(string_agg(row(l.*)::text, '|' order by id), '')) from public.public_listings l; rollback;"
+VITRINE="begin; set local role anon; select count(*) || ':' || md5(coalesce(string_agg((to_jsonb(l) - 'contato_whatsapp_ativo')::text, '|' order by id), '')) from public.public_listings l; rollback;"
 
 ANTES="$(SQL -At -c "$DIGITAL")"
 INTOCAVEL_ANTES="$(SQL -At -c "$INTOCAVEL")"
@@ -71,7 +71,8 @@ SQL -1 -f "$NOVA" >/dev/null; echo "· $(basename "$NOVA") (2ª vez: idempotênc
 
 [ "$(SQL -At -c "$DIGITAL")" = "$ANTES" ] || falhar "a migração alterou dados existentes"
 [ "$(SQL -At -c "$VITRINE" | grep ':')" = "$VITRINE_ANTES" ] || falhar "a vitrine mudou com a migração"
-echo "· nenhum dado existente mudou; vitrine idêntica (${VITRINE_ANTES%%:*} linha(s))"
+[ "$(SQL -At -c "select (select count(*) from public.routes where oferta_pausada) + (select count(*) from public.drivers where contato_whatsapp_ativo)")" = "0" ] || falhar "colunas novas deveriam nascer false"
+echo "· nenhum dado existente mudou (colunas novas nascem false); vitrine idêntica (${VITRINE_ANTES%%:*} linha(s))"
 
 if ! SAIDA="$(SQL -f "$RAIZ/tests/perfil_motorista.sql" 2>&1)"; then
   echo "$SAIDA" | grep -E 'OK T|FALHA|ERROR' >&2
@@ -80,6 +81,6 @@ fi
 echo "$SAIDA" | grep -E '^OK'
 
 [ "$(SQL -At -c "$INTOCAVEL")" = "$INTOCAVEL_ANTES" ] || falhar "vans, rotas, paradas, alunos ou demos mudaram"
-echo "· vans, rotas, paradas, alunos e motoristas demo intactos após os testes"
+echo "· vans, demais rotas, paradas, alunos e motoristas demo intactos após os testes"
 SQL -f "$RAIZ/tests/public_listings_somente_leitura.sql" >/dev/null && echo "· vitrine segue somente leitura"
 echo "OK — perfil real do motorista aprovado no banco local."

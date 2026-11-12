@@ -190,8 +190,10 @@ export async function listarRotas(): Promise<Rota[]> {
       .eq('is_demo', false)
       .order('updated_at', { ascending: false });
     const faltaColuna = (e: unknown) => !!e && ['42703', '42P01', 'PGRST200', 'PGRST204'].includes(String((e as { code?: string }).code));
-    // Abertura da escola (migração 0016): lida quando existir; sem ela, fica "não informada".
-    let { data, error } = await ler(SELECT_ROTA_COM_ABERTURA);
+    // Pausa da oferta (migração do perfil 2C) e abertura da escola (0016): lidas
+    // quando existirem; sem elas, "não pausada" e "não informada".
+    let { data, error } = await ler(SELECT_ROTA_COM_PAUSA);
+    if (faltaColuna(error)) ({ data, error } = await ler(SELECT_ROTA_COM_ABERTURA));
     if (faltaColuna(error)) ({ data, error } = await ler(SELECT_ROTA));
     // Banco ainda sem a migração da etapa 1 (coluna/tabela nova inexistente):
     // lê só o que já existia. Os campos novos ficam "não informados".
@@ -228,6 +230,9 @@ const SELECT_ROTA =
 const SELECT_ROTA_COM_ABERTURA = SELECT_ROTA
   .replace('group_service_min,gate_custom)', 'group_service_min,gate_custom,opening_time_min)')
   .replace('release_time_min,group_service_min)', 'release_time_min,group_service_min,opening_time_min)');
+
+/** + pausa da oferta da rota (migração do perfil profissional, Etapa 2C). */
+const SELECT_ROTA_COM_PAUSA = SELECT_ROTA_COM_ABERTURA.replace('status,is_published,', 'status,is_published,oferta_pausada,');
 
 const minutoDoDia = (v: number | null | undefined): number | null =>
   typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1439 ? Math.round(v) : null;
@@ -385,17 +390,25 @@ export async function listarEscolasGeraisDoMotorista(): Promise<string[]> {
 }
 
 /**
- * Publica/despublica uma rota na busca pública (ação explícita do motorista).
- * Atualização direta (RLS: o dono pode alterar sua própria rota) — NÃO passa
- * pelo RPC de salvamento, para não depender dele. No modo demo, grava local.
+ * PAUSA ou RETOMA a oferta de uma rota na busca (escolha do motorista). Não
+ * muda o status (concluída continua concluída), nem paradas ou passageiros —
+ * por isso é uma atualização direta (RLS: só o dono), sem passar pela RPC de
+ * salvamento. No modo local, grava no navegador.
  */
-export async function publicarRota(id: string, publicar: boolean): Promise<void> {
+export async function pausarOfertaRota(id: string, pausada: boolean): Promise<void> {
   if (USAR_BANCO_MOTORISTA && supabase) {
-    const { error } = await supabase.from('routes').update({ is_published: publicar }).eq('id', id);
-    if (error) throw new Error(error.message);
+    const ownerId = await usuarioLogadoId();
+    if (!ownerId) throw new Error('Faça login para alterar a rota.');
+    const { data, error } = await supabase.from('routes').update({ oferta_pausada: pausada })
+      .eq('id', id).eq('owner_id', ownerId).select('id').maybeSingle();
+    if (error) {
+      if (['42703', 'PGRST204'].includes(String(error.code))) throw new Error('A pausa de rotas ainda não foi liberada no servidor. Tente de novo mais tarde.');
+      throw erroDoBanco(error, 'rota');
+    }
+    if (!data) throw new Error('Rota não encontrada na sua conta.');
     return;
   }
-  const lista = lsGet<Rota[]>(K_ROTAS, []).map((r) => (r.id === id ? { ...r, isPublished: publicar } : r));
+  const lista = lsGet<Rota[]>(K_ROTAS, []).map((r) => (r.id === id ? { ...r, ofertaPausada: pausada } : r));
   lsSet(K_ROTAS, lista);
 }
 
@@ -429,6 +442,7 @@ interface LinhaRota {
   vehicle_id: string | null; monitor: boolean; monitor_ocupa_lugar: boolean; reserved_seats: number;
   last_dropoff_min: number | null; early_leave_limit_min: number | null; status: string; updated_at: string;
   is_published?: boolean | null;
+  oferta_pausada?: boolean | null;
   habitual_departure_min?: number | null; turno_confirmed?: boolean | null; availability_reviewed?: boolean | null;
   route_stops: LinhaStop[]; route_passengers: LinhaPax[]; route_school_availability?: LinhaEscolaDisponivel[] | null;
 }
@@ -458,6 +472,7 @@ export function mapRotaDoBanco(r: unknown): Rota {
     })),
     status: (x.status as Rota['status']) ?? 'rascunho',
     isPublished: !!x.is_published,
+    ofertaPausada: !!x.oferta_pausada,
     atualizadoEm: x.updated_at,
     paradas: (x.route_stops ?? [])
       .map((s) => ({

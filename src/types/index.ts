@@ -107,6 +107,9 @@ export interface Motorista {
   documentacaoVerificada: boolean;
   /** Telefone em formato internacional sem símbolos, ex: "5518999999999". */
   whatsapp: string;
+  /** Motorista REAL autorizou o botão "Conversar no WhatsApp" (o número nunca
+   *  vem da vitrine: só pela RPC, e só com esta autorização). */
+  contatoWhatsapp?: boolean;
   /** Marca o registro como dado de demonstração (Ideathon). */
   demo: boolean;
 }

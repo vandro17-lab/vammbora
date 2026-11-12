@@ -26,10 +26,10 @@ vi.mock('@/data/motorista-store', () => ({ listarRotas: async () => [], listarVe
 import { obterMeuPerfil, salvarMeuPerfil, publicarMeuPerfil, erroDoPerfil } from './perfil-motorista';
 
 const linha = {
-  id: 'd1', slug: 'tio-ze', nome: 'Tio Zé', descricao: null, cidade_id: 'aracatuba-sp', whatsapp_contato: null,
-  anuncio_ativo: false, suspenso: false, rota_concluida_com_van: true, visivel: false,
+  id: 'd1', slug: 'tio-ze', nome: 'Tio Zé', descricao: null, cidade_id: 'aracatuba-sp', whatsapp: '5518999990000',
+  contato_whatsapp_ativo: false, anuncio_ativo: true, suspenso: false, rotas_disponiveis: 0, visivel: true,
 };
-const rascunho = { nome: '  Tio Zé  ', cidadeId: 'aracatuba-sp', apresentacao: '  ', aceitaWhatsapp: false, whatsapp: '(18) 99999-0000' };
+const rascunho = { nome: '  Tio Zé  ', cidadeId: 'aracatuba-sp', apresentacao: '  ', whatsapp: '(18) 99999-0000', contatoDireto: false };
 
 beforeEach(() => { srv.chamadas = []; srv.resposta = {}; });
 
@@ -42,25 +42,27 @@ describe('perfil do motorista — acesso ao servidor', () => {
   it('perfil existente é mapeado com a situação vinda do servidor', async () => {
     srv.resposta.meu_perfil_motorista = { data: linha, error: null };
     const p = await obterMeuPerfil();
-    expect(p).toMatchObject({ slug: 'tio-ze', nome: 'Tio Zé', temPerfil: true, rotaConcluidaComVan: true, visivel: false, local: false });
+    // publicado e visível mesmo SEM rota disponível; contato direto desligado
+    expect(p).toMatchObject({ slug: 'tio-ze', nome: 'Tio Zé', temPerfil: true, rotasDisponiveis: 0, visivel: true, contatoWhatsappAtivo: false, local: false });
   });
 
-  it('salvar envia SÓ os campos do perfil (nunca id, dono, selo ou nota)', async () => {
+  it('salvar envia SÓ os campos do perfil (nunca id, dono, selo ou nota); WhatsApp sempre, contato DESLIGADO por padrão', async () => {
     srv.resposta.salvar_perfil_motorista = { data: linha, error: null };
     srv.resposta.meu_perfil_motorista = { data: linha, error: null };
     await salvarMeuPerfil(rascunho);
     const chamada = srv.chamadas.find((c) => c.fn === 'salvar_perfil_motorista');
-    expect(chamada?.args).toEqual({ p_nome: 'Tio Zé', p_descricao: null, p_city_id: 'aracatuba-sp', p_whatsapp_contato: null });
+    expect(chamada?.args).toEqual({ p_nome: 'Tio Zé', p_descricao: null, p_city_id: 'aracatuba-sp', p_whatsapp: '5518999990000', p_contato_whatsapp_ativo: false });
   });
 
-  it('WhatsApp só vai quando o motorista aceita contato, já normalizado', async () => {
+  it('contato direto é uma escolha separada do WhatsApp obrigatório', async () => {
     srv.resposta.salvar_perfil_motorista = { data: linha, error: null };
-    await salvarMeuPerfil({ ...rascunho, aceitaWhatsapp: true });
-    expect((srv.chamadas[0].args as Record<string, unknown>).p_whatsapp_contato).toBe('5518999990000');
+    await salvarMeuPerfil({ ...rascunho, contatoDireto: true });
+    expect(srv.chamadas[0].args).toMatchObject({ p_whatsapp: '5518999990000', p_contato_whatsapp_ativo: true });
   });
 
-  it('WhatsApp inválido nem chega ao servidor', async () => {
-    await expect(salvarMeuPerfil({ ...rascunho, aceitaWhatsapp: true, whatsapp: '123' })).rejects.toThrow(/Confira o WhatsApp/);
+  it('sem WhatsApp, ou inválido, nem chega ao servidor', async () => {
+    await expect(salvarMeuPerfil({ ...rascunho, whatsapp: '' })).rejects.toThrow(/Confira o WhatsApp/);
+    await expect(salvarMeuPerfil({ ...rascunho, whatsapp: '123' })).rejects.toThrow(/Confira o WhatsApp/);
     expect(srv.chamadas).toHaveLength(0);
   });
 

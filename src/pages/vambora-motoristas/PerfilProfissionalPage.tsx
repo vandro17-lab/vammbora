@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Check, Circle, Loader2, MapPin, MessageCircle, Pencil, Eye, EyeOff, UserRound, ExternalLink, Info } from 'lucide-react';
+import { Check, Circle, Loader2, MapPin, MessageCircle, Pencil, Eye, EyeOff, UserRound, ExternalLink, Info, Route as RouteIcon, Lock } from 'lucide-react';
 import { Avatar } from '@/components/brand/Avatar';
 import { VMShell } from '@/components/vm/VMShell';
 import { Card, SubHeader, AvisoErro, EstadoVazio } from '@/components/vm/ui';
@@ -11,7 +11,7 @@ import { CIDADES, CIDADE_PADRAO } from '@/data/cidades';
 import {
   ETAPAS_PERFIL, EXEMPLO_APRESENTACAO, APRESENTACAO_MAX, NOME_MAX,
   validarEtapa, primeiraEtapaComProblema, rascunhoInicial, mascararWhatsapp,
-  itensDePublicacao, textoDaSituacao, type EtapaPerfil, type RascunhoPerfil,
+  itensDePublicacao, textoDaSituacao, textoDasRotas, type EtapaPerfil, type RascunhoPerfil,
 } from '@/lib/perfil-motorista';
 import { cn } from '@/lib/utils';
 
@@ -41,7 +41,7 @@ export function PerfilProfissionalPage() {
     }
   }
 
-  const situacao = perfil ?? { temPerfil: false, anuncioAtivo: false, rotaConcluidaComVan: false, suspenso: false, visivel: false };
+  const situacao = perfil ?? { temPerfil: false, anuncioAtivo: false, rotasDisponiveis: 0, suspenso: false, visivel: false };
 
   return (
     <VMShell>
@@ -83,7 +83,6 @@ export function PerfilProfissionalPage() {
                       ? <span className="grid h-6 w-6 place-items-center rounded-full bg-mint-500 text-white"><Check className="h-4 w-4" /></span>
                       : <Circle className="h-6 w-6 text-navy-300" />}
                     <span className={i.feito ? 'text-navy-800' : 'text-navy-600'}>{i.texto}</span>
-                    {i.id === 'rota' && !i.feito && <Link to="/app/rotas" className="ml-auto text-sm font-semibold text-mint-700 underline">Minhas rotas</Link>}
                   </li>
                 ))}
               </ul>
@@ -91,6 +90,14 @@ export function PerfilProfissionalPage() {
                 {textoDaSituacao(situacao)}
               </p>
               {perfil.local && <p className="mt-2 text-xs text-navy-500">Modo demonstração: o perfil fica só neste aparelho e não aparece na vitrine.</p>}
+            </Card>
+
+            <Card className="flex items-start gap-3">
+              <RouteIcon className="mt-0.5 h-5 w-5 shrink-0 text-navy-400" />
+              <div className="min-w-0 flex-1">
+                <p className="text-[15px] text-navy-700" data-testid="rotas-oferecidas">{textoDasRotas(perfil.rotasDisponiveis)}</p>
+                <Link to="/app/rotas" className="mt-1 inline-block text-sm font-semibold text-mint-700 underline">Minhas rotas</Link>
+              </div>
             </Card>
 
             {erroPub && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm font-medium text-red-700">{erroPub}</p>}
@@ -129,7 +136,7 @@ export function PerfilProfissionalPage() {
 }
 
 /* ================== Criar / editar perfil — formulário em etapas ================== */
-const K_RASCUNHO = 'vanbora.perfil.rascunho';
+const K_RASCUNHO = 'vanbora.perfil.rascunho.v2';
 function lerRascunho(chave: string): RascunhoPerfil | null {
   try {
     const raw = sessionStorage.getItem(K_RASCUNHO);
@@ -166,12 +173,12 @@ export function EditarPerfilProfissionalPage() {
 
   const indice = ETAPAS_PERFIL.findIndex((e) => e.id === etapa);
   const ultima = indice === ETAPAS_PERFIL.length - 1;
-  const mudar = (m: Partial<RascunhoPerfil>) => setR((atual) => {
+  const mudar = (m: Partial<RascunhoPerfil>) => { setErro(null); setR((atual) => {
     if (!atual) return atual;
     const novo = { ...atual, ...m };
     gravarRascunho(chave, novo);
     return novo;
-  });
+  }); };
   const irPara = (e: EtapaPerfil) => { setErro(null); setEtapa(e); };
   const voltar = () => (indice > 0 ? irPara(ETAPAS_PERFIL[indice - 1].id) : navigate('/app/perfil'));
 
@@ -244,21 +251,20 @@ export function EditarPerfilProfissionalPage() {
               )}
 
               {etapa === 'contato' && (
-                <Etapa tituloRef={titulo} titulo="As famílias podem chamar você no WhatsApp?" texto="Você escolhe. Dá para mudar quando quiser.">
-                  <div className="grid grid-cols-2 gap-2.5" role="radiogroup" aria-label="Aceitar contato pelo WhatsApp">
-                    <Opcao ativa={r.aceitaWhatsapp} onClick={() => mudar({ aceitaWhatsapp: true })}>Sim, aceito</Opcao>
-                    <Opcao ativa={!r.aceitaWhatsapp} onClick={() => mudar({ aceitaWhatsapp: false })}>Agora não</Opcao>
+                <Etapa tituloRef={titulo} titulo="Seu WhatsApp" texto="Obrigatório. Fica guardado e não aparece escrito no perfil.">
+                  <label className="field-label" htmlFor="perfil-whatsapp">WhatsApp com DDD</label>
+                  <input id="perfil-whatsapp" className="field-input text-base" inputMode="tel" autoComplete="tel-national" required
+                    placeholder="(18) 99999-0000" value={r.whatsapp} onChange={(e) => mudar({ whatsapp: mascararWhatsapp(e.target.value) })} />
+                  <p className="mt-4 text-[15px] font-semibold text-navy-800">As famílias podem chamar você direto pelo perfil?</p>
+                  <div className="mt-2 grid grid-cols-2 gap-2.5" role="radiogroup" aria-label="Contato direto pelo WhatsApp">
+                    <Opcao ativa={r.contatoDireto} onClick={() => mudar({ contatoDireto: true })}>Sim</Opcao>
+                    <Opcao ativa={!r.contatoDireto} onClick={() => mudar({ contatoDireto: false })}>Agora não</Opcao>
                   </div>
-                  {r.aceitaWhatsapp && (
-                    <div className="mt-4">
-                      <label className="field-label" htmlFor="perfil-whatsapp">WhatsApp profissional</label>
-                      <input id="perfil-whatsapp" className="field-input text-base" inputMode="tel" autoComplete="tel-national"
-                        placeholder="(18) 99999-0000" value={r.whatsapp} onChange={(e) => mudar({ whatsapp: mascararWhatsapp(e.target.value) })} />
-                    </div>
-                  )}
                   <p className="mt-3 inline-flex gap-1.5 rounded-xl bg-navy-50 p-3 text-sm text-navy-700">
-                    <MessageCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                    O número não fica escrito na vitrine. Ele só é usado quando uma família toca em “Conversar no WhatsApp” no seu perfil publicado.
+                    {r.contatoDireto ? <MessageCircle className="mt-0.5 h-4 w-4 shrink-0" /> : <Lock className="mt-0.5 h-4 w-4 shrink-0" />}
+                    {r.contatoDireto
+                      ? 'O perfil publicado mostra o botão “Conversar no WhatsApp”. O número só é usado quando a família toca nele.'
+                      : 'Sem botão de WhatsApp no perfil. Você pode ligar depois.'}
                   </p>
                 </Etapa>
               )}
@@ -269,7 +275,8 @@ export function EditarPerfilProfissionalPage() {
                     <LinhaRevisao rotulo="Nome" valor={r.nome.trim() || '—'} onAlterar={() => irPara('nome')} />
                     <LinhaRevisao rotulo="Cidade" valor={nomeDaCidade(r.cidadeId)} onAlterar={() => irPara('nome')} />
                     <LinhaRevisao rotulo="Apresentação" valor={r.apresentacao.trim() || 'Sem apresentação'} onAlterar={() => irPara('apresentacao')} />
-                    <LinhaRevisao rotulo="WhatsApp" valor={r.aceitaWhatsapp ? r.whatsapp || '—' : 'Não aceito contato agora'} onAlterar={() => irPara('contato')} />
+                    <LinhaRevisao rotulo="WhatsApp (privado)" valor={r.whatsapp || '—'} onAlterar={() => irPara('contato')} />
+                    <LinhaRevisao rotulo="Contato direto pelo perfil" valor={r.contatoDireto ? 'Sim' : 'Agora não'} onAlterar={() => irPara('contato')} />
                   </dl>
                 </Etapa>
               )}
@@ -319,10 +326,10 @@ function Opcao({ ativa, onClick, children }: { ativa: boolean; onClick: () => vo
 
 function LinhaRevisao({ rotulo, valor, onAlterar }: { rotulo: string; valor: string; onAlterar: () => void }) {
   return (
-    <div className="flex items-start gap-3 py-2.5">
+    <div className="flex items-start gap-3 py-2">
       <div className="min-w-0 flex-1">
         <dt className="text-xs font-semibold uppercase tracking-wide text-navy-500">{rotulo}</dt>
-        <dd className="mt-0.5 line-clamp-3 break-words text-[15px] text-navy-900">{valor}</dd>
+        <dd className="mt-0.5 line-clamp-2 break-words text-[15px] text-navy-900">{valor}</dd>
       </div>
       <button type="button" onClick={onAlterar} className="shrink-0 rounded-full px-3 py-2 text-sm font-semibold text-mint-700 ring-1 ring-mint-200">Alterar</button>
     </div>

@@ -124,14 +124,16 @@ export interface ResultadoRotaReal {
   temposEstimados: boolean;
 }
 
-/** Elegibilidade NO NÍVEL DA ROTA: real (não-demo), concluída e com casa +
- *  escola. NÃO exige publicação manual nem confirmação prévia do motorista:
- *  qualquer rota concluída já é avaliada e apresentada (decisão de produto). */
+/** Elegibilidade NO NÍVEL DA ROTA: real (não-demo), concluída, com a oferta
+ *  NÃO pausada pelo motorista e com casa + escola. Não exige publicação extra:
+ *  rota concluída é avaliada automaticamente; vaga e encaixe quem decide é o
+ *  motor (decisão de produto, Etapa 2C). */
 export function rotaElegivelParaBusca(
-  rota: Pick<Rota, 'status' | 'paradas'> & { isDemo?: boolean },
+  rota: Pick<Rota, 'status' | 'paradas'> & { isDemo?: boolean; ofertaPausada?: boolean },
 ): boolean {
   if (rota.isDemo) return false;
   if (rota.status !== 'concluida') return false;
+  if (rota.ofertaPausada) return false;
   const temEscola = rota.paradas.some((p) => p.tipo === 'escola');
   const temCasa = rota.paradas.some((p) => p.tipo === 'casa');
   return temEscola && temCasa;

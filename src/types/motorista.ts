@@ -124,9 +124,12 @@ export interface Rota {
    *  0 = não autoriza; `null` = não informado (não presumir). */
   limiteAntecipacaoMin: number | null;
   status: StatusRota;
-  /** Publicada na busca pública pela família (ação explícita do motorista).
-   *  "concluída" NÃO implica "publicada". Ausente/false = não aparece na busca. */
+  /** LEGADO (coluna routes.is_published): não decide mais nada. A busca usa
+   *  `status` e `ofertaPausada`. Mantido só para ler/gravar o que já existe. */
   isPublished?: boolean;
+  /** O motorista PAUSOU a oferta desta rota: ela não entra na busca, sem
+   *  apagar nada e sem voltar a rascunho. Ausente/false = rota oferecida. */
+  ofertaPausada?: boolean;
   /** Escolas JÁ PRESENTES no percurso são as paradas `escola` abaixo. */
   paradas: ParadaRota[];
   passageiros: PassageiroRota[];

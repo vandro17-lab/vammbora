@@ -90,6 +90,27 @@ describe('api/buscar-rotas (handler, mock Supabase)', () => {
     expect(res.statusCode).toBe(503);
   });
 
+  it('Etapa 2C: rota com a oferta PAUSADA não é avaliada nem devolvida; a não pausada é', async () => {
+    mockProvedorViario();
+    estado.canned = {
+      routes: [{ ...rotaRealCanon(), id: 'rota-pausada', oferta_pausada: true }, { ...rotaRealCanon(), oferta_pausada: false }],
+      vehicles: [{ id: 'veic-1', seats_passenger: 6 }],
+    };
+    const res = fakeRes();
+    await handler(fakeReq(pedido), res as never);
+    const out = JSON.parse(res.body);
+    expect(out.totalRotasAvaliadas).toBe(1);
+    expect(out.resultados.map((r: { rotaId: string }) => r.rotaId)).toEqual(['rota-1']);
+  });
+
+  it('Etapa 2C: "is_published" legado não esconde rota concluída (sem publicação extra)', async () => {
+    mockProvedorViario();
+    estado.canned = { routes: [{ ...rotaRealCanon(), is_published: false }], vehicles: [{ id: 'veic-1', seats_passenger: 6 }] };
+    const res = fakeRes();
+    await handler(fakeReq(pedido), res as never);
+    expect(JSON.parse(res.body).resultados).toHaveLength(1);
+  });
+
   it('rota publicada e concluída => compatível, com nome/van e SEM PII', async () => {
     const provedor = mockProvedorViario();
     estado.canned = {

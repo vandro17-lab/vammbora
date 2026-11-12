@@ -64,7 +64,7 @@ function Lista() {
                     <p className="truncate font-semibold text-navy-900">{r.nome || 'Rota'}</p>
                     <p className="text-sm text-navy-500">
                       {r.sentido === 'ida' ? 'Ida' : 'Volta'}{r.turno ? ` · ${TURNO_LABEL[r.turno]}${r.periodoConfirmado ? '' : ' (a confirmar)'}` : ''} · {r.passageiros.length} aluno(s)
-                      {' · '}<span className={r.status === 'concluida' ? 'text-mint-700' : 'text-amber-700'}>{r.status === 'concluida' ? 'concluída' : 'rascunho'}</span>
+                      {' · '}<span className={r.status === 'concluida' && !r.ofertaPausada ? 'text-mint-700' : 'text-amber-700'}>{r.status !== 'concluida' ? 'rascunho' : r.ofertaPausada ? 'concluída · oferta pausada' : 'concluída'}</span>
                     </p>
                     {pendentes > 0 && (
                       <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800">

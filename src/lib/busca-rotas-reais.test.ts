@@ -327,3 +327,59 @@ describe('tempos fictícios nunca confirmam encaixe', () => {
     expect(nucleo.candidatasParaBusca([{ rota: rotaIda({ turno: null }), veiculo: veiculo(4) }], pedidoIda({ turno: 'manha' }))).toHaveLength(1);
   });
 });
+
+describe('Etapa 2C — oferta da rota e vagas reais (só seleção; cálculo do motor inalterado)', () => {
+  /** Ida com saída FIXA (06:00, sem antecipar) e os alunos embarcando na 1ª casa. */
+  const comSaidaFixa = (alunos: number, limiteMin: number): Rota => {
+    const r = rotaIda({ ultimoDesembarqueMin: limiteMin });
+    return {
+      ...r, saidaHabitualMin: 6 * 60, limiteAntecipacaoMin: 0,
+      passageiros: r.passageiros.slice(0, alunos).map((p) => ({ ...p, embarqueParadaId: 'a' })),
+    };
+  };
+  const mostra = (s: string) => s === 'compativel' || s === 'sob_confirmacao';
+
+  it('rota concluída fica disponível sem publicação extra; pausada sai; retomada volta', () => {
+    expect(rotaElegivelParaBusca(rotaIda())).toBe(true);
+    expect(rotaElegivelParaBusca({ ...rotaIda(), ofertaPausada: true })).toBe(false);
+    expect(rotaElegivelParaBusca({ ...rotaIda(), ofertaPausada: false })).toBe(true);
+    expect({ ...rotaIda(), ofertaPausada: true }.status).toBe('concluida'); // pausar não é rascunho
+  });
+
+  it('a marcação legada "publicada" não decide mais nada', () => {
+    const naoPublicada: Rota = { ...rotaIda(), isPublished: false };
+    const rascunhoPublicado: Rota = { ...rotaIda(), status: 'rascunho', isPublished: true };
+    expect(rotaElegivelParaBusca(naoPublicada)).toBe(true);
+    expect(rotaElegivelParaBusca(rascunhoPublicado)).toBe(false);
+  });
+
+  it('sem nenhum lugar livre (ocupados/reservados por clientes de fora): não aparece; liberar um lugar faz voltar', () => {
+    const semLugar = { ...rotaIda(), passageiros: [], lugaresReservados: 2 };
+    const r0 = avaliarRotaReal(semLugar, veiculo(2), pedidoIda());
+    expect(mostra(r0.status)).toBe(false);
+    const r1 = avaliarRotaReal({ ...semLugar, lugaresReservados: 1 }, veiculo(2), pedidoIda());
+    expect(r1.status).toBe('compativel');
+  });
+
+  it('nenhuma opção mostrada passa da capacidade em trecho algum (van cheia só encaixa reorganizando)', () => {
+    const d = nucleo.avaliarRotaDetalhada(comSaidaFixa(2, 6 * 60 + 20), veiculo(2), pedidoIda(), FIXTURE);
+    expect(d.publico.status).toBe('sob_confirmacao'); // depende do motorista reorganizar — nunca "compatível" direto
+    const eventos = d.simulacao?.opcao?.eventos ?? [];
+    expect(eventos.length).toBeGreaterThan(0);
+    for (const e of eventos) expect(e.ocupacaoApos).toBeLessThanOrEqual(2);
+  });
+
+  it('remover um aluno (vaga liberada) recalcula o encaixe: de "sob confirmação" para compatível', () => {
+    expect(avaliarRotaReal(comSaidaFixa(2, 6 * 60 + 20), veiculo(2), pedidoIda()).status).toBe('sob_confirmacao');
+    expect(avaliarRotaReal(comSaidaFixa(1, 6 * 60 + 20), veiculo(2), pedidoIda()).status).toBe('compativel');
+  });
+
+  it('busca agregada só avalia rotas oferecidas (a pausada nem entra nas candidatas)', () => {
+    const entradas: EntradaBuscaReal[] = [
+      { rota: rotaIda(), veiculo: veiculo(4) },
+      { rota: { ...rotaIda(), id: 'pausada', ofertaPausada: true }, veiculo: veiculo(4) },
+    ].filter((e) => rotaElegivelParaBusca(e.rota));
+    const out = buscarEmRotasReais(entradas, pedidoIda());
+    expect(out.resultados.map((x) => x.rotaId)).toEqual(['rota-ida']);
+  });
+});

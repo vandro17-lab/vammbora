@@ -48,6 +48,8 @@ interface LinhaListing {
   doc_verified: boolean;
   is_demo: boolean;
   destination_ids: string[];
+  /** Só o indicador (migração do perfil 2C); o número nunca está na view. */
+  contato_whatsapp_ativo?: boolean;
 }
 
 interface LinhaDestino {
@@ -97,6 +99,7 @@ function mapMotorista(r: LinhaListing): Motorista {
     documentacaoVerificada: r.doc_verified,
     // A view pública NÃO expõe telefone. Ele é obtido por RPC ao solicitar contato.
     whatsapp: '',
+    contatoWhatsapp: !!r.contato_whatsapp_ativo,
     demo: r.is_demo,
   };
 }
