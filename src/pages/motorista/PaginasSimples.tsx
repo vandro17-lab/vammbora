@@ -1,3 +1,4 @@
+import { Navigate } from 'react-router-dom';
 import { FileText, User, Search } from 'lucide-react';
 import { MotoristaShell, ExigirMotorista } from './MotoristaShell';
 
@@ -19,11 +20,11 @@ function EmBreve({ titulo, Icone, texto, voltar }: { titulo: string; Icone: type
   );
 }
 
+/** O perfil profissional agora existe de verdade: leva para a tela nova. */
 export function PerfilMotoristaPage() {
   return (
     <ExigirMotorista>
-      <EmBreve titulo="Meu perfil" Icone={User} voltar="/painel"
-        texto="Aqui você vai dizer como costuma ser chamado, colocar sua foto e as etapas de ensino que atende. Em breve nesta parte." />
+      <Navigate to="/app/perfil" replace />
     </ExigirMotorista>
   );
 }
@@ -32,7 +33,7 @@ export function DocumentosMotoristaPage() {
   return (
     <ExigirMotorista>
       <EmBreve titulo="Meus documentos" Icone={FileText} voltar="/painel"
-        texto="O envio dos documentos pelo celular e o acompanhamento da análise entram na próxima parte. Lembrando: você só aparece às famílias depois que os documentos forem aprovados." />
+        texto="O VanBora não exige envio de documentos para você aparecer às famílias. Um espaço privado e opcional para lembrar vencimentos poderá entrar depois." />
     </ExigirMotorista>
   );
 }
