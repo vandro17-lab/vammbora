@@ -9,7 +9,6 @@ import {
   UserCheck,
   Accessibility,
   ShieldCheck,
-  ShieldAlert,
   Clock,
   Users,
   MapPin,
@@ -254,22 +253,14 @@ export function DriverProfilePage() {
               {m.demo ? 'Explore o perfil e conheça a proposta de atendimento.' : 'Você revisa a mensagem antes de enviar — nada é enviado automaticamente. A mensagem leva a escola, o trajeto e o horário que você buscou; falar com o motorista não reserva vaga.'}
             </p>
 
-            {/* Status de verificação — honesto */}
-            <div className="mt-5 flex items-start gap-2.5 rounded-xl border border-navy-100 p-3 text-sm">
-              {m.documentacaoVerificada ? (
-                <>
-                  <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-mint-600" />
-                  <span className="text-navy-700">Documentação verificada pela equipe.</span>
-                </>
-              ) : (
-                <>
-                  <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
-                  <span className="text-navy-600">
-                    Verificação documental pendente. Confira os documentos antes de contratar.
-                  </span>
-                </>
-              )}
-            </div>
+            {/* Verificação: só aparece se existir uma verificação REAL registrada.
+                Sem ela, nada é dito (o VanBora não exige documentos). */}
+            {m.documentacaoVerificada && (
+              <div className="mt-5 flex items-start gap-2.5 rounded-xl border border-navy-100 p-3 text-sm">
+                <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-mint-600" />
+                <span className="text-navy-700">Documentação verificada pela equipe.</span>
+              </div>
+            )}
           </div>
 
         </aside>
