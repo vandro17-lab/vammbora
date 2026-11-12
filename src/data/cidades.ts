@@ -2,7 +2,7 @@ import type { Cidade } from '@/types';
 
 export const CIDADES: Cidade[] = [
   // Mesma área usada para localizar endereços e gravada em public.cities
-  // (migração 20261112230000), que confere de novo no servidor.
+  // (migração 20261112224903), que confere de novo no servidor.
   { id: 'aracatuba-sp', nome: 'Araçatuba', uf: 'SP', area: { latMin: -21.7, latMax: -20.7, lngMin: -51.0, lngMax: -49.9 } },
 ];
 

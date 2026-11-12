@@ -6,7 +6,7 @@ import {
 
 /**
  * Solicitações da FAMÍLIA logada (tabela transport_requests, migração
- * 20261112230000). A RLS garante no servidor que cada conta só lê e altera as
+ * 20261112224903). A RLS garante no servidor que cada conta só lê e altera as
  * próprias; o app nunca envia id de outra conta. Sem Supabase (ambiente de
  * demonstração), guarda no navegador.
  */

@@ -3,7 +3,7 @@ import type { Municipio } from '@/types';
 /**
  * Municípios cuja sede fica numa ÁREA ATENDIDA (src/data/cidades.ts). São as
  * opções de "cidade do embarque" da família. Gerado da mesma fonte da tabela
- * public.municipios (migração 20261112225900; IBGE via
+ * public.municipios (migração 20261112224855; IBGE via
  * kelvins/municipios-brasileiros, licença MIT) — o banco confere o código.
  * Município NÃO é área de cobertura: a cobertura continua em `CIDADES`.
  */

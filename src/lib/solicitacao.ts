@@ -10,7 +10,7 @@ import { normalizarTexto, type MunicipioUF } from '@/lib/geocode';
  * SOLICITAÇÃO DE TRANSPORTE DA FAMÍLIA (Etapa 3A) — regras puras.
  *
  * As mesmas regras são conferidas de novo no banco (constraints e gatilho da
- * migração 20261112230000). Pesquisar NÃO cria solicitação: ela só existe
+ * migração 20261112224903). Pesquisar NÃO cria solicitação: ela só existe
  * depois que a família revisa e confirma.
  */
 

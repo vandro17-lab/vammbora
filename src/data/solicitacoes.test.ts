@@ -4,7 +4,7 @@ import { rascunhoVazio } from '@/lib/solicitacao';
 
 /**
  * Cliente das solicitações contra um Supabase SIMULADO que reproduz o que a
- * migração 20261112230000 garante: RLS por dono, (owner_id, chave_envio) único
+ * migração 20261112224903 garante: RLS por dono, (owner_id, chave_envio) único
  * e gatilho que força status 'ativa' na criação e trava a encerrada.
  * NÃO grava no banco real — prova o contrato do cliente.
  */
