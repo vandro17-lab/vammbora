@@ -131,7 +131,7 @@ export function sugerirVolta(ida: Rota, opcoes: { voltamIds?: string[]; distanci
     lugaresReservados: ida.lugaresReservados, ultimoDesembarqueMin: null, saidaHabitualMin: null, limiteAntecipacaoMin: null,
     // Escolas que aceita incluir valem por ROTA: a volta começa sem nenhuma.
     escolasDisponiveis: [], disponibilidadeRevisada: false,
-    status: 'rascunho', isPublished: false, paradas, passageiros, atualizadoEm: new Date().toISOString(),
+    status: 'rascunho', isPublished: false, ofertaPausada: false, paradas, passageiros, atualizadoEm: new Date().toISOString(),
   };
 }
 

@@ -81,7 +81,7 @@ describe('Salvar no construtor (Etapa 2C)', () => {
   });
 
   it('a pausa da oferta é preservada e informada', () => {
-    expect(avisoRotaConcluidaSalva({ ofertaPausada: true })).toMatch(/pausada/);
-    expect(avisoRotaConcluidaSalva({ ofertaPausada: false })).toMatch(/oferecida na busca/);
+    expect(avisoRotaConcluidaSalva({ ofertaPausada: true })).toMatch(/continua pausada/);
+    expect(avisoRotaConcluidaSalva({ ofertaPausada: false })).toMatch(/vagas foram recalculadas/);
   });
 });

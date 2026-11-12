@@ -246,7 +246,7 @@ export function copiarRota(rota: Rota, novoId: () => string): Rota {
   const nome = rota.nome.trim();
   return {
     ...rota,
-    id: '', nome: nome ? `${nome} (cópia)` : 'Rota (cópia)', status: 'rascunho', isPublished: false,
+    id: '', nome: nome ? `${nome} (cópia)` : 'Rota (cópia)', status: 'rascunho', isPublished: false, ofertaPausada: false,
     dias: [...rota.dias],
     paradas: rota.paradas.map((p) => ({ ...p, id: idDe.get(p.id)! })),
     passageiros: rota.passageiros.map((x) => ({

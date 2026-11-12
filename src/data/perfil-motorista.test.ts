@@ -23,7 +23,7 @@ vi.mock('@/lib/supabase', () => ({
 }));
 vi.mock('@/data/motorista-store', () => ({ listarRotas: async () => [], listarVeiculos: async () => [] }));
 
-import { obterMeuPerfil, salvarMeuPerfil, publicarMeuPerfil, erroDoPerfil } from './perfil-motorista';
+import { obterMeuPerfil, salvarMeuPerfil, publicarMeuPerfil, definirContatoWhatsapp, erroDoPerfil } from './perfil-motorista';
 
 const linha = {
   id: 'd1', slug: 'tio-ze', nome: 'Tio Zé', descricao: null, cidade_id: 'aracatuba-sp', whatsapp: '5518999990000',
@@ -79,6 +79,22 @@ describe('perfil do motorista — acesso ao servidor', () => {
     await expect(publicarMeuPerfil(true)).rejects.toThrow(/Crie seu perfil/);
     expect(erroDoPerfil({ code: '23505', message: 'duplicate key' }).message).toMatch(/já tem um perfil/);
     expect(erroDoPerfil({ code: '42501', message: 'x' }).message).toMatch(/sessão expirou/);
+  });
+
+  it('contato pelo WhatsApp é ligado/desligado pelo perfil, sem refazer o cadastro', async () => {
+    await definirContatoWhatsapp(true);
+    await definirContatoWhatsapp(false);
+    expect(srv.chamadas).toEqual([
+      { fn: 'definir_contato_whatsapp', args: { p_ativo: true } },
+      { fn: 'definir_contato_whatsapp', args: { p_ativo: false } },
+    ]);
+    srv.resposta.definir_contato_whatsapp = { data: null, error: { code: 'P0002', message: 'Cadastre seu perfil e seu WhatsApp antes de ativar o contato.' } };
+    await expect(definirContatoWhatsapp(true)).rejects.toThrow(/Cadastre seu perfil/);
+  });
+
+  it('erro técnico inesperado vira mensagem simples (sem jargão em inglês)', () => {
+    const e = erroDoPerfil({ code: 'XX000', message: 'duplicate key value violates unique constraint' });
+    expect(e.message).toBe('Não foi possível concluir agora. Tente de novo em instantes.');
   });
 
   it('servidor sem confirmação de gravação não vira sucesso', async () => {

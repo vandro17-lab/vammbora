@@ -190,7 +190,7 @@ export function DriverProfilePage() {
               // Motorista REAL: vagas e horários dependem do endereço e da escola de
               // cada família — quem calcula é a busca. Nada de vagas/janelas fictícias.
               <p className="mt-5 border-t border-navy-100 pt-5 text-sm text-navy-600" data-testid="disponibilidade-real">
-                Vagas e horários dependem do seu endereço e da escola. Faça a busca para ver se alguma rota deste motorista atende o seu trajeto.
+                As vagas e os horários dependem do endereço e da escola de cada aluno. O motorista confirma o atendimento.
               </p>
             ) : (
             <dl className="mt-5 space-y-3 border-t border-navy-100 pt-5 text-sm">
@@ -224,7 +224,7 @@ export function DriverProfilePage() {
 
             {!m.demo && !m.contatoWhatsapp ? (
               <p className="mt-5 rounded-xl bg-navy-50 p-3 text-center text-sm text-navy-600" data-testid="sem-contato-direto">
-                Este motorista não ativou o contato direto pelo WhatsApp.
+                Este motorista não ativou o contato pelo WhatsApp.
               </p>
             ) : (
             <button

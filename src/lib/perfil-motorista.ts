@@ -122,7 +122,7 @@ export interface ItemPublicacao { id: 'perfil' | 'publicado'; texto: string; fei
 export function itensDePublicacao(s: SituacaoPublicacao): ItemPublicacao[] {
   return [
     { id: 'perfil', texto: 'Perfil profissional preenchido', feito: s.temPerfil },
-    { id: 'publicado', texto: 'Perfil publicado por você', feito: s.anuncioAtivo },
+    { id: 'publicado', texto: 'Perfil publicado', feito: s.anuncioAtivo },
   ];
 }
 
@@ -131,12 +131,12 @@ export function textoDaSituacao(s: SituacaoPublicacao): string {
   if (!s.temPerfil) return 'Crie seu perfil profissional para poder aparecer às famílias.';
   if (s.suspenso) return 'Seu perfil está suspenso pela equipe VanBora e não aparece às famílias.';
   if (s.visivel) return 'Seu perfil está visível para as famílias.';
-  if (!s.anuncioAtivo) return 'Seu perfil ainda não aparece: toque em Publicar quando quiser.';
+  if (!s.anuncioAtivo) return 'Seu perfil ainda não aparece. Toque em “Publicar perfil” quando quiser.';
   return 'Seu perfil ainda não aparece às famílias.';
 }
 
 /** Frase sobre as rotas oferecidas (sem inventar vagas). */
 export function textoDasRotas(n: number): string {
-  if (n <= 0) return 'Nenhuma rota sua está sendo oferecida na busca agora. Conclua uma rota ou retome uma oferta pausada.';
-  return `${n === 1 ? '1 rota oferecida' : `${n} rotas oferecidas`} na busca. Ela${n === 1 ? '' : 's'} só aparece${n === 1 ? '' : 'm'} para quem couber no trajeto, nos horários e nas vagas.`;
+  if (n <= 0) return 'No momento, nenhuma rota sua está disponível na busca. Conclua uma rota ou retome uma oferta pausada.';
+  return `${n === 1 ? '1 rota disponível' : `${n} rotas disponíveis`} na busca. Só aparece${n === 1 ? '' : 'm'} para famílias que cabem no trajeto, no horário e nas vagas.`;
 }

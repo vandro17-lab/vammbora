@@ -51,8 +51,10 @@ export function erroDoPerfil(e: { code?: string; message?: string }): Error {
   if (e.code === '42501') return new Error('Sua sessão expirou. Entre de novo na sua conta.');
   if (e.code === '22023' || e.code === 'P0002') return new Error(real); // mensagens já em português
   if (e.code === '23505') return new Error('Você já tem um perfil profissional. Abra Meu perfil para editar.');
-  if (/fetch|network/i.test(real)) return new Error('Sem conexão com o servidor. Verifique a internet e tente de novo.');
-  return new Error(real);
+  if (/fetch|network/i.test(real)) return new Error('Sem conexão. Verifique a internet e tente de novo.');
+  // Erro técnico inesperado: mensagem simples na tela; o detalhe fica no console.
+  console.warn('[perfil] erro do servidor:', e.code, real);
+  return new Error('Não foi possível concluir agora. Tente de novo em instantes.');
 }
 
 /* ------------------------------ modo local ------------------------------ */
@@ -109,6 +111,18 @@ export async function salvarMeuPerfil(r: RascunhoPerfil): Promise<PerfilMotorist
   };
   gravarLocal(novo);
   return (await obterMeuPerfil()) ?? novo;
+}
+
+/** Liga/desliga o contato direto pelo WhatsApp sem refazer o cadastro. */
+export async function definirContatoWhatsapp(ativo: boolean): Promise<void> {
+  if (USAR_BANCO && supabase) {
+    const { error } = await supabase.rpc('definir_contato_whatsapp', { p_ativo: ativo });
+    if (error) throw erroDoPerfil(error);
+    return;
+  }
+  const atual = lerLocal();
+  if (!atual) throw new Error('Cadastre seu perfil e seu WhatsApp antes de ativar o contato.');
+  gravarLocal({ ...atual, contatoWhatsappAtivo: ativo });
 }
 
 export async function publicarMeuPerfil(ativo: boolean): Promise<void> {

@@ -31,6 +31,6 @@ export function decidirSalvar(rota: Rota, veiculo: Veiculo | null): DecisaoSalva
 /** Mensagem depois de salvar uma rota que continua concluída. */
 export function avisoRotaConcluidaSalva(rota: Pick<Rota, 'ofertaPausada'>): string {
   return rota.ofertaPausada
-    ? 'Rota salva. Ela continua concluída, com a oferta pausada.'
-    : 'Rota salva. Vagas recalculadas; ela continua oferecida na busca.';
+    ? 'Rota salva. A oferta continua pausada.'
+    : 'Rota salva. As vagas foram recalculadas.';
 }

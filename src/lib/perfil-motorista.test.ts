@@ -73,18 +73,18 @@ describe('publicação do perfil (mesma regra do servidor: sem documentos e sem 
   });
   it('perfil publicado SEM rota disponível continua visível, com mensagem honesta sobre as rotas', () => {
     expect(textoDaSituacao({ ...situacao, anuncioAtivo: true, visivel: true, rotasDisponiveis: 0 })).toMatch(/visível/);
-    expect(textoDasRotas(0)).toMatch(/Nenhuma rota sua está sendo oferecida/);
+    expect(textoDasRotas(0)).toMatch(/nenhuma rota sua está disponível/);
     expect(textoDasRotas(0)).not.toMatch(/\d+ vaga/);
   });
   it('rotas oferecidas não viram vagas inventadas', () => {
-    expect(textoDasRotas(1)).toMatch(/^1 rota oferecida/);
-    expect(textoDasRotas(3)).toMatch(/^3 rotas oferecidas/);
-    expect(textoDasRotas(3)).toMatch(/couber/);
+    expect(textoDasRotas(1)).toMatch(/^1 rota disponível na busca/);
+    expect(textoDasRotas(3)).toMatch(/^3 rotas disponíveis na busca/);
+    expect(textoDasRotas(3)).toMatch(/cabem no trajeto, no horário e nas vagas/);
     expect(textoDasRotas(3)).not.toMatch(/vagas? (disponíve|livre)/i);
   });
   it('frase honesta para cada situação', () => {
     expect(textoDaSituacao({ ...situacao, temPerfil: false })).toMatch(/Crie seu perfil/);
-    expect(textoDaSituacao(situacao)).toMatch(/Publicar/);
+    expect(textoDaSituacao(situacao)).toMatch(/Publicar perfil/);
     expect(textoDaSituacao({ ...situacao, suspenso: true })).toMatch(/suspenso/);
   });
 });

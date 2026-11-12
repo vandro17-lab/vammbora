@@ -5,7 +5,7 @@ import { Avatar } from '@/components/brand/Avatar';
 import { VMShell } from '@/components/vm/VMShell';
 import { Card, SubHeader, AvisoErro, EstadoVazio } from '@/components/vm/ui';
 import { useMeuPerfil } from '@/lib/vm/useMeuPerfil';
-import { salvarMeuPerfil, publicarMeuPerfil } from '@/data/perfil-motorista';
+import { salvarMeuPerfil, publicarMeuPerfil, definirContatoWhatsapp } from '@/data/perfil-motorista';
 import { useAuth } from '@/lib/auth';
 import { CIDADES, CIDADE_PADRAO } from '@/data/cidades';
 import {
@@ -26,6 +26,21 @@ export function PerfilProfissionalPage() {
   const { carregando, erro, perfil, recarregar } = useMeuPerfil();
   const [publicando, setPublicando] = useState(false);
   const [erroPub, setErroPub] = useState<string | null>(null);
+
+  const [mudandoContato, setMudandoContato] = useState(false);
+  async function alternarContato() {
+    if (!perfil) return;
+    setErroPub(null);
+    setMudandoContato(true);
+    try {
+      await definirContatoWhatsapp(!perfil.contatoWhatsappAtivo);
+      recarregar();
+    } catch (e) {
+      setErroPub((e as Error).message);
+    } finally {
+      setMudandoContato(false);
+    }
+  }
 
   async function alternarPublicacao() {
     if (!perfil) return;
@@ -75,7 +90,7 @@ export function PerfilProfissionalPage() {
             </Card>
 
             <Card>
-              <p className="font-display font-bold text-navy-900">Para aparecer às famílias</p>
+              <p className="font-display font-bold text-navy-900">Para as famílias verem seu perfil</p>
               <ul className="mt-2 space-y-2">
                 {itensDePublicacao(situacao).map((i) => (
                   <li key={i.id} className="flex items-center gap-2.5 text-[15px]">
@@ -100,6 +115,10 @@ export function PerfilProfissionalPage() {
               </div>
             </Card>
 
+            <Card>
+              <ContatoWhatsapp ativo={perfil.contatoWhatsappAtivo} ocupado={mudandoContato} onAlternar={alternarContato} />
+            </Card>
+
             {erroPub && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm font-medium text-red-700">{erroPub}</p>}
 
             {!perfil.suspenso && (
@@ -107,7 +126,7 @@ export function PerfilProfissionalPage() {
                 className={cn('flex h-14 w-full items-center justify-center gap-2 rounded-full text-base font-bold transition active:scale-[0.98] disabled:opacity-60',
                   perfil.anuncioAtivo ? 'bg-white text-navy-800 ring-1 ring-navy-200' : 'bg-mint-500 text-white shadow-float')}>
                 {publicando ? <Loader2 className="h-5 w-5 animate-spin" /> : perfil.anuncioAtivo ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                {perfil.anuncioAtivo ? 'Despublicar perfil' : 'Publicar perfil'}
+                {perfil.anuncioAtivo ? 'Ocultar perfil' : 'Publicar perfil'}
               </button>
             )}
             <div className="grid grid-cols-2 gap-2.5">
@@ -116,11 +135,11 @@ export function PerfilProfissionalPage() {
               </Link>
               {perfil.visivel ? (
                 <Link to={`/van/${perfil.slug}`} className="flex h-12 items-center justify-center gap-2 rounded-full bg-white text-[15px] font-semibold text-navy-800 ring-1 ring-navy-200">
-                  <ExternalLink className="h-4 w-4" /> Ver como as famílias
+                  <ExternalLink className="h-4 w-4" /> Ver perfil público
                 </Link>
               ) : (
                 <span className="flex h-12 items-center justify-center gap-2 rounded-full bg-navy-50 text-[15px] font-semibold text-navy-400" aria-disabled="true">
-                  <ExternalLink className="h-4 w-4" /> Ainda não visível
+                  <ExternalLink className="h-4 w-4" /> Perfil não visível
                 </span>
               )}
             </div>
@@ -246,26 +265,18 @@ export function EditarPerfilProfissionalPage() {
                   <textarea id="perfil-apresentacao" className="field-input min-h-[9rem] text-base" rows={6} maxLength={APRESENTACAO_MAX}
                     placeholder={EXEMPLO_APRESENTACAO} value={r.apresentacao} onChange={(e) => mudar({ apresentacao: e.target.value })} />
                   <p className="mt-1 text-right text-xs text-navy-500">{r.apresentacao.length}/{APRESENTACAO_MAX}</p>
-                  <p className="text-xs text-navy-500">O texto em cinza é só um exemplo: ele não é salvo.</p>
+                  <p className="text-xs text-navy-500">O texto em cinza é só um exemplo e não será salvo.</p>
                 </Etapa>
               )}
 
               {etapa === 'contato' && (
-                <Etapa tituloRef={titulo} titulo="Seu WhatsApp" texto="Obrigatório. Fica guardado e não aparece escrito no perfil.">
-                  <label className="field-label" htmlFor="perfil-whatsapp">WhatsApp com DDD</label>
+                <Etapa tituloRef={titulo} titulo="Seu WhatsApp" texto="Obrigatório. Informe o número com DDD.">
+                  <label className="field-label" htmlFor="perfil-whatsapp">WhatsApp</label>
                   <input id="perfil-whatsapp" className="field-input text-base" inputMode="tel" autoComplete="tel-national" required
                     placeholder="(18) 99999-0000" value={r.whatsapp} onChange={(e) => mudar({ whatsapp: mascararWhatsapp(e.target.value) })} />
-                  <p className="mt-4 text-[15px] font-semibold text-navy-800">As famílias podem chamar você direto pelo perfil?</p>
-                  <div className="mt-2 grid grid-cols-2 gap-2.5" role="radiogroup" aria-label="Contato direto pelo WhatsApp">
-                    <Opcao ativa={r.contatoDireto} onClick={() => mudar({ contatoDireto: true })}>Sim</Opcao>
-                    <Opcao ativa={!r.contatoDireto} onClick={() => mudar({ contatoDireto: false })}>Agora não</Opcao>
+                  <div className="mt-4 border-t border-navy-100 pt-3">
+                    <ContatoWhatsapp ativo={r.contatoDireto} onAlternar={() => mudar({ contatoDireto: !r.contatoDireto })} />
                   </div>
-                  <p className="mt-3 inline-flex gap-1.5 rounded-xl bg-navy-50 p-3 text-sm text-navy-700">
-                    {r.contatoDireto ? <MessageCircle className="mt-0.5 h-4 w-4 shrink-0" /> : <Lock className="mt-0.5 h-4 w-4 shrink-0" />}
-                    {r.contatoDireto
-                      ? 'O perfil publicado mostra o botão “Conversar no WhatsApp”. O número só é usado quando a família toca nele.'
-                      : 'Sem botão de WhatsApp no perfil. Você pode ligar depois.'}
-                  </p>
                 </Etapa>
               )}
 
@@ -275,8 +286,7 @@ export function EditarPerfilProfissionalPage() {
                     <LinhaRevisao rotulo="Nome" valor={r.nome.trim() || '—'} onAlterar={() => irPara('nome')} />
                     <LinhaRevisao rotulo="Cidade" valor={nomeDaCidade(r.cidadeId)} onAlterar={() => irPara('nome')} />
                     <LinhaRevisao rotulo="Apresentação" valor={r.apresentacao.trim() || 'Sem apresentação'} onAlterar={() => irPara('apresentacao')} />
-                    <LinhaRevisao rotulo="WhatsApp (privado)" valor={r.whatsapp || '—'} onAlterar={() => irPara('contato')} />
-                    <LinhaRevisao rotulo="Contato direto pelo perfil" valor={r.contatoDireto ? 'Sim' : 'Agora não'} onAlterar={() => irPara('contato')} />
+                    <LinhaRevisao rotulo="WhatsApp" valor={`${r.whatsapp || '—'} · contatos ${r.contatoDireto ? 'ativados' : 'desativados'}`} onAlterar={() => irPara('contato')} />
                   </dl>
                 </Etapa>
               )}
@@ -314,13 +324,21 @@ function Etapa({ titulo, texto, tituloRef, children }: { titulo: string; texto: 
   );
 }
 
-function Opcao({ ativa, onClick, children }: { ativa: boolean; onClick: () => void; children: ReactNode }) {
+/** Permissão de contato pelo WhatsApp: opcional, começa desativada, muda quando quiser. */
+function ContatoWhatsapp({ ativo, ocupado = false, onAlternar }: { ativo: boolean; ocupado?: boolean; onAlternar: () => void }) {
   return (
-    <button type="button" role="radio" aria-checked={ativa} onClick={onClick}
-      className={cn('flex h-14 items-center justify-center gap-2 rounded-2xl text-base font-semibold ring-1 transition active:scale-[0.98]',
-        ativa ? 'bg-mint-500 text-white ring-mint-500' : 'bg-white text-navy-700 ring-navy-200')}>
-      {ativa && <Check className="h-5 w-5" />} {children}
-    </button>
+    <section aria-labelledby="titulo-contato-whatsapp">
+      <p id="titulo-contato-whatsapp" className="font-display text-[17px] font-bold text-navy-900">Permitir contato pelo WhatsApp</p>
+      <p className="mt-0.5 text-[15px] text-navy-600">As famílias poderão entrar em contato com você pelo WhatsApp. Você pode ativar essa opção quando quiser.</p>
+      <button type="button" role="switch" aria-checked={ativo} onClick={onAlternar} disabled={ocupado}
+        className="mt-2.5 flex min-h-[3.25rem] w-full items-center justify-between gap-3 rounded-2xl bg-white px-4 text-left text-base font-semibold text-navy-900 ring-1 ring-navy-200 active:scale-[0.99] disabled:opacity-60">
+        <span className="inline-flex items-center gap-2"><MessageCircle className="h-5 w-5 text-navy-500" /> Receber contatos pelo WhatsApp</span>
+        <span aria-hidden="true" className={cn('relative h-7 w-12 shrink-0 rounded-full transition', ativo ? 'bg-mint-500' : 'bg-navy-200')}>
+          <span className={cn('absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all', ativo ? 'left-[1.375rem]' : 'left-0.5')} />
+        </span>
+      </button>
+      <p className="mt-2 inline-flex items-center gap-1.5 text-sm text-navy-600"><Lock className="h-4 w-4 shrink-0" /> Seu número não será exibido publicamente.</p>
+    </section>
   );
 }
 

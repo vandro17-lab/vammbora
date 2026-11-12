@@ -216,4 +216,27 @@ select pg_temp.ok(not has_table_privilege('anon', 'public.public_listings', 'UPD
                   and not has_table_privilege('authenticated', 'public.public_listings', 'INSERT'), 'T12 vitrine segue somente leitura');
 \echo 'OK T12 demonstração e vitrine'
 
+-- T13 — Contato direto ligado/desligado pelo perfil; perfil só nasce pela RPC
+begin; select pg_temp.como(:C);
+select pg_temp.recusa($q$insert into public.drivers (owner_id, slug, name, city_id) values ('33333333-3333-4333-8333-333333333333', 'c-direto', 'C', 'aracatuba-sp')$q$,
+                      'T13 criar perfil direto pela API (sem RPC)');
+select pg_temp.recusa('select public.definir_contato_whatsapp(true)', 'T13 ativar contato sem perfil');
+commit;
+begin; select pg_temp.como(:A);
+select public.definir_contato_whatsapp(false);
+select pg_temp.ok(not (public.meu_perfil_motorista()->>'contato_whatsapp_ativo')::boolean, 'T13 contato desativado pelo perfil');
+commit;
+begin; select pg_temp.anonimo();
+select pg_temp.recusa($q$select public.solicitar_contato_whatsapp('tio-ze', true)$q$, 'T13 contato desativado não entrega número');
+select pg_temp.recusa('select public.definir_contato_whatsapp(true)', 'T13 anon não altera contato');
+commit;
+begin; select pg_temp.como(:B); select public.definir_contato_whatsapp(true); commit;
+select pg_temp.ok((select not contato_whatsapp_ativo from public.drivers where owner_id = :A), 'T13 B ativar o próprio contato não mexe no de A');
+begin; select pg_temp.como(:A); select public.definir_contato_whatsapp(true); commit;
+begin; select pg_temp.anonimo();
+select pg_temp.ok(public.solicitar_contato_whatsapp('tio-ze', true) = '5518988887777', 'T13 contato reativado sem refazer o cadastro');
+commit;
+select pg_temp.ok(not has_table_privilege('authenticated', 'public.drivers', 'INSERT'), 'T13 sem INSERT direto em drivers');
+\echo 'OK T13 contato direto pelo perfil e criação só pela RPC'
+
 \echo 'OK — perfil real do motorista: todos os testes passaram'

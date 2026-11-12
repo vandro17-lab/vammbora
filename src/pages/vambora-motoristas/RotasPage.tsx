@@ -276,10 +276,10 @@ export function RotaDetalhePage() {
               <p className="font-display font-bold text-navy-900">Busca das famílias</p>
               <p className="mt-0.5 text-sm leading-snug text-navy-600">
                 {rota.status !== 'concluida'
-                  ? 'Rascunho: conclua a rota para ela ser oferecida na busca.'
+                  ? 'Esta rota é um rascunho. Conclua a rota para ela aparecer na busca.'
                   : rota.ofertaPausada
-                    ? 'Oferta pausada: a rota não aparece na busca. Nada foi apagado.'
-                    : 'Oferecida: aparece só para quem couber no trajeto, nos horários e nas vagas de cada trecho.'}
+                    ? 'Oferta pausada. A rota não aparece na busca, mas nada foi apagado.'
+                    : 'Disponível na busca. Só aparece para famílias que cabem no trajeto, no horário e nas vagas.'}
               </p>
             </div>
             {rota.status === 'concluida' && (

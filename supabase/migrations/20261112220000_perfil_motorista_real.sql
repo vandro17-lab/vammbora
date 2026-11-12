@@ -36,7 +36,10 @@
 --      indicador booleano contato_whatsapp_ativo (nunca o número). CREATE OR
 --      REPLACE mantém os privilégios (somente leitura) — ensaiado;
 --   7) RPCs salvar_perfil_motorista / publicar_perfil_motorista /
---      meu_perfil_motorista, sempre sobre a PRÓPRIA conta.
+--      definir_contato_whatsapp / meu_perfil_motorista, sempre sobre a
+--      PRÓPRIA conta;
+--   8) o perfil só é CRIADO pela RPC (validações, slug e WhatsApp): INSERT
+--      direto em public.drivers deixa de ser permitido a anon/authenticated.
 --
 -- NÃO FAZ: não apaga tabelas/funções de documentos, não toca nos motoristas
 -- demonstrativos nem em vans/rotas/passageiros, não altera RLS, não altera
@@ -149,6 +152,17 @@ select
   d.contato_whatsapp_ativo
 from public.drivers d
 where public.motorista_elegivel(d);
+
+-- Defesa explícita (além de CREATE OR REPLACE manter os privilégios): a vitrine
+-- continua SOMENTE LEITURA para anon/authenticated (correção 20261112194000).
+revoke insert, update, delete, truncate on table public.public_listings from anon, authenticated, public;
+
+-- ----------------------------------------------------------------------------
+-- 6b) Perfil só nasce pela RPC salvar_perfil_motorista (SECURITY DEFINER, não
+--     precisa deste privilégio). Edição direta do PRÓPRIO perfil segue pela RLS
+--     (o gatilho protege nota, selo, suspensão, demo, dono e slug).
+-- ----------------------------------------------------------------------------
+revoke insert on table public.drivers from anon, authenticated;
 
 -- ----------------------------------------------------------------------------
 -- 7a) Criar ou atualizar o PRÓPRIO perfil profissional
@@ -272,6 +286,31 @@ end;
 $$;
 
 -- ----------------------------------------------------------------------------
+-- 7b2) Ativar / desativar o contato direto pelo WhatsApp (PRÓPRIO perfil)
+-- ----------------------------------------------------------------------------
+create or replace function public.definir_contato_whatsapp(p_ativo boolean)
+returns boolean
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  v_uid uuid := auth.uid();
+begin
+  if v_uid is null then
+    raise exception 'Entre na sua conta para alterar o contato.' using errcode = '42501';
+  end if;
+  update public.drivers set contato_whatsapp_ativo = coalesce(p_ativo, false)
+   where owner_id = v_uid and not is_demo
+     and (not coalesce(p_ativo, false) or whatsapp is not null);
+  if not found then
+    raise exception 'Cadastre seu perfil e seu WhatsApp antes de ativar o contato.' using errcode = 'P0002';
+  end if;
+  return coalesce(p_ativo, false);
+end;
+$$;
+
+-- ----------------------------------------------------------------------------
 -- 7c) Ler o PRÓPRIO perfil + situação (invoker: RLS do dono)
 --     rotas_disponiveis = rotas concluídas, não pausadas, com van do dono:
 --     são as que a busca AVALIA (quem decide vaga/encaixe é o motor).
@@ -305,9 +344,11 @@ $$;
 -- ----------------------------------------------------------------------------
 revoke execute on function public.salvar_perfil_motorista(text, text, text, text, boolean) from public, anon;
 revoke execute on function public.publicar_perfil_motorista(boolean) from public, anon;
+revoke execute on function public.definir_contato_whatsapp(boolean) from public, anon;
 revoke execute on function public.meu_perfil_motorista() from public, anon;
 grant execute on function public.salvar_perfil_motorista(text, text, text, text, boolean) to authenticated;
 grant execute on function public.publicar_perfil_motorista(boolean) to authenticated;
+grant execute on function public.definir_contato_whatsapp(boolean) to authenticated;
 grant execute on function public.meu_perfil_motorista() to authenticated;
 
 -- Autoverificação: aborta (desfaz tudo) se algo não ficou como esperado.
@@ -315,6 +356,7 @@ do $$
 begin
   if has_function_privilege('anon', 'public.salvar_perfil_motorista(text, text, text, text, boolean)', 'EXECUTE')
      or has_function_privilege('anon', 'public.publicar_perfil_motorista(boolean)', 'EXECUTE')
+     or has_function_privilege('anon', 'public.definir_contato_whatsapp(boolean)', 'EXECUTE')
      or has_function_privilege('anon', 'public.meu_perfil_motorista()', 'EXECUTE') then
     raise exception 'RPC de perfil executável por anon: abortando';
   end if;
@@ -331,6 +373,11 @@ begin
      or has_table_privilege('authenticated', 'public.public_listings', 'UPDATE')
      or has_table_privilege('authenticated', 'public.public_listings', 'DELETE') then
     raise exception 'A vitrine voltou a aceitar escrita: abortando';
+  end if;
+  -- Perfil só nasce pela RPC.
+  if has_table_privilege('anon', 'public.drivers', 'INSERT')
+     or has_table_privilege('authenticated', 'public.drivers', 'INSERT') then
+    raise exception 'INSERT direto em drivers continua liberado: abortando';
   end if;
   -- O número nunca aparece na vitrine.
   if exists (select 1 from information_schema.columns
