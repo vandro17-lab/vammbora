@@ -201,7 +201,7 @@ export function DriverProfilePage() {
                   <Users className="h-4 w-4" /> Vagas
                 </dt>
                 <dd className="font-semibold text-navy-900">
-                  {m.vagasDisponiveis > 0 ? plural(m.vagasDisponiveis, 'vaga', 'vagas') : 'Sem vaga'}
+                  {m.vagasDisponiveis > 0 ? plural(m.vagasDisponiveis, 'vaga', 'vagas') : m.capacidadeTotal > 0 ? 'Sem vaga' : 'Consulte o motorista'}
                 </dd>
               </div>
               <div className="flex items-center justify-between">

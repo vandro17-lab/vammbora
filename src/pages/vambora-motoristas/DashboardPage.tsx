@@ -1,11 +1,12 @@
 import { Link } from 'react-router-dom';
-import { Users, Armchair, Route as RouteIcon, School, Fuel, Coins, Bell, Star, Sparkles, ChevronRight } from 'lucide-react';
+import { Users, Armchair, Route as RouteIcon, School, Fuel, Coins, Bell, Star, Sparkles, ChevronRight, UserRound } from 'lucide-react';
 import { Avatar } from '@/components/brand/Avatar';
 import { VMShell } from '@/components/vm/VMShell';
 import { StatTile, Card, Barra, DemoChip, AvisoErro } from '@/components/vm/ui';
 import { VanEscolar } from '@/components/vm/VanEscolar';
 import { SlotIlustracao } from '@/components/vm/SlotImagem';
 import { useDadosMotorista } from '@/lib/vm/useDadosMotorista';
+import { useMeuPerfil } from '@/lib/vm/useMeuPerfil';
 import { useAuth } from '@/lib/auth';
 import { MOTORISTA_DEMO } from '@/data/motorista-demo';
 import { formatBRL } from '@/lib/utils';
@@ -13,6 +14,7 @@ import { formatBRL } from '@/lib/utils';
 export function DashboardPage() {
   const { dados, indicadores: ind, carregando, erro, recarregar } = useDadosMotorista();
   const { session } = useAuth();
+  const meuPerfil = useMeuPerfil();
   const hora = new Date().getHours();
   const saudacao = hora < 12 ? 'Bom dia' : hora < 18 ? 'Boa tarde' : 'Boa noite';
   const kmDia = Math.round(ind.distanciaDiaKm);
@@ -63,6 +65,20 @@ export function DashboardPage() {
         {dados.demo && <div className="flex justify-end"><DemoChip /></div>}
 
         {erro && <AvisoErro mensagem={erro} onTentar={recarregar} />}
+
+        {/* Perfil profissional: sem ele o motorista não aparece às famílias. */}
+        {!dados.demo && !meuPerfil.carregando && !meuPerfil.erro && !meuPerfil.perfil && (
+          <Link to="/app/perfil/editar" className="block">
+            <Card className="vm-press flex items-center gap-3 p-4 ring-1 ring-mint-200">
+              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-mint-50 text-mint-600"><UserRound className="h-6 w-6" /></span>
+              <div className="min-w-0 flex-1">
+                <p className="font-display font-bold text-navy-900">Crie seu perfil profissional</p>
+                <p className="text-sm text-navy-600">É o que as famílias vão ver. Leva poucos minutos.</p>
+              </div>
+              <ChevronRight className="h-5 w-5 shrink-0 text-navy-300" />
+            </Card>
+          </Link>
+        )}
 
         {/* Primeiros passos (dados reais, ainda incompletos) — só depois de a
             consulta terminar SEM erro, para não confundir "vazio" com "falhou". */}

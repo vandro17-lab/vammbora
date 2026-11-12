@@ -11,6 +11,7 @@ import { OportunidadesPage, SimularEncaixePage as VMSimularPage } from '@/pages/
 import { InteligenciaPage } from '@/pages/vambora-motoristas/InteligenciaPage';
 import { MinhaVanPage, CadastroVanPage } from '@/pages/vambora-motoristas/MinhaVanPage';
 import { MaisPage, ModuloPage } from '@/pages/vambora-motoristas/MaisPage';
+import { PerfilProfissionalPage, EditarPerfilProfissionalPage } from '@/pages/vambora-motoristas/PerfilProfissionalPage';
 import { EditorMotoristasPage } from '@/pages/vambora-motoristas/EditorMotoristasPage';
 import { CriarRotaPage } from '@/pages/vambora-motoristas/CriarRotaPage';
 import { AparenciaPage } from '@/pages/vambora-motoristas/admin/AparenciaPage';
@@ -86,6 +87,8 @@ export default function App() {
               <Route path="inteligencia" element={<InteligenciaPage />} />
               <Route path="van" element={<MinhaVanPage />} />
               <Route path="van/cadastro" element={<CadastroVanPage />} />
+              <Route path="perfil" element={<PerfilProfissionalPage />} />
+              <Route path="perfil/editar" element={<EditarPerfilProfissionalPage />} />
               <Route path="mais" element={<MaisPage />} />
               <Route path="mais/motoristas" element={<EditorMotoristasPage />} />
               <Route path="mais/:modulo" element={<ModuloPage />} />

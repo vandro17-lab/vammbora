@@ -38,8 +38,9 @@ SQL -c "create extension if not exists pgcrypto" -f "$RAIZ/tests/local/00_stubs_
 # quem consulta, por isso a leitura anônima depende desse privilégio.)
 SQL -c "alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
         alter default privileges in schema public grant execute on functions to anon, authenticated, service_role;"
+# Só as migrações ANTERIORES à correção (as posteriores dependem dela).
 for f in "$RAIZ"/migrations/*.sql; do
-  [ "$f" = "$CORRECAO" ] && continue
+  [[ "$(basename "$f")" < "$(basename "$CORRECAO")" ]] || continue
   echo "· $(basename "$f")"; SQL -f "$f" >/dev/null
 done
 SQL -c "insert into public.cities(id,name,uf) values ('aracatuba-sp','Araçatuba','SP') on conflict do nothing;
@@ -64,6 +65,13 @@ done
 echo "· CREATE OR REPLACE VIEW mantém o bloqueio"
 DEF="$(SQL -At -c "select pg_get_viewdef('public.public_listings'::regclass)")"
 SQL -c "create or replace view public.public_listings as $DEF" >/dev/null
+SQL -f "$TESTE" >/dev/null
+
+echo "· migrações POSTERIORES à correção mantêm a vitrine somente leitura"
+for f in "$RAIZ"/migrations/*.sql; do
+  [[ "$(basename "$f")" > "$(basename "$CORRECAO")" ]] || continue
+  echo "  · $(basename "$f")"; SQL -1 -f "$f" >/dev/null
+done
 SQL -f "$TESTE" >/dev/null
 
 echo "OK — vitrine pública somente leitura; leitura preservada."

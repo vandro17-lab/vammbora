@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 // Ícones premium (duotone) para o hub — Phosphor:
 import {
   SquaresFour, Van, CalendarBlank, Wrench, GasPump, ChartBar, FileText as FileDoc,
-  Headset, GearSix, Crown, Gift, CaretRight, SealCheck, Percent,
+  Headset, GearSix, Crown, Gift, CaretRight, Percent,
   PencilSimpleLine, ListBullets, Bell, UserCircle,
 } from '@phosphor-icons/react';
 // Ícones das telas de detalhe (ModuloPage) — lucide (mantidos):
@@ -72,14 +72,14 @@ export function MaisPage() {
       />
 
       <div className="space-y-3 px-4 pt-4">
-        {/* Cartão do motorista */}
-        <button onClick={() => navigate('/app/van')} className="w-full text-left">
+        {/* Cartão do motorista → perfil profissional (sem selo: o VanBora não verifica documentos) */}
+        <button onClick={() => navigate('/app/perfil')} className="w-full text-left">
           <Card className="vm-press flex items-center gap-3 p-3.5">
             <Avatar nome={dados.demo ? MOTORISTA_DEMO.nome : nome} className="h-12 w-12 text-base" />
             <div className="flex-1">
               <p className="font-display text-[17px] font-bold text-navy-900">{nome}</p>
-              <p className="inline-flex items-center gap-1 text-xs font-semibold text-mint-700">
-                <SealCheck size={15} weight="fill" /> Motorista verificado
+              <p className="inline-flex items-center gap-1 text-sm font-semibold text-mint-700">
+                <UserCircle size={16} weight="fill" /> Meu perfil profissional
               </p>
             </div>
             <CaretRight size={18} weight="bold" className="text-navy-300" />

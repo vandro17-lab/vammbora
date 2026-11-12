@@ -34,6 +34,7 @@ aplicada.
 | `20260104000016_abertura_escola.sql` | — | objetos presentes, **sem registro** |
 | `20260104000017_interesse_com_contexto.sql` | — | objetos presentes, **sem registro** |
 | `20261112194000_bloquear_escrita_public_listings.sql` | `20261112194000` `bloquear_escrita_public_listings` | aplicada e registrada — **mesma versão e mesmo conteúdo** (MD5 `64347e08312cd74269da04dba734dd57`) |
+| `20261112220000_perfil_motorista_real.sql` | — | **preparada, NÃO aplicada** (Etapa 2C). Ao aplicar, renomear o arquivo para a versão registrada |
 
 Observações:
 - Há **dois arquivos com o número `000009`**.
