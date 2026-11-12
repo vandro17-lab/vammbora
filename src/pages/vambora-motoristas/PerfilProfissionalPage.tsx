@@ -1,17 +1,17 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Check, Circle, Loader2, MapPin, MessageCircle, Pencil, Eye, EyeOff, UserRound, ExternalLink, Info } from 'lucide-react';
+import { Check, Circle, Loader2, MapPin, MessageCircle, Pencil, Eye, EyeOff, UserRound, ExternalLink, Info, Route as RouteIcon, Lock } from 'lucide-react';
 import { Avatar } from '@/components/brand/Avatar';
 import { VMShell } from '@/components/vm/VMShell';
 import { Card, SubHeader, AvisoErro, EstadoVazio } from '@/components/vm/ui';
 import { useMeuPerfil } from '@/lib/vm/useMeuPerfil';
-import { salvarMeuPerfil, publicarMeuPerfil } from '@/data/perfil-motorista';
+import { salvarMeuPerfil, publicarMeuPerfil, definirContatoWhatsapp } from '@/data/perfil-motorista';
 import { useAuth } from '@/lib/auth';
 import { CIDADES, CIDADE_PADRAO } from '@/data/cidades';
 import {
   ETAPAS_PERFIL, EXEMPLO_APRESENTACAO, APRESENTACAO_MAX, NOME_MAX,
   validarEtapa, primeiraEtapaComProblema, rascunhoInicial, mascararWhatsapp,
-  itensDePublicacao, textoDaSituacao, type EtapaPerfil, type RascunhoPerfil,
+  itensDePublicacao, textoDaSituacao, textoDasRotas, type EtapaPerfil, type RascunhoPerfil,
 } from '@/lib/perfil-motorista';
 import { cn } from '@/lib/utils';
 
@@ -27,6 +27,21 @@ export function PerfilProfissionalPage() {
   const [publicando, setPublicando] = useState(false);
   const [erroPub, setErroPub] = useState<string | null>(null);
 
+  const [mudandoContato, setMudandoContato] = useState(false);
+  async function alternarContato() {
+    if (!perfil) return;
+    setErroPub(null);
+    setMudandoContato(true);
+    try {
+      await definirContatoWhatsapp(!perfil.contatoWhatsappAtivo);
+      recarregar();
+    } catch (e) {
+      setErroPub((e as Error).message);
+    } finally {
+      setMudandoContato(false);
+    }
+  }
+
   async function alternarPublicacao() {
     if (!perfil) return;
     setErroPub(null);
@@ -41,7 +56,7 @@ export function PerfilProfissionalPage() {
     }
   }
 
-  const situacao = perfil ?? { temPerfil: false, anuncioAtivo: false, rotaConcluidaComVan: false, suspenso: false, visivel: false };
+  const situacao = perfil ?? { temPerfil: false, anuncioAtivo: false, rotasDisponiveis: 0, suspenso: false, visivel: false };
 
   return (
     <VMShell>
@@ -75,7 +90,7 @@ export function PerfilProfissionalPage() {
             </Card>
 
             <Card>
-              <p className="font-display font-bold text-navy-900">Para aparecer às famílias</p>
+              <p className="font-display font-bold text-navy-900">Para as famílias verem seu perfil</p>
               <ul className="mt-2 space-y-2">
                 {itensDePublicacao(situacao).map((i) => (
                   <li key={i.id} className="flex items-center gap-2.5 text-[15px]">
@@ -83,7 +98,6 @@ export function PerfilProfissionalPage() {
                       ? <span className="grid h-6 w-6 place-items-center rounded-full bg-mint-500 text-white"><Check className="h-4 w-4" /></span>
                       : <Circle className="h-6 w-6 text-navy-300" />}
                     <span className={i.feito ? 'text-navy-800' : 'text-navy-600'}>{i.texto}</span>
-                    {i.id === 'rota' && !i.feito && <Link to="/app/rotas" className="ml-auto text-sm font-semibold text-mint-700 underline">Minhas rotas</Link>}
                   </li>
                 ))}
               </ul>
@@ -93,6 +107,18 @@ export function PerfilProfissionalPage() {
               {perfil.local && <p className="mt-2 text-xs text-navy-500">Modo demonstração: o perfil fica só neste aparelho e não aparece na vitrine.</p>}
             </Card>
 
+            <Card className="flex items-start gap-3">
+              <RouteIcon className="mt-0.5 h-5 w-5 shrink-0 text-navy-400" />
+              <div className="min-w-0 flex-1">
+                <p className="text-[15px] text-navy-700" data-testid="rotas-oferecidas">{textoDasRotas(perfil.rotasDisponiveis)}</p>
+                <Link to="/app/rotas" className="mt-1 inline-block text-sm font-semibold text-mint-700 underline">Minhas rotas</Link>
+              </div>
+            </Card>
+
+            <Card>
+              <ContatoWhatsapp ativo={perfil.contatoWhatsappAtivo} ocupado={mudandoContato} onAlternar={alternarContato} />
+            </Card>
+
             {erroPub && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm font-medium text-red-700">{erroPub}</p>}
 
             {!perfil.suspenso && (
@@ -100,7 +126,7 @@ export function PerfilProfissionalPage() {
                 className={cn('flex h-14 w-full items-center justify-center gap-2 rounded-full text-base font-bold transition active:scale-[0.98] disabled:opacity-60',
                   perfil.anuncioAtivo ? 'bg-white text-navy-800 ring-1 ring-navy-200' : 'bg-mint-500 text-white shadow-float')}>
                 {publicando ? <Loader2 className="h-5 w-5 animate-spin" /> : perfil.anuncioAtivo ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                {perfil.anuncioAtivo ? 'Despublicar perfil' : 'Publicar perfil'}
+                {perfil.anuncioAtivo ? 'Ocultar perfil' : 'Publicar perfil'}
               </button>
             )}
             <div className="grid grid-cols-2 gap-2.5">
@@ -109,11 +135,11 @@ export function PerfilProfissionalPage() {
               </Link>
               {perfil.visivel ? (
                 <Link to={`/van/${perfil.slug}`} className="flex h-12 items-center justify-center gap-2 rounded-full bg-white text-[15px] font-semibold text-navy-800 ring-1 ring-navy-200">
-                  <ExternalLink className="h-4 w-4" /> Ver como as famílias
+                  <ExternalLink className="h-4 w-4" /> Ver perfil público
                 </Link>
               ) : (
                 <span className="flex h-12 items-center justify-center gap-2 rounded-full bg-navy-50 text-[15px] font-semibold text-navy-400" aria-disabled="true">
-                  <ExternalLink className="h-4 w-4" /> Ainda não visível
+                  <ExternalLink className="h-4 w-4" /> Perfil não visível
                 </span>
               )}
             </div>
@@ -129,7 +155,7 @@ export function PerfilProfissionalPage() {
 }
 
 /* ================== Criar / editar perfil — formulário em etapas ================== */
-const K_RASCUNHO = 'vanbora.perfil.rascunho';
+const K_RASCUNHO = 'vanbora.perfil.rascunho.v2';
 function lerRascunho(chave: string): RascunhoPerfil | null {
   try {
     const raw = sessionStorage.getItem(K_RASCUNHO);
@@ -166,12 +192,12 @@ export function EditarPerfilProfissionalPage() {
 
   const indice = ETAPAS_PERFIL.findIndex((e) => e.id === etapa);
   const ultima = indice === ETAPAS_PERFIL.length - 1;
-  const mudar = (m: Partial<RascunhoPerfil>) => setR((atual) => {
+  const mudar = (m: Partial<RascunhoPerfil>) => { setErro(null); setR((atual) => {
     if (!atual) return atual;
     const novo = { ...atual, ...m };
     gravarRascunho(chave, novo);
     return novo;
-  });
+  }); };
   const irPara = (e: EtapaPerfil) => { setErro(null); setEtapa(e); };
   const voltar = () => (indice > 0 ? irPara(ETAPAS_PERFIL[indice - 1].id) : navigate('/app/perfil'));
 
@@ -239,27 +265,18 @@ export function EditarPerfilProfissionalPage() {
                   <textarea id="perfil-apresentacao" className="field-input min-h-[9rem] text-base" rows={6} maxLength={APRESENTACAO_MAX}
                     placeholder={EXEMPLO_APRESENTACAO} value={r.apresentacao} onChange={(e) => mudar({ apresentacao: e.target.value })} />
                   <p className="mt-1 text-right text-xs text-navy-500">{r.apresentacao.length}/{APRESENTACAO_MAX}</p>
-                  <p className="text-xs text-navy-500">O texto em cinza é só um exemplo: ele não é salvo.</p>
+                  <p className="text-xs text-navy-500">O texto em cinza é só um exemplo e não será salvo.</p>
                 </Etapa>
               )}
 
               {etapa === 'contato' && (
-                <Etapa tituloRef={titulo} titulo="As famílias podem chamar você no WhatsApp?" texto="Você escolhe. Dá para mudar quando quiser.">
-                  <div className="grid grid-cols-2 gap-2.5" role="radiogroup" aria-label="Aceitar contato pelo WhatsApp">
-                    <Opcao ativa={r.aceitaWhatsapp} onClick={() => mudar({ aceitaWhatsapp: true })}>Sim, aceito</Opcao>
-                    <Opcao ativa={!r.aceitaWhatsapp} onClick={() => mudar({ aceitaWhatsapp: false })}>Agora não</Opcao>
+                <Etapa tituloRef={titulo} titulo="Seu WhatsApp" texto="Obrigatório. Informe o número com DDD.">
+                  <label className="field-label" htmlFor="perfil-whatsapp">WhatsApp</label>
+                  <input id="perfil-whatsapp" className="field-input text-base" inputMode="tel" autoComplete="tel-national" required
+                    placeholder="(18) 99999-0000" value={r.whatsapp} onChange={(e) => mudar({ whatsapp: mascararWhatsapp(e.target.value) })} />
+                  <div className="mt-4 border-t border-navy-100 pt-3">
+                    <ContatoWhatsapp ativo={r.contatoDireto} onAlternar={() => mudar({ contatoDireto: !r.contatoDireto })} />
                   </div>
-                  {r.aceitaWhatsapp && (
-                    <div className="mt-4">
-                      <label className="field-label" htmlFor="perfil-whatsapp">WhatsApp profissional</label>
-                      <input id="perfil-whatsapp" className="field-input text-base" inputMode="tel" autoComplete="tel-national"
-                        placeholder="(18) 99999-0000" value={r.whatsapp} onChange={(e) => mudar({ whatsapp: mascararWhatsapp(e.target.value) })} />
-                    </div>
-                  )}
-                  <p className="mt-3 inline-flex gap-1.5 rounded-xl bg-navy-50 p-3 text-sm text-navy-700">
-                    <MessageCircle className="mt-0.5 h-4 w-4 shrink-0" />
-                    O número não fica escrito na vitrine. Ele só é usado quando uma família toca em “Conversar no WhatsApp” no seu perfil publicado.
-                  </p>
                 </Etapa>
               )}
 
@@ -269,7 +286,7 @@ export function EditarPerfilProfissionalPage() {
                     <LinhaRevisao rotulo="Nome" valor={r.nome.trim() || '—'} onAlterar={() => irPara('nome')} />
                     <LinhaRevisao rotulo="Cidade" valor={nomeDaCidade(r.cidadeId)} onAlterar={() => irPara('nome')} />
                     <LinhaRevisao rotulo="Apresentação" valor={r.apresentacao.trim() || 'Sem apresentação'} onAlterar={() => irPara('apresentacao')} />
-                    <LinhaRevisao rotulo="WhatsApp" valor={r.aceitaWhatsapp ? r.whatsapp || '—' : 'Não aceito contato agora'} onAlterar={() => irPara('contato')} />
+                    <LinhaRevisao rotulo="WhatsApp" valor={`${r.whatsapp || '—'} · contatos ${r.contatoDireto ? 'ativados' : 'desativados'}`} onAlterar={() => irPara('contato')} />
                   </dl>
                 </Etapa>
               )}
@@ -307,22 +324,30 @@ function Etapa({ titulo, texto, tituloRef, children }: { titulo: string; texto: 
   );
 }
 
-function Opcao({ ativa, onClick, children }: { ativa: boolean; onClick: () => void; children: ReactNode }) {
+/** Permissão de contato pelo WhatsApp: opcional, começa desativada, muda quando quiser. */
+function ContatoWhatsapp({ ativo, ocupado = false, onAlternar }: { ativo: boolean; ocupado?: boolean; onAlternar: () => void }) {
   return (
-    <button type="button" role="radio" aria-checked={ativa} onClick={onClick}
-      className={cn('flex h-14 items-center justify-center gap-2 rounded-2xl text-base font-semibold ring-1 transition active:scale-[0.98]',
-        ativa ? 'bg-mint-500 text-white ring-mint-500' : 'bg-white text-navy-700 ring-navy-200')}>
-      {ativa && <Check className="h-5 w-5" />} {children}
-    </button>
+    <section aria-labelledby="titulo-contato-whatsapp">
+      <p id="titulo-contato-whatsapp" className="font-display text-[17px] font-bold text-navy-900">Permitir contato pelo WhatsApp</p>
+      <p className="mt-0.5 text-[15px] text-navy-600">As famílias poderão entrar em contato com você pelo WhatsApp. Você pode ativar essa opção quando quiser.</p>
+      <button type="button" role="switch" aria-checked={ativo} onClick={onAlternar} disabled={ocupado}
+        className="mt-2.5 flex min-h-[3.25rem] w-full items-center justify-between gap-3 rounded-2xl bg-white px-4 text-left text-base font-semibold text-navy-900 ring-1 ring-navy-200 active:scale-[0.99] disabled:opacity-60">
+        <span className="inline-flex items-center gap-2"><MessageCircle className="h-5 w-5 text-navy-500" /> Receber contatos pelo WhatsApp</span>
+        <span aria-hidden="true" className={cn('relative h-7 w-12 shrink-0 rounded-full transition', ativo ? 'bg-mint-500' : 'bg-navy-200')}>
+          <span className={cn('absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all', ativo ? 'left-[1.375rem]' : 'left-0.5')} />
+        </span>
+      </button>
+      <p className="mt-2 inline-flex items-center gap-1.5 text-sm text-navy-600"><Lock className="h-4 w-4 shrink-0" /> Seu número não será exibido publicamente.</p>
+    </section>
   );
 }
 
 function LinhaRevisao({ rotulo, valor, onAlterar }: { rotulo: string; valor: string; onAlterar: () => void }) {
   return (
-    <div className="flex items-start gap-3 py-2.5">
+    <div className="flex items-start gap-3 py-2">
       <div className="min-w-0 flex-1">
         <dt className="text-xs font-semibold uppercase tracking-wide text-navy-500">{rotulo}</dt>
-        <dd className="mt-0.5 line-clamp-3 break-words text-[15px] text-navy-900">{valor}</dd>
+        <dd className="mt-0.5 line-clamp-2 break-words text-[15px] text-navy-900">{valor}</dd>
       </div>
       <button type="button" onClick={onAlterar} className="shrink-0 rounded-full px-3 py-2 text-sm font-semibold text-mint-700 ring-1 ring-mint-200">Alterar</button>
     </div>

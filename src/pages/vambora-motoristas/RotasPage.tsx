@@ -11,7 +11,7 @@ import { Card, SubHeader, DemoChip, EstadoVazio, AvisoErro } from '@/components/
 import { MapaInterativoRota } from '@/components/motorista/MapaInterativoRota';
 import { SugestaoRotaMelhor } from '@/components/motorista/SugestaoRotaMelhor';
 import { useDadosMotorista } from '@/lib/vm/useDadosMotorista';
-import { publicarRota, duplicarRota } from '@/data/motorista-store';
+import { pausarOfertaRota, duplicarRota } from '@/data/motorista-store';
 import { PendenciasRevisao } from '@/components/motorista/CadastroRotaEtapa1';
 import { pendenciasDeRevisao, totalDePendencias } from '@/lib/cadastro-rota';
 import { useVitrine } from '@/data/VitrineProvider';
@@ -176,16 +176,16 @@ export function RotaDetalhePage() {
     }
   }
 
-  async function alternarPublicacao() {
+  /** Pausa/retoma a oferta: não apaga a rota, não vira rascunho, não mexe nos passageiros. */
+  async function alternarOferta() {
     if (!rota) return;
     setPublicando(true);
     setErroPub(null);
     try {
-      await publicarRota(rota.id, !rota.isPublished);
+      await pausarOfertaRota(rota.id, !rota.ofertaPausada);
       recarregar();
-    } catch {
-      // Ex.: coluna is_published ainda não criada no banco (migração pendente).
-      setErroPub('Não foi possível publicar agora. Se o problema persistir, a publicação ainda está sendo liberada.');
+    } catch (e) {
+      setErroPub((e as Error).message);
     } finally {
       setPublicando(false);
     }
@@ -269,24 +269,28 @@ export function RotaDetalhePage() {
           </Card>
         )}
 
-        {/* Publicar na busca pública (ação explícita do motorista) */}
+        {/* Oferta na busca das famílias: automática quando concluída; o motorista pode pausar */}
         <Card className="p-4">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <p className="font-display font-bold text-navy-900">Busca pública</p>
-              <p className="mt-0.5 text-xs leading-snug text-navy-500">
-                {rota.isPublished
-                  ? 'As famílias podem encontrar esta rota e ver o horário estimado de passagem.'
-                  : 'Concluir não publica. Publique para as famílias encontrarem esta rota na busca.'}
+              <p className="font-display font-bold text-navy-900">Busca das famílias</p>
+              <p className="mt-0.5 text-sm leading-snug text-navy-600">
+                {rota.status !== 'concluida'
+                  ? 'Esta rota é um rascunho. Conclua a rota para ela aparecer na busca.'
+                  : rota.ofertaPausada
+                    ? 'Oferta pausada. A rota não aparece na busca, mas nada foi apagado.'
+                    : 'Disponível na busca. Só aparece para famílias que cabem no trajeto, no horário e nas vagas.'}
               </p>
             </div>
-            <button onClick={alternarPublicacao} disabled={publicando} aria-pressed={!!rota.isPublished}
-              className={cn('shrink-0 rounded-full px-4 py-2 text-sm font-bold transition active:scale-95 disabled:opacity-60',
-                rota.isPublished ? 'bg-mint-500 text-white shadow-glow' : 'bg-navy-100 text-navy-700')}>
-              {publicando ? '…' : rota.isPublished ? 'Publicada ✓' : 'Publicar'}
-            </button>
+            {rota.status === 'concluida' && (
+              <button type="button" onClick={alternarOferta} disabled={publicando} aria-pressed={!rota.ofertaPausada}
+                className={cn('min-h-[2.75rem] shrink-0 rounded-full px-4 text-sm font-bold transition active:scale-95 disabled:opacity-60',
+                  rota.ofertaPausada ? 'bg-mint-500 text-white shadow-glow' : 'bg-navy-100 text-navy-800')}>
+                {publicando ? '…' : rota.ofertaPausada ? 'Retomar oferta' : 'Pausar oferta'}
+              </button>
+            )}
           </div>
-          {erroPub && <p className="mt-2 rounded-xl bg-amber-50 p-2.5 text-xs text-amber-800">{erroPub}</p>}
+          {erroPub && <p role="alert" className="mt-2 rounded-xl bg-amber-50 p-2.5 text-sm text-amber-800">{erroPub}</p>}
         </Card>
 
         {/* Mapa da sua rota (card titulado) */}

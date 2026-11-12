@@ -2,7 +2,7 @@
  * PERFIL PROFISSIONAL DO MOTORISTA — regras puras (sem banco, sem tela).
  *
  * As mesmas regras são conferidas de novo no servidor pela RPC
- * `salvar_perfil_motorista` (migração 20261112220000): aqui servem para
+ * `salvar_perfil_motorista` (migração 20261112205224): aqui servem para
  * avisar cedo, em linguagem simples, e para montar o rascunho do formulário.
  */
 
@@ -28,10 +28,11 @@ export interface RascunhoPerfil {
   nome: string;
   cidadeId: string;
   apresentacao: string;
-  /** Famílias podem tocar em "Conversar no WhatsApp" no perfil publicado. */
-  aceitaWhatsapp: boolean;
-  /** Como o motorista digitou (com ou sem máscara). */
+  /** WhatsApp OBRIGATÓRIO, privado (como o motorista digitou, com ou sem máscara). */
   whatsapp: string;
+  /** Escolha separada: famílias podem tocar em "Conversar no WhatsApp" no
+   *  perfil publicado. Desligada por padrão. */
+  contatoDireto: boolean;
 }
 
 export const apenasDigitos = (s: string): string => (s ?? '').replace(/\D/g, '');
@@ -68,8 +69,9 @@ export function validarEtapa(etapa: EtapaPerfil, r: RascunhoPerfil): string | nu
   if (etapa === 'apresentacao' && r.apresentacao.trim().length > APRESENTACAO_MAX) {
     return `A apresentação pode ter no máximo ${APRESENTACAO_MAX} caracteres.`;
   }
-  if (etapa === 'contato' && r.aceitaWhatsapp && !normalizarWhatsapp(r.whatsapp)) {
-    return 'Confira o WhatsApp: DDD e número de celular, como (18) 99999-0000.';
+  if (etapa === 'contato') {
+    if (!apenasDigitos(r.whatsapp)) return 'Informe o seu WhatsApp (com DDD).';
+    if (!normalizarWhatsapp(r.whatsapp)) return 'Confira o WhatsApp: DDD e número de celular, como (18) 99999-0000.';
   }
   return null;
 }
@@ -85,7 +87,7 @@ export function primeiraEtapaComProblema(r: RascunhoPerfil): { etapa: EtapaPerfi
 
 /** Rascunho inicial: perfil salvo, ou dados da conta para começar. */
 export function rascunhoInicial(
-  perfil: { nome: string; cidadeId: string; descricao: string | null; whatsappContato: string | null } | null,
+  perfil: { nome: string; cidadeId: string; descricao: string | null; whatsapp: string | null; contatoWhatsappAtivo: boolean } | null,
   conta: { nome?: string | null; cidadeId: string },
 ): RascunhoPerfil {
   if (perfil) {
@@ -93,42 +95,48 @@ export function rascunhoInicial(
       nome: perfil.nome,
       cidadeId: perfil.cidadeId,
       apresentacao: perfil.descricao ?? '',
-      aceitaWhatsapp: !!perfil.whatsappContato,
-      whatsapp: perfil.whatsappContato ? mascararWhatsapp(perfil.whatsappContato) : '',
+      whatsapp: perfil.whatsapp ? mascararWhatsapp(perfil.whatsapp) : '',
+      contatoDireto: !!perfil.contatoWhatsappAtivo,
     };
   }
-  return { nome: (conta.nome ?? '').trim().slice(0, NOME_MAX), cidadeId: conta.cidadeId, apresentacao: '', aceitaWhatsapp: false, whatsapp: '' };
+  return { nome: (conta.nome ?? '').trim().slice(0, NOME_MAX), cidadeId: conta.cidadeId, apresentacao: '', whatsapp: '', contatoDireto: false };
 }
 
 /** Situação do perfil diante da vitrine (vinda do servidor). */
 export interface SituacaoPublicacao {
   temPerfil: boolean;
   anuncioAtivo: boolean;
-  rotaConcluidaComVan: boolean;
   suspenso: boolean;
   visivel: boolean;
+  /** Rotas concluídas, não pausadas, com van própria: as que a busca AVALIA.
+   *  Não são vagas: quem decide vaga e encaixe é o motor, a cada busca. */
+  rotasDisponiveis: number;
 }
 
-export interface ItemPublicacao { id: 'perfil' | 'rota' | 'publicado'; texto: string; feito: boolean }
+export interface ItemPublicacao { id: 'perfil' | 'publicado'; texto: string; feito: boolean }
 
 /**
- * O que é preciso para aparecer às famílias (mesma regra de
- * `motorista_elegivel` no servidor). Documentos NÃO são exigidos.
+ * O que é preciso para o PERFIL aparecer às famílias (mesma regra de
+ * `motorista_elegivel` no servidor). Documentos e rotas NÃO são exigidos.
  */
 export function itensDePublicacao(s: SituacaoPublicacao): ItemPublicacao[] {
   return [
     { id: 'perfil', texto: 'Perfil profissional preenchido', feito: s.temPerfil },
-    { id: 'rota', texto: 'Uma rota concluída com a sua van', feito: s.rotaConcluidaComVan },
-    { id: 'publicado', texto: 'Perfil publicado por você', feito: s.anuncioAtivo },
+    { id: 'publicado', texto: 'Perfil publicado', feito: s.anuncioAtivo },
   ];
 }
 
-/** Frase única e honesta sobre a visibilidade. */
+/** Frase única e honesta sobre a visibilidade do perfil. */
 export function textoDaSituacao(s: SituacaoPublicacao): string {
   if (!s.temPerfil) return 'Crie seu perfil profissional para poder aparecer às famílias.';
   if (s.suspenso) return 'Seu perfil está suspenso pela equipe VanBora e não aparece às famílias.';
   if (s.visivel) return 'Seu perfil está visível para as famílias.';
-  if (!s.rotaConcluidaComVan) return 'Seu perfil ainda não aparece: conclua uma rota com a sua van.';
-  if (!s.anuncioAtivo) return 'Seu perfil ainda não aparece: toque em Publicar quando quiser.';
+  if (!s.anuncioAtivo) return 'Seu perfil ainda não aparece. Toque em “Publicar perfil” quando quiser.';
   return 'Seu perfil ainda não aparece às famílias.';
+}
+
+/** Frase sobre as rotas oferecidas (sem inventar vagas). */
+export function textoDasRotas(n: number): string {
+  if (n <= 0) return 'No momento, nenhuma rota sua está disponível na busca. Conclua uma rota ou retome uma oferta pausada.';
+  return `${n === 1 ? '1 rota disponível' : `${n} rotas disponíveis`} na busca. Só aparece${n === 1 ? '' : 'm'} para famílias que cabem no trajeto, no horário e nas vagas.`;
 }

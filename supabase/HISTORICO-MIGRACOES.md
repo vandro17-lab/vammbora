@@ -9,7 +9,7 @@ catálogo e de `supabase_migrations.schema_migrations`.
 
 ## Situação
 
-O histórico de produção registra **8** migrações, com versões e nomes diferentes dos arquivos. Várias
+O histórico de produção registra **9** migrações, com versões e nomes diferentes dos arquivos. Várias
 migrações do repositório foram aplicadas **manualmente** (SQL Editor), sem registro, e uma nunca foi
 aplicada.
 
@@ -34,7 +34,7 @@ aplicada.
 | `20260104000016_abertura_escola.sql` | — | objetos presentes, **sem registro** |
 | `20260104000017_interesse_com_contexto.sql` | — | objetos presentes, **sem registro** |
 | `20261112194000_bloquear_escrita_public_listings.sql` | `20261112194000` `bloquear_escrita_public_listings` | aplicada e registrada — **mesma versão e mesmo conteúdo** (MD5 `64347e08312cd74269da04dba734dd57`) |
-| `20261112220000_perfil_motorista_real.sql` | — | **preparada, NÃO aplicada** (Etapa 2C). Ao aplicar, renomear o arquivo para a versão registrada |
+| `20261112205224_perfil_motorista_real.sql` | `20261112205224` `perfil_motorista_real` | aplicada e registrada em 12/11/2026 — **mesma versão e mesmo conteúdo** (MD5 `4e86823526289f0af9b713d8dc5ce476`). O cabeçalho do arquivo ainda diz "NÃO APLICADA" porque o conteúdo foi mantido idêntico ao registrado |
 
 Observações:
 - Há **dois arquivos com o número `000009`**.

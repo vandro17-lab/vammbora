@@ -119,9 +119,11 @@ function rotaDoConstrutor(sentido: Rota['sentido'] = 'ida'): Rota {
     ],
   };
 }
-/** Só o que importa comparar (sem carimbos de data e campos derivados). */
+/** Só o que importa comparar (sem carimbos de data e campos derivados).
+ *  `isPublished`/`ofertaPausada` vêm do banco e o salvamento NÃO os grava (a
+ *  pausa é preservada pela RPC: ver supabase/tests/perfil_motorista.sql, T7). */
 const essencial = (r: Rota) => ({
-  ...r, atualizadoEm: '', isPublished: undefined,
+  ...r, atualizadoEm: '', isPublished: undefined, ofertaPausada: undefined,
   paradas: r.paradas.map((p) => ({ id: p.id, ordem: p.ordem, tipo: p.tipo, rotulo: p.rotulo, lat: p.lat, lng: p.lng, destinoId: p.destinoId ?? null, tempo: p.tempoAteProximaMin ?? null, chegada: p.horarioChegadaMin ?? null })),
   passageiros: [...r.passageiros].sort((a, b) => a.identificacao.localeCompare(b.identificacao)).map((x) => ({ id: x.id, nome: x.identificacao, emb: x.embarqueParadaId, des: x.desembarqueParadaId, destino: x.destinoId ?? null, h: x.horarioHabitualMin ?? null, antes: x.ajusteAntesMin ?? null, depois: x.ajusteDepoisMin ?? null, atend: x.atendimentoMin ?? null })),
 });

@@ -60,7 +60,7 @@ const numero = (v: number | string | null | undefined): number | null => (v == n
 interface LinhaRota {
   id: string; name: string | null; owner_id: string; vehicle_id: string | null; direction: string; turno: string | null;
   monitor: boolean; monitor_ocupa_lugar: boolean; reserved_seats: number; last_dropoff_min: number | null; early_leave_limit_min?: number | null;
-  status: string; is_demo: boolean; is_published: boolean; price_month: number | null; price_type: string | null;
+  status: string; is_demo: boolean; is_published: boolean; oferta_pausada?: boolean | null; price_month: number | null; price_type: string | null;
   habitual_departure_min?: number | null; availability_reviewed?: boolean | null;
   route_stops: LinhaStop[]; route_passengers: LinhaPax[];
   route_school_availability?: { id: string; destination_id: string; days: string[] | null; gate_lat: number | null; gate_lng: number | null; arrival_deadline_min: number | null; release_time_min: number | null; group_service_min: number | string | null; opening_time_min?: number | null }[] | null;
@@ -186,11 +186,14 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     // §10: `limit` alto e explícito evita o truncamento silencioso do PostgREST
     // (default 1000 linhas) com ~300 rotas na demonstração.
     const sentidoPedido = pedido.sentido;
+    // Pausa da oferta (Etapa 2C): lida quando a coluna existir; rota pausada sai
+    // da lista ANTES do motor (só muda QUAIS rotas são avaliadas, não o cálculo).
+    let colunaPausa = ',oferta_pausada';
     const consultar = (colunasDaParada: string, extras = '') => {
       let consulta = db
         .from('routes')
         .select(
-          'id,name,owner_id,vehicle_id,direction,turno,monitor,monitor_ocupa_lugar,reserved_seats,last_dropoff_min,early_leave_limit_min,status,is_demo,is_published,price_month,price_type,' +
+          'id,name,owner_id,vehicle_id,direction,turno,monitor,monitor_ocupa_lugar,reserved_seats,last_dropoff_min,early_leave_limit_min,status,is_demo,is_published,price_month,price_type' + colunaPausa + ',' +
             `route_stops(${colunasDaParada}),` +
             'route_passengers(id,identificacao,board_stop_id,alight_stop_id,destination_id,horario_habitual_min,ajuste_antes_min,ajuste_depois_min,atendimento_min)' + extras,
         )
@@ -209,11 +212,13 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
       `,habitual_departure_min,availability_reviewed,route_school_availability(id,destination_id,days,gate_lat,gate_lng,${VISITA}${extra})`);
     // Abertura da escola (migração 0016): lida quando existir; senão, formatos anteriores.
     let { data: rotas, error: errR } = await etapa1(',opening_time_min');
+    if (colunaAusente(errR)) { colunaPausa = ''; ({ data: rotas, error: errR } = await etapa1(',opening_time_min')); }
     if (colunaAusente(errR)) ({ data: rotas, error: errR } = await etapa1(''));
     if (colunaAusente(errR)) ({ data: rotas, error: errR } = await consultar(PARADA_BASE));
     if (errR) return reply(res, 500, { erro: 'Falha ao consultar rotas.' });
 
-    const linhas = (rotas ?? []) as unknown as LinhaRota[];
+    // Rota com a oferta PAUSADA pelo motorista não é avaliada nem devolvida.
+    const linhas = ((rotas ?? []) as unknown as LinhaRota[]).filter((r) => r.oferta_pausada !== true);
     const semNada = { candidatas: 0, compativeis: 0, sobConfirmacao: 0, incompativeis: 0, dadosInsuficientes: 0, avaliacaoIncompleta: 0 };
     if (linhas.length === 0) return reply(res, 200, { resultados: [], totalRotasAvaliadas: 0, inconclusivas: 0, resumo: semNada, aguardando: 0, continuacao: null, semProvedor: false, reiniciada: !!body.continuacao });
 

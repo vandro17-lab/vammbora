@@ -24,6 +24,7 @@ import { locaisDeDestinos, type SugestaoEndereco } from '@/lib/geocode';
 import { capacidadeAlunos, picoOcupacao, podeFinalizar, validarRota } from '@/lib/ocupacao-rota';
 import { planejarRotaDoCadastro } from '@/lib/rota-para-motor';
 import { conferirRotaDoCadastro } from '@/lib/rota-para-encaixe';
+import { decidirSalvar, avisoRotaConcluidaSalva } from '@/lib/salvar-rota';
 import { USE_SUPABASE } from '@/lib/supabase';
 import { useAlturaVisivel } from '@/lib/useAlturaVisivel';
 import { cn, nomeDestinoParaExibicao } from '@/lib/utils';
@@ -94,6 +95,8 @@ export function ConstrutorRota({ voltarPara = '/painel/rotas' }: { voltarPara?: 
   const [salvando, setSalvando] = useState<null | Rota['status']>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
+  /** Rota concluída com problema estrutural: o motorista escolhe (nunca rebaixa sozinho). */
+  const [escolherSalvar, setEscolherSalvar] = useState<string[] | null>(null);
   const [listaGeral, setListaGeral] = useState<string[]>([]);
   const [noMapa, setNoMapa] = useState<PontoNoMapa | null>(null);
   const editando = !!id && id !== 'nova';
@@ -182,7 +185,15 @@ export function ConstrutorRota({ voltarPara = '/painel/rotas' }: { voltarPara?: 
     });
   }, []);
 
-  async function salvar(status: Rota['status']) {
+  /** Botão "Salvar" do topo: preserva a rota concluída quando os dados estruturais são válidos. */
+  function salvarTopo() {
+    const d = decidirSalvar(rota, veiculo);
+    if (d.tipo === 'escolher') { setErro(null); setEscolherSalvar(d.problemas); return; }
+    setEscolherSalvar(null);
+    void salvar(d.status, { permanecer: d.continuaConcluida });
+  }
+
+  async function salvar(status: Rota['status'], opcoes: { permanecer?: boolean } = {}) {
     // Concluir com uma escola sem alunos e sem decisão gravaria a visita "por acaso".
     if (status === 'concluida' && escolasSemAlunos(rota).some((p) => escolasADecidir.includes(p.id))) {
       setErro('Antes de concluir, diga o que fazer com a escola que ficou sem alunos (aviso acima).');
@@ -193,7 +204,11 @@ export function ConstrutorRota({ voltarPara = '/painel/rotas' }: { voltarPara?: 
       const nome = rota.nome.trim() || `Rota ${rota.sentido === 'ida' ? 'de ida' : 'de volta'}`;
       const salva = await salvarRota({ ...rota, nome, status });
       setRota(salva);
-      if (status === 'concluida') {
+      setEscolherSalvar(null);
+      if (status === 'concluida' && opcoes.permanecer) {
+        // Administração de passageiros numa rota já concluída: fica na tela.
+        setAviso(avisoRotaConcluidaSalva(salva));
+      } else if (status === 'concluida') {
         // Ida concluída: o app já oferece montar a volta a partir dela.
         navigate(salva.sentido === 'ida' && salva.passageiros.length > 0 ? `/app/rotas/${salva.id}/volta` : voltarPara);
       } else {
@@ -271,7 +286,7 @@ export function ConstrutorRota({ voltarPara = '/painel/rotas' }: { voltarPara?: 
     <div className="fixed inset-0 flex flex-col overflow-hidden bg-neutral-100" style={altura ? { height: altura } : undefined} data-testid="construtor-rota">
       <Topo onVoltar={voltar} titulo={editando ? 'Editar rota' : 'Nova rota'}
         acao={saida && (
-          <button type="button" onClick={() => salvar('rascunho')} disabled={salvando !== null} className="inline-flex h-10 items-center gap-1.5 rounded-full bg-white/10 px-3.5 text-sm font-bold text-white ring-1 ring-white/20 transition active:scale-95 disabled:opacity-60">
+          <button type="button" onClick={salvarTopo} disabled={salvando !== null} className="inline-flex h-10 items-center gap-1.5 rounded-full bg-white/10 px-3.5 text-sm font-bold text-white ring-1 ring-white/20 transition active:scale-95 disabled:opacity-60">
             {salvando === 'rascunho' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Salvar
           </button>
         )} />
@@ -301,6 +316,17 @@ export function ConstrutorRota({ voltarPara = '/painel/rotas' }: { voltarPara?: 
         {/* PAINEL — só o cadastro atual */}
         <section className="flex min-h-0 flex-1 flex-col rounded-t-3xl bg-white shadow-[0_-8px_24px_-12px_rgba(0,0,0,.25)] lg:max-w-md lg:rounded-none" aria-live="polite">
           {erro && <p role="alert" className="mx-4 mt-3 rounded-2xl bg-red-50 p-3 text-sm font-medium text-red-700">{erro}</p>}
+          {escolherSalvar && (
+            <div role="alertdialog" aria-label="A rota tem pendências" data-testid="salvar-com-pendencias" className="mx-4 mt-3 rounded-2xl bg-amber-50 p-3 text-sm text-amber-900 ring-1 ring-amber-200">
+              <p className="font-bold">Esta rota está concluída, mas agora tem pendências:</p>
+              <ul className="mt-1 list-disc space-y-0.5 pl-5">{escolherSalvar.map((t) => <li key={t}>{t}</li>)}</ul>
+              <p className="mt-1.5">Corrija para ela continuar na busca. Se salvar como rascunho, ela sai da busca até ser concluída de novo.</p>
+              <div className="mt-2 flex gap-2">
+                <button type="button" onClick={() => setEscolherSalvar(null)} className="min-h-[2.75rem] flex-1 rounded-xl bg-white px-3 text-sm font-extrabold ring-1 ring-amber-300">Corrigir</button>
+                <button type="button" onClick={() => salvar('rascunho')} disabled={salvando !== null} className="min-h-[2.75rem] flex-1 rounded-xl bg-amber-700 px-3 text-sm font-extrabold text-white disabled:opacity-60">Salvar como rascunho</button>
+              </div>
+            </div>
+          )}
           {escolasPendentes.map((p) => (
             <div key={p.id} role="alertdialog" aria-label="Escola sem alunos" data-testid="escola-sem-alunos" className="mx-4 mt-3 rounded-2xl bg-amber-50 p-3 ring-1 ring-amber-200">
               <p className="text-sm font-bold text-amber-900">{nomeEscola(p)} ficou sem alunos nesta rota.</p>

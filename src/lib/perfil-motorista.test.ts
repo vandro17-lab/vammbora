@@ -1,11 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
   normalizarWhatsapp, mascararWhatsapp, validarEtapa, primeiraEtapaComProblema,
-  rascunhoInicial, itensDePublicacao, textoDaSituacao, APRESENTACAO_MAX, type RascunhoPerfil,
+  rascunhoInicial, itensDePublicacao, textoDaSituacao, textoDasRotas, APRESENTACAO_MAX, type RascunhoPerfil,
 } from './perfil-motorista';
 
-const base: RascunhoPerfil = { nome: 'Tio João', cidadeId: 'aracatuba-sp', apresentacao: '', aceitaWhatsapp: false, whatsapp: '' };
-const situacao = { temPerfil: true, anuncioAtivo: false, rotaConcluidaComVan: false, suspenso: false, visivel: false };
+const base: RascunhoPerfil = { nome: 'Tio João', cidadeId: 'aracatuba-sp', apresentacao: '', whatsapp: '(18) 99999-0000', contatoDireto: false };
+const situacao = { temPerfil: true, anuncioAtivo: false, rotasDisponiveis: 0, suspenso: false, visivel: false };
 
 describe('WhatsApp do motorista', () => {
   it('normaliza celular com ou sem 55 e com máscara', () => {
@@ -39,41 +39,52 @@ describe('validação por etapa', () => {
     expect(validarEtapa('apresentacao', base)).toBeNull();
     expect(validarEtapa('apresentacao', { ...base, apresentacao: 'a'.repeat(APRESENTACAO_MAX + 1) })).toMatch(/no máximo/);
   });
-  it('WhatsApp só é exigido quando o motorista aceita contato', () => {
-    expect(validarEtapa('contato', { ...base, aceitaWhatsapp: false, whatsapp: 'lixo' })).toBeNull();
-    expect(validarEtapa('contato', { ...base, aceitaWhatsapp: true, whatsapp: '123' })).toMatch(/Confira o WhatsApp/);
-    expect(validarEtapa('contato', { ...base, aceitaWhatsapp: true, whatsapp: '(18) 99999-0000' })).toBeNull();
+  it('WhatsApp é OBRIGATÓRIO, com ou sem contato direto', () => {
+    expect(validarEtapa('contato', { ...base, whatsapp: '' })).toMatch(/Informe o seu WhatsApp/);
+    expect(validarEtapa('contato', { ...base, whatsapp: '', contatoDireto: true })).toMatch(/Informe o seu WhatsApp/);
+    expect(validarEtapa('contato', { ...base, whatsapp: '123' })).toMatch(/Confira o WhatsApp/);
+    expect(validarEtapa('contato', { ...base, contatoDireto: false })).toBeNull();
+    expect(validarEtapa('contato', { ...base, contatoDireto: true })).toBeNull();
   });
   it('a revisão aponta a primeira etapa com problema', () => {
-    expect(primeiraEtapaComProblema({ ...base, nome: '', aceitaWhatsapp: true, whatsapp: '1' })?.etapa).toBe('nome');
-    expect(primeiraEtapaComProblema({ ...base, aceitaWhatsapp: true, whatsapp: '1' })?.etapa).toBe('contato');
+    expect(primeiraEtapaComProblema({ ...base, nome: '', whatsapp: '1' })?.etapa).toBe('nome');
+    expect(primeiraEtapaComProblema({ ...base, whatsapp: '1' })?.etapa).toBe('contato');
     expect(primeiraEtapaComProblema(base)).toBeNull();
   });
 });
 
 describe('rascunho inicial', () => {
   it('perfil salvo é editado como está (WhatsApp mascarado)', () => {
-    const r = rascunhoInicial({ nome: 'Tia Ana', cidadeId: 'aracatuba-sp', descricao: 'Oi', whatsappContato: '5518999990000' }, { nome: 'Outro', cidadeId: 'x' });
-    expect(r).toEqual({ nome: 'Tia Ana', cidadeId: 'aracatuba-sp', apresentacao: 'Oi', aceitaWhatsapp: true, whatsapp: '(18) 99999-0000' });
+    const r = rascunhoInicial({ nome: 'Tia Ana', cidadeId: 'aracatuba-sp', descricao: 'Oi', whatsapp: '5518999990000', contatoWhatsappAtivo: true }, { nome: 'Outro', cidadeId: 'x' });
+    expect(r).toEqual({ nome: 'Tia Ana', cidadeId: 'aracatuba-sp', apresentacao: 'Oi', whatsapp: '(18) 99999-0000', contatoDireto: true });
   });
-  it('sem perfil começa com o nome da conta, sem WhatsApp e sem texto inventado', () => {
+  it('sem perfil começa com o nome da conta, sem WhatsApp inventado e contato direto DESLIGADO', () => {
     expect(rascunhoInicial(null, { nome: '  Maria Souza ', cidadeId: 'aracatuba-sp' }))
-      .toEqual({ nome: 'Maria Souza', cidadeId: 'aracatuba-sp', apresentacao: '', aceitaWhatsapp: false, whatsapp: '' });
+      .toEqual({ nome: 'Maria Souza', cidadeId: 'aracatuba-sp', apresentacao: '', whatsapp: '', contatoDireto: false });
     expect(rascunhoInicial(null, { cidadeId: 'aracatuba-sp' }).nome).toBe('');
   });
 });
 
-describe('publicação (mesma regra do servidor, sem documentos)', () => {
-  it('lista o que falta, sem exigir documento', () => {
+describe('publicação do perfil (mesma regra do servidor: sem documentos e sem exigir rota)', () => {
+  it('lista o que falta, sem exigir documento nem rota', () => {
     const itens = itensDePublicacao(situacao);
-    expect(itens.map((i) => i.id)).toEqual(['perfil', 'rota', 'publicado']);
-    expect(itens.map((i) => i.texto).join(' ')).not.toMatch(/document/i);
+    expect(itens.map((i) => i.id)).toEqual(['perfil', 'publicado']);
+    expect(itens.map((i) => i.texto).join(' ')).not.toMatch(/document|rota/i);
+  });
+  it('perfil publicado SEM rota disponível continua visível, com mensagem honesta sobre as rotas', () => {
+    expect(textoDaSituacao({ ...situacao, anuncioAtivo: true, visivel: true, rotasDisponiveis: 0 })).toMatch(/visível/);
+    expect(textoDasRotas(0)).toMatch(/nenhuma rota sua está disponível/);
+    expect(textoDasRotas(0)).not.toMatch(/\d+ vaga/);
+  });
+  it('rotas oferecidas não viram vagas inventadas', () => {
+    expect(textoDasRotas(1)).toMatch(/^1 rota disponível na busca/);
+    expect(textoDasRotas(3)).toMatch(/^3 rotas disponíveis na busca/);
+    expect(textoDasRotas(3)).toMatch(/cabem no trajeto, no horário e nas vagas/);
+    expect(textoDasRotas(3)).not.toMatch(/vagas? (disponíve|livre)/i);
   });
   it('frase honesta para cada situação', () => {
     expect(textoDaSituacao({ ...situacao, temPerfil: false })).toMatch(/Crie seu perfil/);
-    expect(textoDaSituacao(situacao)).toMatch(/conclua uma rota/);
-    expect(textoDaSituacao({ ...situacao, rotaConcluidaComVan: true })).toMatch(/Publicar/);
-    expect(textoDaSituacao({ ...situacao, rotaConcluidaComVan: true, anuncioAtivo: true, visivel: true })).toMatch(/visível/);
-    expect(textoDaSituacao({ ...situacao, suspenso: true, visivel: false })).toMatch(/suspenso/);
+    expect(textoDaSituacao(situacao)).toMatch(/Publicar perfil/);
+    expect(textoDaSituacao({ ...situacao, suspenso: true })).toMatch(/suspenso/);
   });
 });

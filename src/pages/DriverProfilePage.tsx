@@ -9,7 +9,6 @@ import {
   UserCheck,
   Accessibility,
   ShieldCheck,
-  ShieldAlert,
   Clock,
   Users,
   MapPin,
@@ -186,6 +185,13 @@ export function DriverProfilePage() {
               </p>
             )}
 
+            {!m.demo ? (
+              // Motorista REAL: vagas e horários dependem do endereço e da escola de
+              // cada família — quem calcula é a busca. Nada de vagas/janelas fictícias.
+              <p className="mt-5 border-t border-navy-100 pt-5 text-sm text-navy-600" data-testid="disponibilidade-real">
+                As vagas e os horários dependem do endereço e da escola de cada aluno. O motorista confirma o atendimento.
+              </p>
+            ) : (
             <dl className="mt-5 space-y-3 border-t border-navy-100 pt-5 text-sm">
               <div className="flex items-center justify-between">
                 <dt
@@ -213,7 +219,13 @@ export function DriverProfilePage() {
                 </dd>
               </div>
             </dl>
+            )}
 
+            {!m.demo && !m.contatoWhatsapp ? (
+              <p className="mt-5 rounded-xl bg-navy-50 p-3 text-center text-sm text-navy-600" data-testid="sem-contato-direto">
+                Este motorista não ativou o contato pelo WhatsApp.
+              </p>
+            ) : (
             <button
               type="button"
               onClick={abrirWhatsApp}
@@ -231,6 +243,7 @@ export function DriverProfilePage() {
                 </>
               )}
             </button>
+            )}
             {erroZap && (
               <p className="mt-2 rounded-xl bg-red-50 p-2 text-center text-xs text-red-700" role="alert">
                 Não foi possível abrir o contato agora. Tente novamente.
@@ -240,22 +253,14 @@ export function DriverProfilePage() {
               {m.demo ? 'Explore o perfil e conheça a proposta de atendimento.' : 'Você revisa a mensagem antes de enviar — nada é enviado automaticamente. A mensagem leva a escola, o trajeto e o horário que você buscou; falar com o motorista não reserva vaga.'}
             </p>
 
-            {/* Status de verificação — honesto */}
-            <div className="mt-5 flex items-start gap-2.5 rounded-xl border border-navy-100 p-3 text-sm">
-              {m.documentacaoVerificada ? (
-                <>
-                  <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-mint-600" />
-                  <span className="text-navy-700">Documentação verificada pela equipe.</span>
-                </>
-              ) : (
-                <>
-                  <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-amber-500" />
-                  <span className="text-navy-600">
-                    Verificação documental pendente. Confira os documentos antes de contratar.
-                  </span>
-                </>
-              )}
-            </div>
+            {/* Verificação: só aparece se existir uma verificação REAL registrada.
+                Sem ela, nada é dito (o VanBora não exige documentos). */}
+            {m.documentacaoVerificada && (
+              <div className="mt-5 flex items-start gap-2.5 rounded-xl border border-navy-100 p-3 text-sm">
+                <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-mint-600" />
+                <span className="text-navy-700">Documentação verificada pela equipe.</span>
+              </div>
+            )}
           </div>
 
         </aside>
@@ -263,9 +268,11 @@ export function DriverProfilePage() {
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-navy-100 bg-white/95 px-5 pb-[max(16px,env(safe-area-inset-bottom))] pt-4 backdrop-blur lg:hidden">
         <div className="mx-auto flex max-w-lg items-center justify-between gap-3">
           <div className="min-w-0"><p className="truncate text-sm font-semibold">{m.nome}</p><p className="text-xs text-navy-500">Converse sobre sua rota</p></div>
+          {(m.demo || m.contatoWhatsapp) && (
           <button type="button" onClick={abrirWhatsApp} disabled={abrindoZap || m.demo} className="btn btn-md btn-primary shrink-0">
             <MessageCircle className="h-4 w-4" />{m.demo ? 'Em breve' : abrindoZap ? 'Abrindo…' : 'Conversar'}
           </button>
+          )}
         </div>
       </div>
     </div>
